@@ -7,7 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/guiyumin/vget/internal/utils"
+	"github.com/guiyumin/vget/internal/i18n"
 )
 
 const asciiArt = `
@@ -58,25 +58,25 @@ func initialModel(cfg *Config) model {
 	return m
 }
 
-func (m *model) t() utils.Translations {
-	return utils.GetTranslations(m.config.Language)
+func (m *model) t() *i18n.Translations {
+	return i18n.GetTranslations(m.config.Language)
 }
 
 func (m *model) getStepTitle() string {
 	t := m.t()
 	switch m.currentStep {
 	case 0:
-		return t.Language
+		return t.Config.Language
 	case 1:
-		return t.Proxy
+		return t.Config.Proxy
 	case 2:
-		return t.OutputDir
+		return t.Config.OutputDir
 	case 3:
-		return t.Format
+		return t.Config.Format
 	case 4:
-		return t.Quality
+		return t.Config.Quality
 	case 5:
-		return t.Confirm
+		return t.Config.Confirm
 	}
 	return ""
 }
@@ -85,17 +85,17 @@ func (m *model) getStepDescription() string {
 	t := m.t()
 	switch m.currentStep {
 	case 0:
-		return t.LanguageDesc
+		return t.Config.LanguageDesc
 	case 1:
-		return t.ProxyDesc
+		return t.Config.ProxyDesc
 	case 2:
-		return t.OutputDirDesc
+		return t.Config.OutputDirDesc
 	case 3:
-		return t.FormatDesc
+		return t.Config.FormatDesc
 	case 4:
-		return t.QualityDesc
+		return t.Config.QualityDesc
 	case 5:
-		return t.ConfirmDesc
+		return t.Config.ConfirmDesc
 	}
 	return ""
 }
@@ -104,25 +104,21 @@ func (m *model) getOptions() []struct{ label, value string } {
 	t := m.t()
 	switch m.currentStep {
 	case 0:
-		return []struct{ label, value string }{
-			{"English", "en"},
-			{"中文", "zh"},
-			{"日本語", "ja"},
-			{"한국어", "ko"},
-			{"Español", "es"},
-			{"Français", "fr"},
-			{"Deutsch", "de"},
+		opts := make([]struct{ label, value string }, len(i18n.SupportedLanguages))
+		for i, lang := range i18n.SupportedLanguages {
+			opts[i] = struct{ label, value string }{lang.Name, lang.Code}
 		}
+		return opts
 	case 3:
 		return []struct{ label, value string }{
-			{"MP4 " + t.Recommended, "mp4"},
+			{"MP4 " + t.Config.Recommended, "mp4"},
 			{"WebM", "webm"},
 			{"MKV", "mkv"},
-			{t.BestAvailable, "best"},
+			{t.Config.BestAvailable, "best"},
 		}
 	case 4:
 		return []struct{ label, value string }{
-			{t.BestAvailable, "best"},
+			{t.Config.BestAvailable, "best"},
 			{"4K (2160p)", "2160p"},
 			{"1080p", "1080p"},
 			{"720p", "720p"},
@@ -130,8 +126,8 @@ func (m *model) getOptions() []struct{ label, value string } {
 		}
 	case 5:
 		return []struct{ label, value string }{
-			{t.YesSave, "yes"},
-			{t.NoCancel, "no"},
+			{t.Config.YesSave, "yes"},
+			{t.Config.NoCancel, "no"},
 		}
 	}
 	return nil
@@ -295,7 +291,7 @@ func (m model) View() string {
 	t := m.t()
 
 	// Progress indicator
-	progress := fmt.Sprintf(t.StepOf, m.currentStep+1, 6)
+	progress := fmt.Sprintf(t.Config.StepOf, m.currentStep+1, 6)
 	b.WriteString(stepStyle.Render(progress))
 	b.WriteString("\n\n")
 
@@ -341,7 +337,7 @@ func (m model) View() string {
 	// Help
 	b.WriteString("\n")
 	help := fmt.Sprintf("← %s • → %s • ↑↓ %s • enter %s • esc %s",
-		t.HelpBack, t.HelpNext, t.HelpSelect, t.HelpConfirm, t.HelpQuit)
+		t.Help.Back, t.Help.Next, t.Help.Select, t.Help.Confirm, t.Help.Quit)
 	b.WriteString(helpStyle.Render(help))
 
 	// Apply padding
@@ -361,7 +357,7 @@ func (m model) renderReview() string {
 
 	proxy := m.config.Proxy
 	if proxy == "" {
-		proxy = t.ProxyNone
+		proxy = t.Config.ProxyNone
 	}
 	outputDir := m.config.OutputDir
 	if outputDir == "" {
@@ -372,11 +368,11 @@ func (m model) renderReview() string {
 		label string
 		value string
 	}{
-		{t.ReviewLanguage, getLanguageName(m.config.Language)},
-		{t.ReviewProxy, proxy},
-		{t.ReviewOutputDir, outputDir},
-		{t.ReviewFormat, m.config.Format},
-		{t.ReviewQuality, m.config.Quality},
+		{t.ConfigReview.Language, getLanguageName(m.config.Language)},
+		{t.ConfigReview.Proxy, proxy},
+		{t.ConfigReview.OutputDir, outputDir},
+		{t.ConfigReview.Format, m.config.Format},
+		{t.ConfigReview.Quality, m.config.Quality},
 	}
 
 	for _, line := range lines {

@@ -1,0 +1,55 @@
+# English translations
+
+config:
+  step_of: "Step %d of %d"
+  language: "Language"
+  language_desc: "Preferred language for metadata"
+  proxy: "Proxy"
+  proxy_desc: "Leave empty for no proxy"
+  output_dir: "Output Directory"
+  output_dir_desc: "Where to save downloaded videos"
+  format: "Format"
+  format_desc: "Preferred video format"
+  quality: "Quality"
+  quality_desc: "Preferred video quality"
+  confirm: "Confirm"
+  confirm_desc: "Review and save configuration"
+  yes_save: "Yes, save"
+  no_cancel: "No, cancel"
+  proxy_none: "(none)"
+  best_available: "Best available"
+  recommended: "(recommended)"
+
+config_review:
+  language: "Language"
+  proxy: "Proxy"
+  output_dir: "Output Dir"
+  format: "Format"
+  quality: "Quality"
+
+help:
+  back: "back"
+  next: "next"
+  select: "select"
+  confirm: "confirm"
+  quit: "quit"
+
+terminal:
+  downloading: "Downloading"
+  extracting: "Extracting"
+  completed: "Completed"
+  failed: "Failed"
+  progress: "Progress"
+  speed: "Speed"
+  eta: "ETA"
+  file_saved: "File saved to"
+  no_formats: "No formats available"
+  select_format: "Select format"
+
+errors:
+  config_not_found: "Config file not found"
+  invalid_url: "Invalid URL"
+  network_error: "Network error"
+  extraction_failed: "Extraction failed"
+  download_failed: "Download failed"
+  no_extractor: "No extractor found for this URL"

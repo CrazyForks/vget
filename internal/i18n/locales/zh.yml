@@ -1,0 +1,55 @@
+# 中文翻译
+
+config:
+  step_of: "第 %d 步，共 %d 步"
+  language: "语言"
+  language_desc: "元数据的首选语言"
+  proxy: "代理"
+  proxy_desc: "留空表示不使用代理"
+  output_dir: "输出目录"
+  output_dir_desc: "视频保存位置"
+  format: "格式"
+  format_desc: "首选视频格式"
+  quality: "画质"
+  quality_desc: "首选视频画质"
+  confirm: "确认"
+  confirm_desc: "检查并保存配置"
+  yes_save: "是，保存"
+  no_cancel: "否，取消"
+  proxy_none: "（无）"
+  best_available: "最佳可用"
+  recommended: "（推荐）"
+
+config_review:
+  language: "语言"
+  proxy: "代理"
+  output_dir: "输出目录"
+  format: "格式"
+  quality: "画质"
+
+help:
+  back: "返回"
+  next: "下一步"
+  select: "选择"
+  confirm: "确认"
+  quit: "退出"
+
+terminal:
+  downloading: "下载中"
+  extracting: "解析中"
+  completed: "完成"
+  failed: "失败"
+  progress: "进度"
+  speed: "速度"
+  eta: "剩余时间"
+  file_saved: "文件已保存至"
+  no_formats: "没有可用格式"
+  select_format: "选择格式"
+
+errors:
+  config_not_found: "未找到配置文件"
+  invalid_url: "无效的URL"
+  network_error: "网络错误"
+  extraction_failed: "解析失败"
+  download_failed: "下载失败"
+  no_extractor: "没有找到适用于此URL的解析器"

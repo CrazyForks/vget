@@ -1,0 +1,55 @@
+# 한국어 번역
+
+config:
+  step_of: "%d단계 / %d단계"
+  language: "언어"
+  language_desc: "메타데이터 언어 설정"
+  proxy: "프록시"
+  proxy_desc: "프록시 없음은 비워두세요"
+  output_dir: "출력 디렉토리"
+  output_dir_desc: "동영상 저장 위치"
+  format: "형식"
+  format_desc: "선호하는 동영상 형식"
+  quality: "화질"
+  quality_desc: "선호하는 동영상 화질"
+  confirm: "확인"
+  confirm_desc: "설정을 검토하고 저장"
+  yes_save: "예, 저장"
+  no_cancel: "아니오, 취소"
+  proxy_none: "(없음)"
+  best_available: "최고 화질"
+  recommended: "(권장)"
+
+config_review:
+  language: "언어"
+  proxy: "프록시"
+  output_dir: "출력 경로"
+  format: "형식"
+  quality: "화질"
+
+help:
+  back: "뒤로"
+  next: "다음"
+  select: "선택"
+  confirm: "확인"
+  quit: "종료"
+
+terminal:
+  downloading: "다운로드 중"
+  extracting: "추출 중"
+  completed: "완료"
+  failed: "실패"
+  progress: "진행률"
+  speed: "속도"
+  eta: "남은 시간"
+  file_saved: "파일 저장됨"
+  no_formats: "사용 가능한 형식 없음"
+  select_format: "형식 선택"
+
+errors:
+  config_not_found: "설정 파일을 찾을 수 없습니다"
+  invalid_url: "잘못된 URL"
+  network_error: "네트워크 오류"
+  extraction_failed: "추출 실패"
+  download_failed: "다운로드 실패"
+  no_extractor: "이 URL에 대한 추출기를 찾을 수 없습니다"

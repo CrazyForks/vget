@@ -1,0 +1,55 @@
+# Traductions françaises
+
+config:
+  step_of: "Étape %d sur %d"
+  language: "Langue"
+  language_desc: "Langue préférée pour les métadonnées"
+  proxy: "Proxy"
+  proxy_desc: "Laisser vide pour aucun proxy"
+  output_dir: "Répertoire de sortie"
+  output_dir_desc: "Où enregistrer les vidéos"
+  format: "Format"
+  format_desc: "Format vidéo préféré"
+  quality: "Qualité"
+  quality_desc: "Qualité vidéo préférée"
+  confirm: "Confirmer"
+  confirm_desc: "Vérifier et sauvegarder"
+  yes_save: "Oui, sauvegarder"
+  no_cancel: "Non, annuler"
+  proxy_none: "(aucun)"
+  best_available: "Meilleure qualité"
+  recommended: "(recommandé)"
+
+config_review:
+  language: "Langue"
+  proxy: "Proxy"
+  output_dir: "Répertoire"
+  format: "Format"
+  quality: "Qualité"
+
+help:
+  back: "retour"
+  next: "suivant"
+  select: "sélectionner"
+  confirm: "confirmer"
+  quit: "quitter"
+
+terminal:
+  downloading: "Téléchargement"
+  extracting: "Extraction"
+  completed: "Terminé"
+  failed: "Échoué"
+  progress: "Progression"
+  speed: "Vitesse"
+  eta: "Temps restant"
+  file_saved: "Fichier enregistré dans"
+  no_formats: "Aucun format disponible"
+  select_format: "Sélectionner le format"
+
+errors:
+  config_not_found: "Fichier de configuration introuvable"
+  invalid_url: "URL invalide"
+  network_error: "Erreur réseau"
+  extraction_failed: "Échec de l'extraction"
+  download_failed: "Échec du téléchargement"
+  no_extractor: "Aucun extracteur trouvé pour cette URL"

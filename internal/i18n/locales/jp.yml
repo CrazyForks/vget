@@ -1,0 +1,55 @@
+# 日本語翻訳
+
+config:
+  step_of: "ステップ %d / %d"
+  language: "言語"
+  language_desc: "メタデータの言語設定"
+  proxy: "プロキシ"
+  proxy_desc: "空欄でプロキシなし"
+  output_dir: "出力ディレクトリ"
+  output_dir_desc: "動画の保存先"
+  format: "フォーマット"
+  format_desc: "動画フォーマットの設定"
+  quality: "画質"
+  quality_desc: "動画の画質設定"
+  confirm: "確認"
+  confirm_desc: "設定を確認して保存"
+  yes_save: "はい、保存する"
+  no_cancel: "いいえ、キャンセル"
+  proxy_none: "（なし）"
+  best_available: "最高画質"
+  recommended: "（推奨）"
+
+config_review:
+  language: "言語"
+  proxy: "プロキシ"
+  output_dir: "出力先"
+  format: "フォーマット"
+  quality: "画質"
+
+help:
+  back: "戻る"
+  next: "次へ"
+  select: "選択"
+  confirm: "確定"
+  quit: "終了"
+
+terminal:
+  downloading: "ダウンロード中"
+  extracting: "解析中"
+  completed: "完了"
+  failed: "失敗"
+  progress: "進捗"
+  speed: "速度"
+  eta: "残り時間"
+  file_saved: "保存先"
+  no_formats: "利用可能なフォーマットがありません"
+  select_format: "フォーマットを選択"
+
+errors:
+  config_not_found: "設定ファイルが見つかりません"
+  invalid_url: "無効なURL"
+  network_error: "ネットワークエラー"
+  extraction_failed: "解析に失敗しました"
+  download_failed: "ダウンロードに失敗しました"
+  no_extractor: "このURLに対応する解析器がありません"

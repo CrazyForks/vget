@@ -1,0 +1,55 @@
+# Traducciones en español
+
+config:
+  step_of: "Paso %d de %d"
+  language: "Idioma"
+  language_desc: "Idioma preferido para metadatos"
+  proxy: "Proxy"
+  proxy_desc: "Dejar vacío si no usa proxy"
+  output_dir: "Directorio de salida"
+  output_dir_desc: "Dónde guardar los videos"
+  format: "Formato"
+  format_desc: "Formato de video preferido"
+  quality: "Calidad"
+  quality_desc: "Calidad de video preferida"
+  confirm: "Confirmar"
+  confirm_desc: "Revisar y guardar configuración"
+  yes_save: "Sí, guardar"
+  no_cancel: "No, cancelar"
+  proxy_none: "(ninguno)"
+  best_available: "Mejor disponible"
+  recommended: "(recomendado)"
+
+config_review:
+  language: "Idioma"
+  proxy: "Proxy"
+  output_dir: "Directorio"
+  format: "Formato"
+  quality: "Calidad"
+
+help:
+  back: "atrás"
+  next: "siguiente"
+  select: "seleccionar"
+  confirm: "confirmar"
+  quit: "salir"
+
+terminal:
+  downloading: "Descargando"
+  extracting: "Extrayendo"
+  completed: "Completado"
+  failed: "Fallido"
+  progress: "Progreso"
+  speed: "Velocidad"
+  eta: "Tiempo restante"
+  file_saved: "Archivo guardado en"
+  no_formats: "No hay formatos disponibles"
+  select_format: "Seleccionar formato"
+
+errors:
+  config_not_found: "Archivo de configuración no encontrado"
+  invalid_url: "URL inválida"
+  network_error: "Error de red"
+  extraction_failed: "Extracción fallida"
+  download_failed: "Descarga fallida"
+  no_extractor: "No se encontró extractor para esta URL"
