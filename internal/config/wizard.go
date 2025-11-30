@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -21,14 +22,14 @@ const asciiArt = `
 
 var (
 	titleStyle       = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("86"))
-	stepStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	stepStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("248"))
 	selectedStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("86")).Bold(true)
 	unselectedStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	cursorStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("86"))
-	helpStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	helpStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	inputStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	inputCursorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("86")).Bold(true)
-	labelStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Width(14)
+	labelStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("248")).Width(14)
 	valueStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("86"))
 	containerStyle   = lipgloss.NewStyle().Padding(2, 4)
 )
@@ -89,7 +90,11 @@ func (m *model) getStepDescription() string {
 	case 1:
 		return t.Config.ProxyDesc
 	case 2:
-		return t.Config.OutputDirDesc
+		cwd, err := os.Getwd()
+		if err != nil {
+			cwd = "current directory"
+		}
+		return fmt.Sprintf("%s (. = %s)", t.Config.OutputDirDesc, cwd)
 	case 3:
 		return t.Config.FormatDesc
 	case 4:
@@ -142,6 +147,9 @@ func (m *model) getPlaceholder() string {
 	case 1:
 		return "http://127.0.0.1:7890"
 	case 2:
+		if cwd, err := os.Getwd(); err == nil {
+			return cwd
+		}
 		return "."
 	}
 	return ""
@@ -360,8 +368,12 @@ func (m model) renderReview() string {
 		proxy = t.Config.ProxyNone
 	}
 	outputDir := m.config.OutputDir
-	if outputDir == "" {
-		outputDir = "."
+	if outputDir == "" || outputDir == "." {
+		if cwd, err := os.Getwd(); err == nil {
+			outputDir = cwd
+		} else {
+			outputDir = "."
+		}
 	}
 
 	lines := []struct {
