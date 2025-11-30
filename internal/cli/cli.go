@@ -64,16 +64,11 @@ func Run(args []string) error {
 		return fmt.Errorf("%s: %s", t.Errors.NoExtractor, opts.URL)
 	}
 
-	fmt.Printf("%s: %s\n", t.Download.Extracting, opts.URL)
-
-	// Extract video info
-	info, err := ext.Extract(opts.URL)
+	// Extract video info with spinner
+	info, err := runExtractWithSpinner(ext, opts.URL, cfg.Language)
 	if err != nil {
-		return fmt.Errorf("%s: %w", t.Errors.ExtractionFailed, err)
+		return err
 	}
-
-	fmt.Printf("ID: %s\n", info.ID)
-	fmt.Printf("Formats: %d\n", len(info.Formats))
 
 	// Info only mode
 	if opts.Info {
@@ -89,7 +84,7 @@ func Run(args []string) error {
 		return errors.New(t.Download.NoFormats)
 	}
 
-	fmt.Printf("Format: %s (%s)\n", format.Quality, format.Ext)
+	fmt.Printf("  Format: %s (%s)\n", format.Quality, format.Ext)
 
 	// Determine output filename
 	output := opts.Output
