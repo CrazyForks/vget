@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/guiyumin/vget/internal/utils"
 )
 
 const asciiArt = `
@@ -27,117 +28,137 @@ var (
 	helpStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	inputStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	inputCursorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("86")).Bold(true)
-	reviewStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	labelStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Width(14)
 	valueStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("86"))
 	containerStyle   = lipgloss.NewStyle().Padding(2, 4)
 )
 
-type step struct {
-	title       string
-	description string
-	options     []option
-	isInput     bool
-	inputValue  *string
-	placeholder string
-}
-
-type option struct {
-	label string
-	value string
-}
-
 type model struct {
-	steps        []step
-	currentStep  int
-	cursor       int
-	config       *Config
-	confirmed    bool
-	cancelled    bool
-	inputMode    bool
-	inputBuffer  string
-	inputCursor  int
-	width        int
-	height       int
+	currentStep int
+	cursor      int
+	config      *Config
+	confirmed   bool
+	cancelled   bool
+	inputBuffer string
+	inputCursor int
+	width       int
+	height      int
 }
 
 func initialModel(cfg *Config) model {
-	steps := []step{
-		{
-			title:       "Language",
-			description: "Preferred language for metadata",
-			options: []option{
-				{"English", "en"},
-				{"中文", "zh"},
-				{"日本語", "ja"},
-				{"한국어", "ko"},
-				{"Español", "es"},
-				{"Français", "fr"},
-				{"Deutsch", "de"},
-			},
-		},
-		{
-			title:       "Proxy",
-			description: "Leave empty for no proxy",
-			isInput:     true,
-			inputValue:  &cfg.Proxy,
-			placeholder: "http://127.0.0.1:7890",
-		},
-		{
-			title:       "Output Directory",
-			description: "Where to save downloaded videos",
-			isInput:     true,
-			inputValue:  &cfg.OutputDir,
-			placeholder: ".",
-		},
-		{
-			title:       "Format",
-			description: "Preferred video format",
-			options: []option{
-				{"MP4 (recommended)", "mp4"},
-				{"WebM", "webm"},
-				{"MKV", "mkv"},
-				{"Best available", "best"},
-			},
-		},
-		{
-			title:       "Quality",
-			description: "Preferred video quality",
-			options: []option{
-				{"Best available", "best"},
-				{"4K (2160p)", "2160p"},
-				{"1080p", "1080p"},
-				{"720p", "720p"},
-				{"480p", "480p"},
-			},
-		},
-		{
-			title:       "Confirm",
-			description: "Review and save configuration",
-			options: []option{
-				{"Yes, save", "yes"},
-				{"No, cancel", "no"},
-			},
-		},
-	}
-
 	m := model{
-		steps:       steps,
 		currentStep: 0,
 		cursor:      0,
 		config:      cfg,
 	}
 
-	// Set initial cursor positions based on current config values
+	// Set initial cursor position for language
 	m.setCursorFromConfig()
 
 	return m
 }
 
+func (m *model) t() utils.Translations {
+	return utils.GetTranslations(m.config.Language)
+}
+
+func (m *model) getStepTitle() string {
+	t := m.t()
+	switch m.currentStep {
+	case 0:
+		return t.Language
+	case 1:
+		return t.Proxy
+	case 2:
+		return t.OutputDir
+	case 3:
+		return t.Format
+	case 4:
+		return t.Quality
+	case 5:
+		return t.Confirm
+	}
+	return ""
+}
+
+func (m *model) getStepDescription() string {
+	t := m.t()
+	switch m.currentStep {
+	case 0:
+		return t.LanguageDesc
+	case 1:
+		return t.ProxyDesc
+	case 2:
+		return t.OutputDirDesc
+	case 3:
+		return t.FormatDesc
+	case 4:
+		return t.QualityDesc
+	case 5:
+		return t.ConfirmDesc
+	}
+	return ""
+}
+
+func (m *model) getOptions() []struct{ label, value string } {
+	t := m.t()
+	switch m.currentStep {
+	case 0:
+		return []struct{ label, value string }{
+			{"English", "en"},
+			{"中文", "zh"},
+			{"日本語", "ja"},
+			{"한국어", "ko"},
+			{"Español", "es"},
+			{"Français", "fr"},
+			{"Deutsch", "de"},
+		}
+	case 3:
+		return []struct{ label, value string }{
+			{"MP4 " + t.Recommended, "mp4"},
+			{"WebM", "webm"},
+			{"MKV", "mkv"},
+			{t.BestAvailable, "best"},
+		}
+	case 4:
+		return []struct{ label, value string }{
+			{t.BestAvailable, "best"},
+			{"4K (2160p)", "2160p"},
+			{"1080p", "1080p"},
+			{"720p", "720p"},
+			{"480p", "480p"},
+		}
+	case 5:
+		return []struct{ label, value string }{
+			{t.YesSave, "yes"},
+			{t.NoCancel, "no"},
+		}
+	}
+	return nil
+}
+
+func (m *model) isInputStep() bool {
+	return m.currentStep == 1 || m.currentStep == 2
+}
+
+func (m *model) getPlaceholder() string {
+	switch m.currentStep {
+	case 1:
+		return "http://127.0.0.1:7890"
+	case 2:
+		return "."
+	}
+	return ""
+}
+
 func (m *model) setCursorFromConfig() {
-	step := m.steps[m.currentStep]
-	if step.isInput {
-		m.inputBuffer = *step.inputValue
+	if m.isInputStep() {
+		switch m.currentStep {
+		case 1:
+			m.inputBuffer = m.config.Proxy
+		case 2:
+			m.inputBuffer = m.config.OutputDir
+		}
 		m.inputCursor = len(m.inputBuffer)
 		return
 	}
@@ -152,7 +173,8 @@ func (m *model) setCursorFromConfig() {
 		currentValue = m.config.Quality
 	}
 
-	for i, opt := range step.options {
+	options := m.getOptions()
+	for i, opt := range options {
 		if opt.value == currentValue {
 			m.cursor = i
 			break
@@ -172,8 +194,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		step := m.steps[m.currentStep]
-
 		switch msg.String() {
 		case "ctrl+c", "esc":
 			m.cancelled = true
@@ -189,12 +209,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case "right", "enter":
-			if step.isInput {
-				*step.inputValue = m.inputBuffer
-			}
 			m.saveCurrentValue()
 
-			if m.currentStep == len(m.steps)-1 {
+			if m.currentStep == 5 {
 				// Confirmation step
 				if m.cursor == 0 {
 					m.confirmed = true
@@ -210,25 +227,35 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case "up", "k":
-			if !step.isInput && m.cursor > 0 {
-				m.cursor--
+			if !m.isInputStep() {
+				options := m.getOptions()
+				if m.cursor > 0 {
+					m.cursor--
+				} else {
+					m.cursor = len(options) - 1
+				}
 			}
 			return m, nil
 
 		case "down", "j":
-			if !step.isInput && m.cursor < len(step.options)-1 {
-				m.cursor++
+			if !m.isInputStep() {
+				options := m.getOptions()
+				if m.cursor < len(options)-1 {
+					m.cursor++
+				} else {
+					m.cursor = 0
+				}
 			}
 			return m, nil
 
 		case "backspace":
-			if step.isInput && len(m.inputBuffer) > 0 {
+			if m.isInputStep() && len(m.inputBuffer) > 0 {
 				m.inputBuffer = m.inputBuffer[:len(m.inputBuffer)-1]
 			}
 			return m, nil
 
 		default:
-			if step.isInput && len(msg.String()) == 1 {
+			if m.isInputStep() && len(msg.String()) == 1 {
 				m.inputBuffer += msg.String()
 			}
 			return m, nil
@@ -239,13 +266,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) saveCurrentValue() {
-	step := m.steps[m.currentStep]
-	if step.isInput {
+	if m.isInputStep() {
+		switch m.currentStep {
+		case 1:
+			m.config.Proxy = m.inputBuffer
+		case 2:
+			m.config.OutputDir = m.inputBuffer
+		}
 		return
 	}
 
-	if m.cursor < len(step.options) {
-		value := step.options[m.cursor].value
+	options := m.getOptions()
+	if m.cursor < len(options) {
+		value := options[m.cursor].value
 		switch m.currentStep {
 		case 0:
 			m.config.Language = value
@@ -259,32 +292,31 @@ func (m *model) saveCurrentValue() {
 
 func (m model) View() string {
 	var b strings.Builder
+	t := m.t()
 
 	// Progress indicator
-	progress := fmt.Sprintf("Step %d of %d", m.currentStep+1, len(m.steps))
+	progress := fmt.Sprintf(t.StepOf, m.currentStep+1, 6)
 	b.WriteString(stepStyle.Render(progress))
 	b.WriteString("\n\n")
 
-	step := m.steps[m.currentStep]
-
 	// Title
-	b.WriteString(titleStyle.Render(step.title))
+	b.WriteString(titleStyle.Render(m.getStepTitle()))
 	b.WriteString("\n")
-	b.WriteString(stepStyle.Render(step.description))
+	b.WriteString(stepStyle.Render(m.getStepDescription()))
 	b.WriteString("\n\n")
 
 	// Content
-	if m.currentStep == len(m.steps)-1 {
+	if m.currentStep == 5 {
 		// Review step
 		b.WriteString(m.renderReview())
 		b.WriteString("\n")
 	}
 
-	if step.isInput {
+	if m.isInputStep() {
 		// Input field
 		display := m.inputBuffer
 		if display == "" {
-			display = stepStyle.Render(step.placeholder)
+			display = stepStyle.Render(m.getPlaceholder())
 		}
 		b.WriteString(inputCursorStyle.Render("> "))
 		b.WriteString(inputStyle.Render(display))
@@ -292,7 +324,8 @@ func (m model) View() string {
 		b.WriteString("\n")
 	} else {
 		// Options
-		for i, opt := range step.options {
+		options := m.getOptions()
+		for i, opt := range options {
 			cursor := "  "
 			style := unselectedStyle
 			if i == m.cursor {
@@ -307,7 +340,9 @@ func (m model) View() string {
 
 	// Help
 	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("← back • → next • ↑↓ select • enter confirm • esc quit"))
+	help := fmt.Sprintf("← %s • → %s • ↑↓ %s • enter %s • esc %s",
+		t.HelpBack, t.HelpNext, t.HelpSelect, t.HelpConfirm, t.HelpQuit)
+	b.WriteString(helpStyle.Render(help))
 
 	// Apply padding
 	content := containerStyle.Render(b.String())
@@ -322,10 +357,11 @@ func (m model) View() string {
 
 func (m model) renderReview() string {
 	var b strings.Builder
+	t := m.t()
 
 	proxy := m.config.Proxy
 	if proxy == "" {
-		proxy = "(none)"
+		proxy = t.ProxyNone
 	}
 	outputDir := m.config.OutputDir
 	if outputDir == "" {
@@ -336,11 +372,11 @@ func (m model) renderReview() string {
 		label string
 		value string
 	}{
-		{"Language", getLanguageName(m.config.Language)},
-		{"Proxy", proxy},
-		{"Output Dir", outputDir},
-		{"Format", m.config.Format},
-		{"Quality", m.config.Quality},
+		{t.ReviewLanguage, getLanguageName(m.config.Language)},
+		{t.ReviewProxy, proxy},
+		{t.ReviewOutputDir, outputDir},
+		{t.ReviewFormat, m.config.Format},
+		{t.ReviewQuality, m.config.Quality},
 	}
 
 	for _, line := range lines {
