@@ -62,6 +62,8 @@ type searchModel struct {
 	selected      map[int]bool   // Track selected items by global index within active tab
 	selectedCount int
 	confirmed     bool
+	goBack        bool           // User wants to go back
+	allowBack     bool           // Whether back navigation is allowed
 	keyBindings   searchKeyMap
 	width         int
 	height        int
@@ -78,6 +80,7 @@ type searchKeyMap struct {
 	ShiftTab key.Binding
 	Toggle   key.Binding
 	Confirm  key.Binding
+	Back     key.Binding
 	Quit     key.Binding
 }
 
@@ -114,6 +117,10 @@ func defaultSearchKeyMap() searchKeyMap {
 		Confirm: key.NewBinding(
 			key.WithKeys("enter"),
 			key.WithHelp("enter", "confirm"),
+		),
+		Back: key.NewBinding(
+			key.WithKeys("b", "backspace"),
+			key.WithHelp("b", "back"),
 		),
 		Quit: key.NewBinding(
 			key.WithKeys("q", "esc", "ctrl+c"),
@@ -265,6 +272,12 @@ func (m searchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keyBindings.Confirm):
 			m.confirmed = true
 			return m, tea.Quit
+
+		case key.Matches(msg, m.keyBindings.Back):
+			if m.allowBack {
+				m.goBack = true
+				return m, tea.Quit
+			}
 		}
 	}
 
@@ -389,11 +402,19 @@ func (m searchModel) View() string {
 	}
 
 	// Help text with tab switching hint
-	if isPodcast {
-		b.WriteString(searchHelpStyle.Render("  ←/→ switch tabs • " + t.Search.HelpPodcast))
-	} else {
-		b.WriteString(searchHelpStyle.Render("  ←/→ switch tabs • " + t.Search.Help))
+	var helpText string
+	if len(m.sections) > 1 {
+		helpText = "←/→ switch tabs • "
 	}
+	if m.allowBack {
+		helpText += "b back • "
+	}
+	if isPodcast {
+		helpText += t.Search.HelpPodcast
+	} else {
+		helpText += t.Search.Help
+	}
+	b.WriteString(searchHelpStyle.Render("  " + helpText))
 	b.WriteString("\n")
 
 	// Apply container style
@@ -423,9 +444,21 @@ func (m searchModel) GetSelectedItems() []SearchItem {
 	return items
 }
 
+// SearchTUIResult holds the result of RunSearchTUI
+type SearchTUIResult struct {
+	Items  []SearchItem
+	GoBack bool
+}
+
 // RunSearchTUI runs the search TUI and returns selected items
 func RunSearchTUI(sections []SearchSection, query, lang string) ([]SearchItem, error) {
+	return RunSearchTUIWithBack(sections, query, lang, false)
+}
+
+// RunSearchTUIWithBack runs the search TUI with optional back navigation
+func RunSearchTUIWithBack(sections []SearchSection, query, lang string, allowBack bool) ([]SearchItem, error) {
 	model := newSearchModel(sections, query, lang)
+	model.allowBack = allowBack
 	p := tea.NewProgram(model, tea.WithAltScreen())
 
 	finalModel, err := p.Run()
@@ -434,9 +467,15 @@ func RunSearchTUI(sections []SearchSection, query, lang string) ([]SearchItem, e
 	}
 
 	m := finalModel.(searchModel)
+	if m.goBack {
+		return nil, errGoBack
+	}
 	if !m.confirmed {
 		return nil, nil // User quit without confirming
 	}
 
 	return m.GetSelectedItems(), nil
 }
+
+// ErrGoBack is returned when user wants to go back
+var errGoBack = fmt.Errorf("go back")

@@ -8,11 +8,11 @@ import (
 	"regexp"
 )
 
-// AppleExtractor handles Apple Podcasts downloads
-type AppleExtractor struct{}
+// iTunesExtractor handles Apple Podcasts downloads via iTunes API
+type iTunesExtractor struct{}
 
-func (e *AppleExtractor) Name() string {
-	return "apple"
+func (e *iTunesExtractor) Name() string {
+	return "itunes"
 }
 
 // Match URLs like:
@@ -21,12 +21,12 @@ func (e *AppleExtractor) Name() string {
 // https://podcasts.apple.com/us/podcast/dan-carlins-hardcore-history/id173001861?i=1000682587885
 var applePodcastRegex = regexp.MustCompile(`/(?:podcast/)?(?:[^/]+/)?id(\d+)`)
 
-func (e *AppleExtractor) Match(u *url.URL) bool {
+func (e *iTunesExtractor) Match(u *url.URL) bool {
 	host := u.Hostname()
 	return host == "podcasts.apple.com"
 }
 
-func (e *AppleExtractor) Extract(rawURL string) (*VideoInfo, error) {
+func (e *iTunesExtractor) Extract(rawURL string) (Media, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid URL: %w", err)
@@ -46,10 +46,10 @@ func (e *AppleExtractor) Extract(rawURL string) (*VideoInfo, error) {
 	}
 
 	// Otherwise list episodes from the podcast
-	return e.listEpisodes(podcastID)
+	return e.listEpisodes()
 }
 
-func (e *AppleExtractor) extractEpisode(podcastID, episodeID string) (*VideoInfo, error) {
+func (e *iTunesExtractor) extractEpisode(podcastID, episodeID string) (*AudioMedia, error) {
 	// Lookup episode by ID
 	url := fmt.Sprintf("https://itunes.apple.com/lookup?id=%s&entity=podcastEpisode", podcastID)
 
@@ -72,22 +72,16 @@ func (e *AppleExtractor) extractEpisode(podcastID, episodeID string) (*VideoInfo
 				ext = "mp3"
 			}
 
-			// Create filename: {podcast} - {episode}.{ext}
+			// Create filename: {podcast} - {episode}
 			filename := sanitizeFilename(fmt.Sprintf("%s - %s", item.CollectionName, item.TrackName))
 
-			return &VideoInfo{
-				ID:        episodeID,
-				Title:     filename,
-				Duration:  item.TrackTimeMillis / 1000,
-				Uploader:  item.ArtistName,
-				MediaType: MediaTypeAudio,
-				Formats: []Format{
-					{
-						URL:     item.EpisodeURL,
-						Quality: "audio",
-						Ext:     ext,
-					},
-				},
+			return &AudioMedia{
+				ID:       episodeID,
+				Title:    filename,
+				Uploader: item.ArtistName,
+				Duration: item.TrackTimeMillis / 1000,
+				URL:      item.EpisodeURL,
+				Ext:      ext,
 			}, nil
 		}
 	}
@@ -95,7 +89,7 @@ func (e *AppleExtractor) extractEpisode(podcastID, episodeID string) (*VideoInfo
 	return nil, fmt.Errorf("episode not found")
 }
 
-func (e *AppleExtractor) listEpisodes(podcastID string) (*VideoInfo, error) {
+func (e *iTunesExtractor) listEpisodes() (*AudioMedia, error) {
 	// Return error suggesting to use specific episode URL
 	// We could list episodes here but for now keep it simple
 	return nil, fmt.Errorf("please provide a specific episode URL. Use 'vget search --podcast <name>' to find episodes, or visit the podcast page and select an episode")
@@ -121,5 +115,5 @@ type iTunesLookupResult struct {
 }
 
 func init() {
-	Register(&AppleExtractor{})
+	Register(&iTunesExtractor{})
 }

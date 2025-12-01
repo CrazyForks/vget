@@ -18,7 +18,7 @@ func (e *YouTubeExtractor) Match(u *url.URL) bool {
 		host == "youtu.be" || host == "m.youtube.com"
 }
 
-func (e *YouTubeExtractor) Extract(url string) (*VideoInfo, error) {
+func (e *YouTubeExtractor) Extract(url string) (Media, error) {
 	return nil, fmt.Errorf("YouTube support coming soon")
 }
 

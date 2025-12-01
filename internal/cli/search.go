@@ -165,7 +165,7 @@ func searchXiaoyuzhou(query string) error {
 	if len(result.Data.Podcasts) > 0 {
 		var items []SearchItem
 		for _, p := range result.Data.Podcasts {
-			subtitle := fmt.Sprintf("%s | %d episodes", p.Author, p.EpisodeCount)
+			subtitle := fmt.Sprintf("%s | %d ep", p.Author, p.EpisodeCount)
 			items = append(items, SearchItem{
 				Title:      p.Title,
 				Subtitle:   subtitle,
@@ -200,18 +200,24 @@ func searchXiaoyuzhou(query string) error {
 		})
 	}
 
-	// Run TUI
-	selected, err := RunSearchTUI(sections, query, cfg.Language)
-	if err != nil {
+	// Run TUI loop (allows going back from episode view)
+	for {
+		selected, err := RunSearchTUI(sections, query, cfg.Language)
+		if err != nil {
+			return err
+		}
+
+		if len(selected) == 0 {
+			return nil
+		}
+
+		// Handle selection based on type
+		err = handleSelectedItems(selected, "xiaoyuzhou", cfg.Language, sections, query)
+		if err == errGoBack {
+			continue // Go back to podcast list
+		}
 		return err
 	}
-
-	if len(selected) == 0 {
-		return nil
-	}
-
-	// Handle selection based on type
-	return handleSelectedItems(selected, "xiaoyuzhou", cfg.Language)
 }
 
 func formatEpisodeDuration(seconds int) string {
@@ -333,7 +339,7 @@ func searchITunes(query string) error {
 		for _, p := range podcastResult.Results {
 			items = append(items, SearchItem{
 				Title:      p.CollectionName,
-				Subtitle:   fmt.Sprintf("%s | %d episodes", p.ArtistName, p.TrackCount),
+				Subtitle:   fmt.Sprintf("%s | %d ep", p.ArtistName, p.TrackCount),
 				Selectable: true,
 				Type:       ItemTypePodcast,
 				PodcastID:  fmt.Sprintf("%d", p.CollectionID),
@@ -365,22 +371,28 @@ func searchITunes(query string) error {
 		})
 	}
 
-	// Run TUI
-	selected, err := RunSearchTUI(sections, query, cfg.Language)
-	if err != nil {
+	// Run TUI loop (allows going back from episode view)
+	for {
+		selected, err := RunSearchTUI(sections, query, cfg.Language)
+		if err != nil {
+			return err
+		}
+
+		if len(selected) == 0 {
+			return nil
+		}
+
+		// Handle selection
+		err = handleSelectedItems(selected, "itunes", cfg.Language, sections, query)
+		if err == errGoBack {
+			continue // Go back to podcast list
+		}
 		return err
 	}
-
-	if len(selected) == 0 {
-		return nil
-	}
-
-	// Handle selection
-	return handleSelectedItems(selected, "itunes", cfg.Language)
 }
 
 // handleSelectedItems processes selected items based on their type
-func handleSelectedItems(items []SearchItem, source, lang string) error {
+func handleSelectedItems(items []SearchItem, source, lang string, originalSections []SearchSection, query string) error {
 	if len(items) == 0 {
 		return nil
 	}
@@ -396,7 +408,7 @@ func handleSelectedItems(items []SearchItem, source, lang string) error {
 			fmt.Printf("\nNote: Multiple podcasts selected, showing episodes for: %s\n", podcast.Title)
 		}
 
-		return fetchAndShowEpisodes(podcast, source, lang)
+		return fetchAndShowEpisodes(podcast, source, lang, originalSections, query)
 	}
 
 	// Episodes selected - download them
@@ -404,7 +416,7 @@ func handleSelectedItems(items []SearchItem, source, lang string) error {
 }
 
 // fetchAndShowEpisodes fetches episodes for a podcast and shows TUI
-func fetchAndShowEpisodes(podcast SearchItem, source, lang string) error {
+func fetchAndShowEpisodes(podcast SearchItem, source, lang string, originalSections []SearchSection, query string) error {
 	t := i18n.T(lang)
 
 	// Show spinner while fetching episodes
@@ -446,8 +458,11 @@ func fetchAndShowEpisodes(podcast SearchItem, source, lang string) error {
 		},
 	}
 
-	// Run TUI for episode selection
-	selected, err := RunSearchTUI(sections, podcast.Title, lang)
+	// Run TUI for episode selection with back navigation enabled
+	selected, err := RunSearchTUIWithBack(sections, podcast.Title, lang, true)
+	if err == errGoBack {
+		return errGoBack // Propagate back to original search
+	}
 	if err != nil {
 		return err
 	}

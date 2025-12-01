@@ -17,8 +17,8 @@ const (
 	// Public bearer token (same as used by web client)
 	twitterBearerToken = "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs=1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA"
 
-	twitterGuestTokenURL = "https://api.x.com/1.1/guest/activate.json"
-	twitterGraphQLURL    = "https://x.com/i/api/graphql/NmCeCgkVlsRGS1cAwqtgmw/TweetResultByRestId"
+	twitterGuestTokenURL  = "https://api.x.com/1.1/guest/activate.json"
+	twitterGraphQLURL     = "https://x.com/i/api/graphql/NmCeCgkVlsRGS1cAwqtgmw/TweetResultByRestId"
 	twitterSyndicationURL = "https://cdn.syndication.twimg.com/tweet-result"
 )
 
@@ -27,7 +27,7 @@ var (
 	twitterURLRegex = regexp.MustCompile(`(?:twitter\.com|x\.com)/(?:[^/]+)/status/(\d+)`)
 )
 
-// TwitterExtractor handles Twitter/X video extraction
+// TwitterExtractor handles Twitter/X media extraction
 type TwitterExtractor struct {
 	client     *http.Client
 	guestToken string
@@ -48,8 +48,8 @@ func (t *TwitterExtractor) Match(u *url.URL) bool {
 	return twitterURLRegex.MatchString(u.String())
 }
 
-// Extract retrieves video information from a Twitter/X URL
-func (t *TwitterExtractor) Extract(urlStr string) (*VideoInfo, error) {
+// Extract retrieves media from a Twitter/X URL
+func (t *TwitterExtractor) Extract(urlStr string) (Media, error) {
 	// Initialize HTTP client
 	if t.client == nil {
 		t.client = &http.Client{
@@ -65,9 +65,9 @@ func (t *TwitterExtractor) Extract(urlStr string) (*VideoInfo, error) {
 	tweetID := matches[1]
 
 	// Try syndication API first (simpler, no auth needed for public tweets)
-	info, err := t.fetchFromSyndication(tweetID)
+	media, err := t.fetchFromSyndication(tweetID)
 	if err == nil {
-		return info, nil
+		return media, nil
 	}
 
 	// Fallback to GraphQL API
@@ -75,16 +75,16 @@ func (t *TwitterExtractor) Extract(urlStr string) (*VideoInfo, error) {
 		return nil, fmt.Errorf("failed to get guest token: %w", err)
 	}
 
-	info, err = t.fetchFromGraphQL(tweetID)
+	media, err = t.fetchFromGraphQL(tweetID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch tweet: %w", err)
 	}
 
-	return info, nil
+	return media, nil
 }
 
 // fetchFromSyndication tries the syndication endpoint (works for public tweets)
-func (t *TwitterExtractor) fetchFromSyndication(tweetID string) (*VideoInfo, error) {
+func (t *TwitterExtractor) fetchFromSyndication(tweetID string) (Media, error) {
 	params := url.Values{}
 	params.Set("id", tweetID)
 	params.Set("token", "x") // Required but value doesn't matter
@@ -150,12 +150,12 @@ func (t *TwitterExtractor) fetchGuestToken() error {
 }
 
 // fetchFromGraphQL uses the GraphQL API
-func (t *TwitterExtractor) fetchFromGraphQL(tweetID string) (*VideoInfo, error) {
+func (t *TwitterExtractor) fetchFromGraphQL(tweetID string) (Media, error) {
 	variables := map[string]interface{}{
-		"tweetId":                                tweetID,
-		"withCommunity":                          false,
-		"includePromotedContent":                 false,
-		"withVoice":                              false,
+		"tweetId":                tweetID,
+		"withCommunity":          false,
+		"includePromotedContent": false,
+		"withVoice":              false,
 	}
 
 	features := map[string]interface{}{
@@ -222,48 +222,58 @@ func (t *TwitterExtractor) fetchFromGraphQL(tweetID string) (*VideoInfo, error) 
 	return t.parseGraphQLResponse(body, tweetID)
 }
 
-// parseSyndicationResponse extracts video info from syndication API response
-func (t *TwitterExtractor) parseSyndicationResponse(data *syndicationResponse, tweetID string) (*VideoInfo, error) {
-	info := &VideoInfo{
-		ID:        tweetID,
-		Title:     truncateText(data.Text, 100),
-		Uploader:  data.User.ScreenName,
-		MediaType: MediaTypeVideo,
-	}
-
-	// Check for video in mediaDetails
+// parseSyndicationResponse extracts media from syndication API response
+func (t *TwitterExtractor) parseSyndicationResponse(data *syndicationResponse, tweetID string) (Media, error) {
 	if len(data.MediaDetails) == 0 {
 		return nil, fmt.Errorf("no media found in tweet")
 	}
 
+	title := truncateText(data.Text, 100)
+	uploader := data.User.ScreenName
+
+	var videoFormats []VideoFormat
+	var images []Image
+
 	for _, media := range data.MediaDetails {
-		if media.Type != "video" && media.Type != "animated_gif" {
-			continue
-		}
+		switch media.Type {
+		case "video", "animated_gif":
+			for _, variant := range media.VideoInfo.Variants {
+				if variant.ContentType != "video/mp4" {
+					continue
+				}
 
-		info.Thumbnail = media.MediaURLHTTPS
+				format := VideoFormat{
+					URL:     variant.URL,
+					Ext:     "mp4",
+					Bitrate: variant.Bitrate,
+				}
 
-		// Extract video formats from variants
-		for _, variant := range media.VideoInfo.Variants {
-			if variant.ContentType != "video/mp4" {
-				continue
+				if w, h := extractResolutionFromURL(variant.URL); w > 0 {
+					format.Width = w
+					format.Height = h
+					format.Quality = fmt.Sprintf("%dp", h)
+				} else if variant.Bitrate > 0 {
+					format.Quality = estimateQualityFromBitrate(variant.Bitrate)
+				}
+
+				videoFormats = append(videoFormats, format)
 			}
 
-			format := Format{
-				URL:     variant.URL,
-				Ext:     "mp4",
-				Bitrate: variant.Bitrate,
+		case "photo":
+			imageURL := getHighQualityImageURL(media.MediaURLHTTPS)
+			ext := getImageExtension(media.MediaURLHTTPS)
+
+			img := Image{
+				URL: imageURL,
+				Ext: ext,
 			}
 
-			if w, h := extractResolutionFromURL(variant.URL); w > 0 {
-				format.Width = w
-				format.Height = h
-				format.Quality = fmt.Sprintf("%dp", h)
-			} else if variant.Bitrate > 0 {
-				format.Quality = estimateQualityFromBitrate(variant.Bitrate)
+			if media.OriginalWidth > 0 {
+				img.Width = media.OriginalWidth
+				img.Height = media.OriginalHeight
 			}
 
-			info.Formats = append(info.Formats, format)
+			images = append(images, img)
 		}
 	}
 
@@ -276,7 +286,7 @@ func (t *TwitterExtractor) parseSyndicationResponse(data *syndicationResponse, t
 
 			// Check if this URL already exists
 			exists := false
-			for _, f := range info.Formats {
+			for _, f := range videoFormats {
 				if f.URL == variant.Src {
 					exists = true
 					break
@@ -286,7 +296,7 @@ func (t *TwitterExtractor) parseSyndicationResponse(data *syndicationResponse, t
 				continue
 			}
 
-			format := Format{
+			format := VideoFormat{
 				URL: variant.Src,
 				Ext: "mp4",
 			}
@@ -297,27 +307,42 @@ func (t *TwitterExtractor) parseSyndicationResponse(data *syndicationResponse, t
 				format.Quality = fmt.Sprintf("%dp", h)
 			}
 
-			info.Formats = append(info.Formats, format)
+			videoFormats = append(videoFormats, format)
 		}
 	}
 
-	if len(info.Formats) == 0 {
-		return nil, fmt.Errorf("no video formats found in tweet")
+	// Return appropriate media type
+	if len(videoFormats) > 0 {
+		// Sort by bitrate/height (highest first)
+		sort.Slice(videoFormats, func(i, j int) bool {
+			if videoFormats[i].Bitrate != videoFormats[j].Bitrate {
+				return videoFormats[i].Bitrate > videoFormats[j].Bitrate
+			}
+			return videoFormats[i].Height > videoFormats[j].Height
+		})
+
+		return &VideoMedia{
+			ID:       tweetID,
+			Title:    title,
+			Uploader: uploader,
+			Formats:  videoFormats,
+		}, nil
 	}
 
-	// Sort by bitrate/height (highest first)
-	sort.Slice(info.Formats, func(i, j int) bool {
-		if info.Formats[i].Bitrate != info.Formats[j].Bitrate {
-			return info.Formats[i].Bitrate > info.Formats[j].Bitrate
-		}
-		return info.Formats[i].Height > info.Formats[j].Height
-	})
+	if len(images) > 0 {
+		return &ImageMedia{
+			ID:       tweetID,
+			Title:    title,
+			Uploader: uploader,
+			Images:   images,
+		}, nil
+	}
 
-	return info, nil
+	return nil, fmt.Errorf("no media found in tweet")
 }
 
-// parseGraphQLResponse extracts video info from GraphQL API response
-func (t *TwitterExtractor) parseGraphQLResponse(body []byte, tweetID string) (*VideoInfo, error) {
+// parseGraphQLResponse extracts media from GraphQL API response
+func (t *TwitterExtractor) parseGraphQLResponse(body []byte, tweetID string) (Media, error) {
 	var resp graphQLResponse
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return nil, fmt.Errorf("failed to parse GraphQL response: %w", err)
@@ -338,74 +363,105 @@ func (t *TwitterExtractor) parseGraphQLResponse(body []byte, tweetID string) (*V
 		return nil, fmt.Errorf("could not find tweet data")
 	}
 
-	info := &VideoInfo{
-		ID:        tweetID,
-		Title:     truncateText(legacy.FullText, 100),
-		MediaType: MediaTypeVideo,
-	}
-
+	title := truncateText(legacy.FullText, 100)
+	var uploader string
 	if result.Core != nil && result.Core.UserResults.Result != nil {
-		info.Uploader = result.Core.UserResults.Result.Legacy.ScreenName
+		uploader = result.Core.UserResults.Result.Legacy.ScreenName
 	}
 
-	// Extract media
 	if legacy.ExtendedEntities == nil || len(legacy.ExtendedEntities.Media) == 0 {
 		return nil, fmt.Errorf("no media found in tweet")
 	}
 
+	var videoFormats []VideoFormat
+	var images []Image
+	var duration int
+
 	for _, media := range legacy.ExtendedEntities.Media {
-		if media.Type != "video" && media.Type != "animated_gif" {
-			continue
-		}
+		switch media.Type {
+		case "video", "animated_gif":
+			duration = media.VideoInfo.DurationMillis / 1000
 
-		info.Thumbnail = media.MediaURLHTTPS
-		info.Duration = media.VideoInfo.DurationMillis / 1000
+			for _, variant := range media.VideoInfo.Variants {
+				if variant.ContentType != "video/mp4" {
+					continue
+				}
 
-		for _, variant := range media.VideoInfo.Variants {
-			if variant.ContentType != "video/mp4" {
-				continue
+				format := VideoFormat{
+					URL:     variant.URL,
+					Ext:     "mp4",
+					Bitrate: variant.Bitrate,
+				}
+
+				if w, h := extractResolutionFromURL(variant.URL); w > 0 {
+					format.Width = w
+					format.Height = h
+					format.Quality = fmt.Sprintf("%dp", h)
+				} else if variant.Bitrate > 0 {
+					format.Quality = estimateQualityFromBitrate(variant.Bitrate)
+				}
+
+				videoFormats = append(videoFormats, format)
 			}
 
-			format := Format{
-				URL:     variant.URL,
-				Ext:     "mp4",
-				Bitrate: variant.Bitrate,
+		case "photo":
+			imageURL := getHighQualityImageURL(media.MediaURLHTTPS)
+			ext := getImageExtension(media.MediaURLHTTPS)
+
+			img := Image{
+				URL: imageURL,
+				Ext: ext,
 			}
 
-			if w, h := extractResolutionFromURL(variant.URL); w > 0 {
-				format.Width = w
-				format.Height = h
-				format.Quality = fmt.Sprintf("%dp", h)
-			} else if variant.Bitrate > 0 {
-				format.Quality = estimateQualityFromBitrate(variant.Bitrate)
+			if media.OriginalInfo.Width > 0 {
+				img.Width = media.OriginalInfo.Width
+				img.Height = media.OriginalInfo.Height
 			}
 
-			info.Formats = append(info.Formats, format)
+			images = append(images, img)
 		}
 	}
 
-	if len(info.Formats) == 0 {
-		return nil, fmt.Errorf("no video formats found in tweet")
+	// Return appropriate media type
+	if len(videoFormats) > 0 {
+		sort.Slice(videoFormats, func(i, j int) bool {
+			return videoFormats[i].Bitrate > videoFormats[j].Bitrate
+		})
+
+		return &VideoMedia{
+			ID:       tweetID,
+			Title:    title,
+			Uploader: uploader,
+			Duration: duration,
+			Formats:  videoFormats,
+		}, nil
 	}
 
-	sort.Slice(info.Formats, func(i, j int) bool {
-		return info.Formats[i].Bitrate > info.Formats[j].Bitrate
-	})
+	if len(images) > 0 {
+		return &ImageMedia{
+			ID:       tweetID,
+			Title:    title,
+			Uploader: uploader,
+			Images:   images,
+		}, nil
+	}
 
-	return info, nil
+	return nil, fmt.Errorf("no media found in tweet")
 }
 
 // Syndication API response structures
 type syndicationResponse struct {
-	Text         string `json:"text"`
-	User         struct {
+	Text string `json:"text"`
+	User struct {
 		ScreenName string `json:"screen_name"`
 		Name       string `json:"name"`
 	} `json:"user"`
 	MediaDetails []struct {
-		Type          string `json:"type"`
-		MediaURLHTTPS string `json:"media_url_https"`
-		VideoInfo     struct {
+		Type           string `json:"type"`
+		MediaURLHTTPS  string `json:"media_url_https"`
+		OriginalWidth  int    `json:"original_info_width"`
+		OriginalHeight int    `json:"original_info_height"`
+		VideoInfo      struct {
 			Variants []struct {
 				Bitrate     int    `json:"bitrate"`
 				ContentType string `json:"content_type"`
@@ -431,10 +487,10 @@ type graphQLResponse struct {
 }
 
 type graphQLTweetResult struct {
-	TypeName string               `json:"__typename"`
-	Legacy   *graphQLLegacy       `json:"legacy"`
-	Core     *graphQLCore         `json:"core"`
-	Tweet    *graphQLTweetResult  `json:"tweet"` // For TweetWithVisibilityResults
+	TypeName string              `json:"__typename"`
+	Legacy   *graphQLLegacy      `json:"legacy"`
+	Core     *graphQLCore        `json:"core"`
+	Tweet    *graphQLTweetResult `json:"tweet"` // For TweetWithVisibilityResults
 }
 
 type graphQLCore struct {
@@ -453,7 +509,11 @@ type graphQLLegacy struct {
 		Media []struct {
 			Type          string `json:"type"`
 			MediaURLHTTPS string `json:"media_url_https"`
-			VideoInfo     struct {
+			OriginalInfo  struct {
+				Width  int `json:"width"`
+				Height int `json:"height"`
+			} `json:"original_info"`
+			VideoInfo struct {
 				DurationMillis int `json:"duration_millis"`
 				Variants       []struct {
 					Bitrate     int    `json:"bitrate"`
@@ -498,4 +558,31 @@ func estimateQualityFromBitrate(bitrate int) string {
 	default:
 		return "360p"
 	}
+}
+
+// getHighQualityImageURL converts a Twitter image URL to highest quality version
+func getHighQualityImageURL(imageURL string) string {
+	baseURL := strings.Split(imageURL, "?")[0]
+
+	format := "jpg"
+	if strings.Contains(baseURL, ".png") {
+		format = "png"
+	} else if strings.Contains(baseURL, ".webp") {
+		format = "webp"
+	}
+
+	return baseURL + "?format=" + format + "&name=orig"
+}
+
+// getImageExtension extracts the image extension from URL
+func getImageExtension(imageURL string) string {
+	baseURL := strings.Split(imageURL, "?")[0]
+	if strings.HasSuffix(baseURL, ".png") {
+		return "png"
+	} else if strings.HasSuffix(baseURL, ".webp") {
+		return "webp"
+	} else if strings.HasSuffix(baseURL, ".gif") {
+		return "gif"
+	}
+	return "jpg"
 }

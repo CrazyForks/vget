@@ -9,16 +9,20 @@ import (
 type MediaType string
 
 const (
-	MediaTypeVideo   MediaType = "video"
-	MediaTypeAudio   MediaType = "audio"
-	MediaTypePDF     MediaType = "pdf"
-	MediaTypeEPUB    MediaType = "epub"
-	MediaTypeMOBI    MediaType = "mobi"
-	MediaTypeAZW     MediaType = "azw"
-	MediaTypeUnknown MediaType = "unknown" // fallback, treated as video
+	MediaTypeVideo MediaType = "video"
+	MediaTypeAudio MediaType = "audio"
+	MediaTypeImage MediaType = "image"
 )
 
-// Extractor defines the interface for video extractors
+// Media is the interface for all extracted media types
+type Media interface {
+	GetID() string
+	GetTitle() string
+	GetUploader() string
+	Type() MediaType
+}
+
+// Extractor defines the interface for media extractors
 type Extractor interface {
 	// Name returns the extractor name (e.g., "twitter", "direct")
 	Name() string
@@ -27,38 +31,37 @@ type Extractor interface {
 	// The URL is pre-parsed so extractors can reliably check the host/domain
 	Match(u *url.URL) bool
 
-	// Extract retrieves video information from the URL
-	Extract(url string) (*VideoInfo, error)
+	// Extract retrieves media information from the URL
+	Extract(url string) (Media, error)
 }
 
-// VideoInfo contains extracted video metadata
-type VideoInfo struct {
-	ID          string
-	Title       string
-	Description string
-	Duration    int // seconds
-	Thumbnail   string
-	Formats     []Format
-	Uploader    string
-	UploadDate  string
-	MediaType   MediaType // video, audio, document, etc.
+// VideoMedia represents video content with multiple format options
+type VideoMedia struct {
+	ID        string
+	Title     string
+	Uploader  string
+	Duration  int // seconds
+	Thumbnail string
+	Formats   []VideoFormat
 }
 
-// Format represents a single video format/quality option
-type Format struct {
-	URL       string
-	Quality   string // "1080p", "720p", etc.
-	Ext       string // "mp4", "m3u8", "ts"
-	Width     int
-	Height    int
-	Bitrate   int
-	FileSize  int64
-	VideoOnly bool
-	AudioOnly bool
+func (v *VideoMedia) GetID() string       { return v.ID }
+func (v *VideoMedia) GetTitle() string    { return v.Title }
+func (v *VideoMedia) GetUploader() string { return v.Uploader }
+func (v *VideoMedia) Type() MediaType     { return MediaTypeVideo }
+
+// VideoFormat represents a single video quality option
+type VideoFormat struct {
+	URL     string
+	Quality string // "1080p", "720p", etc.
+	Ext     string // "mp4", "m3u8", "ts"
+	Width   int
+	Height  int
+	Bitrate int
 }
 
 // QualityLabel returns a human-readable quality label
-func (f *Format) QualityLabel() string {
+func (f *VideoFormat) QualityLabel() string {
 	if f.Quality != "" {
 		return f.Quality
 	}
@@ -66,4 +69,40 @@ func (f *Format) QualityLabel() string {
 		return fmt.Sprintf("%dp", f.Height)
 	}
 	return "unknown"
+}
+
+// AudioMedia represents audio content (podcasts, music)
+type AudioMedia struct {
+	ID       string
+	Title    string
+	Uploader string
+	Duration int // seconds
+	URL      string
+	Ext      string // "mp3", "m4a", etc.
+}
+
+func (a *AudioMedia) GetID() string       { return a.ID }
+func (a *AudioMedia) GetTitle() string    { return a.Title }
+func (a *AudioMedia) GetUploader() string { return a.Uploader }
+func (a *AudioMedia) Type() MediaType     { return MediaTypeAudio }
+
+// ImageMedia represents one or more images from a single source
+type ImageMedia struct {
+	ID       string
+	Title    string
+	Uploader string
+	Images   []Image
+}
+
+func (i *ImageMedia) GetID() string       { return i.ID }
+func (i *ImageMedia) GetTitle() string    { return i.Title }
+func (i *ImageMedia) GetUploader() string { return i.Uploader }
+func (i *ImageMedia) Type() MediaType     { return MediaTypeImage }
+
+// Image represents a single image to download
+type Image struct {
+	URL    string
+	Ext    string // "jpg", "png", "webp"
+	Width  int
+	Height int
 }

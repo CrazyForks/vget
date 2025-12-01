@@ -25,7 +25,7 @@ func (e *XiaoyuzhouExtractor) Match(u *url.URL) bool {
 	return strings.HasPrefix(u.Path, "/episode/") || strings.HasPrefix(u.Path, "/podcast/")
 }
 
-func (e *XiaoyuzhouExtractor) Extract(url string) (*VideoInfo, error) {
+func (e *XiaoyuzhouExtractor) Extract(url string) (Media, error) {
 	if strings.Contains(url, "/episode/") {
 		return e.extractEpisode(url)
 	}
@@ -36,7 +36,7 @@ func (e *XiaoyuzhouExtractor) Extract(url string) (*VideoInfo, error) {
 }
 
 // extractEpisode extracts a single episode
-func (e *XiaoyuzhouExtractor) extractEpisode(url string) (*VideoInfo, error) {
+func (e *XiaoyuzhouExtractor) extractEpisode(url string) (*AudioMedia, error) {
 	// Extract episode ID from URL
 	re := regexp.MustCompile(`/episode/([a-zA-Z0-9]+)`)
 	matches := re.FindStringSubmatch(url)
@@ -108,27 +108,21 @@ func (e *XiaoyuzhouExtractor) extractEpisode(url string) (*VideoInfo, error) {
 		ext = "mp3"
 	}
 
-	// Create filename: {podcast} - {title}.{ext}
+	// Create filename: {podcast} - {title}
 	filename := sanitizeFilename(fmt.Sprintf("%s - %s", episode.Podcast.Title, episode.Title))
 
-	return &VideoInfo{
-		ID:        episodeID,
-		Title:     filename,
-		Duration:  episode.Duration,
-		Uploader:  episode.Podcast.Title,
-		MediaType: MediaTypeAudio,
-		Formats: []Format{
-			{
-				URL:     episode.Enclosure.URL,
-				Quality: "audio",
-				Ext:     ext,
-			},
-		},
+	return &AudioMedia{
+		ID:       episodeID,
+		Title:    filename,
+		Uploader: episode.Podcast.Title,
+		Duration: episode.Duration,
+		URL:      episode.Enclosure.URL,
+		Ext:      ext,
 	}, nil
 }
 
 // extractPodcast lists all episodes from a podcast
-func (e *XiaoyuzhouExtractor) extractPodcast(url string) (*VideoInfo, error) {
+func (e *XiaoyuzhouExtractor) extractPodcast(_ string) (*AudioMedia, error) {
 	// For now, return an error suggesting to use search
 	// Full podcast download can be implemented later
 	return nil, fmt.Errorf("podcast download not yet implemented. Use 'vget search --podcast <name>' to find specific episodes")

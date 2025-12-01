@@ -24,10 +24,10 @@ type extractState struct {
 	mu     sync.RWMutex
 	done   bool
 	err    error
-	result *extractor.VideoInfo
+	result extractor.Media
 }
 
-func (s *extractState) setDone(result *extractor.VideoInfo) {
+func (s *extractState) setDone(result extractor.Media) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.done = true
@@ -41,7 +41,7 @@ func (s *extractState) setError(err error) {
 	s.done = true
 }
 
-func (s *extractState) get() (bool, error, *extractor.VideoInfo) {
+func (s *extractState) get() (bool, error, extractor.Media) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.done, s.err, s.result
@@ -117,32 +117,33 @@ func (m extractModel) View() string {
 	if done && result != nil {
 		var s string
 		s += fmt.Sprintf("\n  %s %s\n", extractDoneStyle.Render("✓"), m.t.Download.Completed)
-		s += fmt.Sprintf("  ID: %s\n\n", extractInfoStyle.Render(result.ID))
+		s += fmt.Sprintf("  ID: %s\n\n", extractInfoStyle.Render(result.GetID()))
 
-		// List all available formats based on media type
-		s += fmt.Sprintf("  %s:\n", m.t.Download.FormatsAvailable)
-		for _, f := range result.Formats {
-			switch result.MediaType {
-			case extractor.MediaTypeAudio:
-				s += fmt.Sprintf("    • %s (%s)\n", f.Quality, f.Ext)
-			case extractor.MediaTypePDF:
-				fallthrough
-			case extractor.MediaTypeEPUB:
-				fallthrough
-			case extractor.MediaTypeMOBI:
-				fallthrough
-			case extractor.MediaTypeAZW:
-				s += fmt.Sprintf("    • %s\n", f.Ext)
-			default: // video or unknown
+		// Display based on media type
+		switch media := result.(type) {
+		case *extractor.VideoMedia:
+			s += fmt.Sprintf("  %s:\n", m.t.Download.FormatsAvailable)
+			for _, f := range media.Formats {
 				s += fmt.Sprintf("    • %s %dx%d (%s)\n", f.Quality, f.Width, f.Height, f.Ext)
 			}
-		}
-		s += "\n"
-
-		// Hint for quality selection - only for video
-		if result.MediaType == extractor.MediaTypeVideo || result.MediaType == extractor.MediaTypeUnknown {
+			s += "\n"
 			s += fmt.Sprintf("  %s\n\n", extractHintStyle.Render(m.t.Download.QualityHint))
+
+		case *extractor.AudioMedia:
+			s += fmt.Sprintf("  Audio: %s\n\n", media.Ext)
+
+		case *extractor.ImageMedia:
+			s += fmt.Sprintf("  Images (%d):\n", len(media.Images))
+			for i, img := range media.Images {
+				if img.Width > 0 && img.Height > 0 {
+					s += fmt.Sprintf("    • [%d] %dx%d (%s)\n", i+1, img.Width, img.Height, img.Ext)
+				} else {
+					s += fmt.Sprintf("    • [%d] %s\n", i+1, img.Ext)
+				}
+			}
+			s += "\n"
 		}
+
 		return s
 	}
 
@@ -154,7 +155,7 @@ func (m extractModel) View() string {
 }
 
 // runExtractWithSpinner runs extraction with a spinner TUI
-func runExtractWithSpinner(ext extractor.Extractor, url, lang string) (*extractor.VideoInfo, error) {
+func runExtractWithSpinner(ext extractor.Extractor, url, lang string) (extractor.Media, error) {
 	state := &extractState{}
 
 	// Start extraction in background
