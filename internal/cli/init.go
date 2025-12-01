@@ -9,7 +9,7 @@ import (
 
 var initCmd = &cobra.Command{
 	Use:   "init",
-	Short: "Create a .vget.yml config file",
+	Short: "Create vget config file",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Run interactive wizard (loads existing config as defaults if present)
 		cfg, err := config.RunInitWizard()
@@ -22,7 +22,7 @@ var initCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("\nSaved %s\n", config.ConfigFileYml)
+		fmt.Printf("\nSaved %s\n", config.SavePath())
 		return nil
 	},
 }

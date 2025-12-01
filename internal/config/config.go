@@ -9,9 +9,30 @@ import (
 )
 
 const (
-	ConfigFileYml  = ".vget.yml"
-	ConfigFileYaml = ".vget.yaml"
+	ConfigFileName = "config.yml"
+	AppDirName     = "vget"
 )
+
+// ConfigDir returns the standard config directory for vget.
+// macOS/Linux: ~/.config/vget/
+// Windows: %APPDATA%\vget\
+func ConfigDir() (string, error) {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(configDir, AppDirName), nil
+}
+
+// ConfigPath returns the path to the config file.
+// e.g., ~/.config/vget/config.yml
+func ConfigPath() (string, error) {
+	dir, err := ConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, ConfigFileName), nil
+}
 
 type Config struct {
 	// Language for metadata (e.g., "en", "zh", "ja")
@@ -45,35 +66,26 @@ func DefaultConfig() *Config {
 	}
 }
 
-// ConfigPath returns the path to the config file that should be used.
-// Priority: .vget.yml > .vget.yaml
-func ConfigPath() (string, bool) {
-	// .yml takes priority
-	if _, err := os.Stat(ConfigFileYml); err == nil {
-		return ConfigFileYml, true
-	}
-	if _, err := os.Stat(ConfigFileYaml); err == nil {
-		return ConfigFileYaml, true
-	}
-	return "", false
-}
-
-// Exists checks if any config file exists in the current directory
+// Exists checks if config file exists
 func Exists() bool {
-	_, found := ConfigPath()
-	return found
+	path, err := ConfigPath()
+	if err != nil {
+		return false
+	}
+	_, err = os.Stat(path)
+	return err == nil
 }
 
-// Load reads the config from .vget.yml or .vget.yaml
+// Load reads the config from ~/.config/vget/config.yml
 func Load() (*Config, error) {
-	path, found := ConfigPath()
-	if !found {
-		return nil, fmt.Errorf("config file not found")
+	path, err := ConfigPath()
+	if err != nil {
+		return nil, err
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("config file not found: %w", err)
 	}
 
 	cfg := &Config{}
@@ -84,21 +96,40 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
-// Save writes the config to .vget.yml
+// Save writes the config to ~/.config/vget/config.yml
 func Save(cfg *Config) error {
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to serialize config: %w", err)
 	}
 
+	configPath, err := ConfigPath()
+	if err != nil {
+		return fmt.Errorf("failed to get config path: %w", err)
+	}
+
+	// Ensure config directory exists
+	configDir := filepath.Dir(configPath)
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
 	// Add a header comment
 	header := "# vget configuration file\n# Run 'vget init' to regenerate with defaults\n\n"
 	content := header + string(data)
 
-	return os.WriteFile(ConfigFileYml, []byte(content), 0644)
+	return os.WriteFile(configPath, []byte(content), 0644)
 }
 
-// Init creates a new .vget.yml with default values
+// SavePath returns the path where config will be saved
+func SavePath() string {
+	if path, err := ConfigPath(); err == nil {
+		return path
+	}
+	return "config.yml"
+}
+
+// Init creates a new config.yml with default values
 func Init() error {
 	if Exists() {
 		path, _ := ConfigPath()
@@ -114,35 +145,4 @@ func LoadOrDefault() *Config {
 		return DefaultConfig()
 	}
 	return cfg
-}
-
-// FindConfigFile looks for .vget.yml or .vget.yaml in current dir and parent dirs
-// Priority: .vget.yml > .vget.yaml
-func FindConfigFile() (string, bool) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", false
-	}
-
-	for {
-		// Check .yml first (higher priority)
-		ymlPath := filepath.Join(dir, ConfigFileYml)
-		if _, err := os.Stat(ymlPath); err == nil {
-			return ymlPath, true
-		}
-		// Then check .yaml
-		yamlPath := filepath.Join(dir, ConfigFileYaml)
-		if _, err := os.Stat(yamlPath); err == nil {
-			return yamlPath, true
-		}
-
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			// Reached root
-			break
-		}
-		dir = parent
-	}
-
-	return "", false
 }

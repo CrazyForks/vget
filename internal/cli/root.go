@@ -21,7 +21,7 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:     "vget [url]",
-	Short:   "A modern, blazing-fast, cross-platform downloader cli",
+	Short:   "Versatile command-line toolkit for downloading audio, video, podcasts, and more",
 	Version: version.Version,
 	Args:    cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
