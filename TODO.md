@@ -1,5 +1,15 @@
 # TODO
 
+## Tomorrow's Tasks
+
+1. [ ] Self update - implement `vget update` command
+2. [ ] Support m3u8 streaming format
+3. [ ] GoReleaser setup
+4. [ ] Cross-platform builds:
+   - macOS (Intel x86_64, Apple Silicon arm64)
+   - Windows (Intel x86_64, ARM arm64)
+   - Linux (x86, amd64, arm64)
+
 ## Features
 
 - [x] `vget init` command
@@ -7,7 +17,8 @@
   - Proxy settings
   - Default output directory
   - Default format/quality
-- [ ] self update
+- [ ] Self update
+- [ ] m3u8 streaming support
 - [ ] Bulk download from txt file
   - Read URLs from txt file
   - Sequential or parallel processing
