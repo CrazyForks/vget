@@ -2,6 +2,19 @@ package extractor
 
 import "fmt"
 
+// MediaType represents the type of media being downloaded
+type MediaType string
+
+const (
+	MediaTypeVideo   MediaType = "video"
+	MediaTypeAudio   MediaType = "audio"
+	MediaTypePDF     MediaType = "pdf"
+	MediaTypeEPUB    MediaType = "epub"
+	MediaTypeMOBI    MediaType = "mobi"
+	MediaTypeAZW     MediaType = "azw"
+	MediaTypeUnknown MediaType = "unknown" // fallback, treated as video
+)
+
 // Extractor defines the interface for video extractors
 type Extractor interface {
 	// Name returns the extractor name (e.g., "twitter", "direct")
@@ -24,6 +37,7 @@ type VideoInfo struct {
 	Formats     []Format
 	Uploader    string
 	UploadDate  string
+	MediaType   MediaType // video, audio, document, etc.
 }
 
 // Format represents a single video format/quality option

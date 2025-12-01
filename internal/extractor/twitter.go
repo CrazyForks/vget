@@ -220,9 +220,10 @@ func (t *TwitterExtractor) fetchFromGraphQL(tweetID string) (*VideoInfo, error) 
 // parseSyndicationResponse extracts video info from syndication API response
 func (t *TwitterExtractor) parseSyndicationResponse(data *syndicationResponse, tweetID string) (*VideoInfo, error) {
 	info := &VideoInfo{
-		ID:       tweetID,
-		Title:    truncateText(data.Text, 100),
-		Uploader: data.User.ScreenName,
+		ID:        tweetID,
+		Title:     truncateText(data.Text, 100),
+		Uploader:  data.User.ScreenName,
+		MediaType: MediaTypeVideo,
 	}
 
 	// Check for video in mediaDetails
@@ -333,8 +334,9 @@ func (t *TwitterExtractor) parseGraphQLResponse(body []byte, tweetID string) (*V
 	}
 
 	info := &VideoInfo{
-		ID:    tweetID,
-		Title: truncateText(legacy.FullText, 100),
+		ID:        tweetID,
+		Title:     truncateText(legacy.FullText, 100),
+		MediaType: MediaTypeVideo,
 	}
 
 	if result.Core != nil && result.Core.UserResults.Result != nil {

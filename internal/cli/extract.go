@@ -119,15 +119,30 @@ func (m extractModel) View() string {
 		s += fmt.Sprintf("\n  %s %s\n", extractDoneStyle.Render("✓"), m.t.Download.Completed)
 		s += fmt.Sprintf("  ID: %s\n\n", extractInfoStyle.Render(result.ID))
 
-		// List all available formats
+		// List all available formats based on media type
 		s += fmt.Sprintf("  %s:\n", m.t.Download.FormatsAvailable)
 		for _, f := range result.Formats {
-			s += fmt.Sprintf("    • %s %dx%d (%s)\n", f.Quality, f.Width, f.Height, f.Ext)
+			switch result.MediaType {
+			case extractor.MediaTypeAudio:
+				s += fmt.Sprintf("    • %s (%s)\n", f.Quality, f.Ext)
+			case extractor.MediaTypePDF:
+				fallthrough
+			case extractor.MediaTypeEPUB:
+				fallthrough
+			case extractor.MediaTypeMOBI:
+				fallthrough
+			case extractor.MediaTypeAZW:
+				s += fmt.Sprintf("    • %s\n", f.Ext)
+			default: // video or unknown
+				s += fmt.Sprintf("    • %s %dx%d (%s)\n", f.Quality, f.Width, f.Height, f.Ext)
+			}
 		}
 		s += "\n"
 
-		// Hint for quality selection
-		s += fmt.Sprintf("  %s\n\n", extractHintStyle.Render(m.t.Download.QualityHint))
+		// Hint for quality selection - only for video
+		if result.MediaType == extractor.MediaTypeVideo || result.MediaType == extractor.MediaTypeUnknown {
+			s += fmt.Sprintf("  %s\n\n", extractHintStyle.Render(m.t.Download.QualityHint))
+		}
 		return s
 	}
 

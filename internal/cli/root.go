@@ -86,7 +86,12 @@ func runDownload(url string) error {
 	// Determine output filename
 	outputFile := output
 	if outputFile == "" {
-		outputFile = fmt.Sprintf("%s.%s", videoInfo.ID, format.Ext)
+		// Use Title if available (for podcasts), otherwise use ID
+		if videoInfo.Title != "" {
+			outputFile = fmt.Sprintf("%s.%s", videoInfo.Title, format.Ext)
+		} else {
+			outputFile = fmt.Sprintf("%s.%s", videoInfo.ID, format.Ext)
+		}
 	}
 
 	// Download
