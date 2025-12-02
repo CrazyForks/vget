@@ -73,7 +73,7 @@ func (e *iTunesExtractor) extractEpisode(podcastID, episodeID string) (*AudioMed
 			}
 
 			// Create filename: {podcast} - {episode}
-			filename := sanitizeFilename(fmt.Sprintf("%s - %s", item.CollectionName, item.TrackName))
+			filename := SanitizeFilename(fmt.Sprintf("%s - %s", item.CollectionName, item.TrackName))
 
 			return &AudioMedia{
 				ID:       episodeID,

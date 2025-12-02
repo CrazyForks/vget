@@ -189,8 +189,9 @@ func downloadVideo(m *extractor.VideoMedia, dl *downloader.Downloader, t *i18n.T
 	// Determine output filename
 	outputFile := output
 	if outputFile == "" {
-		if m.Title != "" {
-			outputFile = fmt.Sprintf("%s.%s", m.Title, format.Ext)
+		title := extractor.SanitizeFilename(m.Title)
+		if title != "" {
+			outputFile = fmt.Sprintf("%s.%s", title, format.Ext)
 		} else {
 			outputFile = fmt.Sprintf("%s.%s", m.ID, format.Ext)
 		}
@@ -209,8 +210,9 @@ func downloadAudio(m *extractor.AudioMedia, dl *downloader.Downloader) error {
 	// Determine output filename
 	outputFile := output
 	if outputFile == "" {
-		if m.Title != "" {
-			outputFile = fmt.Sprintf("%s.%s", m.Title, m.Ext)
+		title := extractor.SanitizeFilename(m.Title)
+		if title != "" {
+			outputFile = fmt.Sprintf("%s.%s", title, m.Ext)
 		} else {
 			outputFile = fmt.Sprintf("%s.%s", m.ID, m.Ext)
 		}
@@ -241,11 +243,15 @@ func downloadImages(m *extractor.ImageMedia, dl *downloader.Downloader) error {
 				outputFile = fmt.Sprintf("%s.%s", output, img.Ext)
 			}
 		} else {
-			// Use ID with index suffix
+			// Use sanitized title or ID with index suffix
+			baseFilename := m.ID
+			if title := extractor.SanitizeFilename(m.Title); title != "" {
+				baseFilename = title
+			}
 			if len(m.Images) > 1 {
-				outputFile = fmt.Sprintf("%s_%d.%s", m.ID, i+1, img.Ext)
+				outputFile = fmt.Sprintf("%s_%d.%s", baseFilename, i+1, img.Ext)
 			} else {
-				outputFile = fmt.Sprintf("%s.%s", m.ID, img.Ext)
+				outputFile = fmt.Sprintf("%s.%s", baseFilename, img.Ext)
 			}
 		}
 

@@ -109,7 +109,7 @@ func (e *XiaoyuzhouExtractor) extractEpisode(url string) (*AudioMedia, error) {
 	}
 
 	// Create filename: {podcast} - {title}
-	filename := sanitizeFilename(fmt.Sprintf("%s - %s", episode.Podcast.Title, episode.Title))
+	filename := SanitizeFilename(fmt.Sprintf("%s - %s", episode.Podcast.Title, episode.Title))
 
 	return &AudioMedia{
 		ID:       episodeID,
@@ -128,35 +128,6 @@ func (e *XiaoyuzhouExtractor) extractPodcast(_ string) (*AudioMedia, error) {
 	return nil, fmt.Errorf("podcast download not yet implemented. Use 'vget search --podcast <name>' to find specific episodes")
 }
 
-// sanitizeFilename removes or replaces characters that are invalid in filenames
-func sanitizeFilename(name string) string {
-	// Replace characters that are problematic in filenames
-	replacer := strings.NewReplacer(
-		"/", "-",
-		"\\", "-",
-		":", "-",
-		"*", "",
-		"?", "",
-		"\"", "",
-		"<", "",
-		">", "",
-		"|", "",
-		"\n", " ",
-		"\r", "",
-	)
-	result := replacer.Replace(name)
-
-	// Trim spaces and dots from ends
-	result = strings.TrimSpace(result)
-	result = strings.Trim(result, ".")
-
-	// Limit length
-	if len(result) > 200 {
-		result = result[:200]
-	}
-
-	return result
-}
 
 func init() {
 	Register(&XiaoyuzhouExtractor{})

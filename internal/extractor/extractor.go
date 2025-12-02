@@ -3,6 +3,8 @@ package extractor
 import (
 	"fmt"
 	"net/url"
+	"regexp"
+	"strings"
 )
 
 // MediaType represents the type of media being downloaded
@@ -105,4 +107,45 @@ type Image struct {
 	Ext    string // "jpg", "png", "webp"
 	Width  int
 	Height int
+}
+
+// SanitizeFilename removes or replaces characters that are invalid in filenames
+func SanitizeFilename(name string) string {
+	// Replace characters that are problematic in filenames
+	replacer := strings.NewReplacer(
+		"/", "-",
+		"\\", "-",
+		":", "-",
+		"*", "",
+		"?", "",
+		"\"", "",
+		"<", "",
+		">", "",
+		"|", "",
+		"\n", " ",
+		"\r", "",
+	)
+	result := replacer.Replace(name)
+
+	// Remove URLs (http:// or https://)
+	urlRegex := regexp.MustCompile(`https?://[^\s]+`)
+	result = urlRegex.ReplaceAllString(result, "")
+
+	// Trim spaces and dots from ends
+	result = strings.TrimSpace(result)
+	result = strings.Trim(result, ".")
+
+	// Collapse multiple spaces
+	spaceRegex := regexp.MustCompile(`\s+`)
+	result = spaceRegex.ReplaceAllString(result, " ")
+
+	// Limit length
+	if len(result) > 200 {
+		result = result[:200]
+	}
+
+	// If result is empty after sanitization, return empty
+	result = strings.TrimSpace(result)
+
+	return result
 }
