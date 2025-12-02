@@ -1,0 +1,97 @@
+version: 2
+
+project_name: vget
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: ./cmd/vget
+    binary: vget
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+      - -X github.com/guiyumin/vget/internal/version.Version={{.Version}}
+      - -X github.com/guiyumin/vget/internal/version.Commit={{.Commit}}
+      - -X github.com/guiyumin/vget/internal/version.Date={{.Date}}
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+      - "386"
+      - arm
+    goarm:
+      - "7"
+    ignore:
+      # Windows ARM not supported (32-bit and 64-bit)
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: arm64
+      # macOS 386 and arm not supported
+      - goos: darwin
+        goarch: "386"
+      - goos: darwin
+        goarch: arm
+      # Linux 386 on arm not applicable
+      - goos: linux
+        goarch: arm
+        goarm: "6"
+
+archives:
+  - format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE*
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - Merge pull request
+      - Merge branch
+
+release:
+  github:
+    owner: guiyumin
+    name: vget
+  draft: false
+  prerelease: auto
+  name_template: "v{{.Version}}"
+
+brews:
+  - repository:
+      owner: guiyumin
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    folder: Formula
+    homepage: "https://github.com/guiyumin/vget"
+    description: "Versatile command-line toolkit for downloading audio, video, podcasts, and more"
+    license: "MIT"
+    install: |
+      bin.install "vget"
+    test: |
+      system "#{bin}/vget", "--version"
+    skip_upload: auto
