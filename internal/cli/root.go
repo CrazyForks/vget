@@ -94,15 +94,15 @@ func runWebDAVDownload(rawURL, lang string) error {
 
 	var client *webdav.Client
 	var filePath string
+	var serverName string
 	var err error
 
 	// Check if it's a remote path (e.g., "pikpak:/path/to/file")
 	if webdav.IsRemotePath(rawURL) {
-		serverName, path, err := webdav.ParseRemotePath(rawURL)
+		serverName, filePath, err = webdav.ParseRemotePath(rawURL)
 		if err != nil {
 			return err
 		}
-		filePath = path
 
 		server := cfg.GetWebDAVServer(serverName)
 		if server == nil {
@@ -125,6 +125,7 @@ func runWebDAVDownload(rawURL, lang string) error {
 		if err != nil {
 			return fmt.Errorf("invalid WebDAV URL: %w", err)
 		}
+		serverName = "webdav" // Default name for direct URLs
 	}
 
 	// Get file info
@@ -133,8 +134,22 @@ func runWebDAVDownload(rawURL, lang string) error {
 		return fmt.Errorf("failed to get file info: %w", err)
 	}
 
+	// If it's a directory, open the TUI browser
 	if fileInfo.IsDir {
-		return fmt.Errorf("cannot download directory, use 'vget ls %s' to list contents", rawURL)
+		result, err := RunBrowseTUI(client, serverName, filePath)
+		if err != nil {
+			return fmt.Errorf("browse failed: %w", err)
+		}
+		if result.Cancelled {
+			return nil // User cancelled, no error
+		}
+		// User selected a file, update filePath and continue with download
+		filePath = result.SelectedFile
+		// Re-fetch file info for the selected file
+		fileInfo, err = client.Stat(ctx, filePath)
+		if err != nil {
+			return fmt.Errorf("failed to get file info: %w", err)
+		}
 	}
 
 	// Determine output filename
