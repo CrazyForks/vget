@@ -107,9 +107,26 @@ func (c *Client) List(ctx context.Context, dirPath string) ([]FileInfo, error) {
 		return nil, fmt.Errorf("failed to list %s: %w", dirPath, err)
 	}
 
+	// Normalize dirPath for comparison
+	normalizedDir := strings.TrimSuffix(dirPath, "/")
+	if normalizedDir == "" {
+		normalizedDir = "/"
+	}
+
 	result := make([]FileInfo, 0, len(infos))
 	for _, info := range infos {
+		// Skip the directory itself (some WebDAV servers include it)
+		infoPath := strings.TrimSuffix(info.Path, "/")
+		if infoPath == normalizedDir || infoPath == "" {
+			continue
+		}
+
 		name := path.Base(info.Path)
+		// Skip entries with empty names or just "."
+		if name == "" || name == "." {
+			continue
+		}
+
 		result = append(result, FileInfo{
 			Name:  name,
 			Path:  info.Path,

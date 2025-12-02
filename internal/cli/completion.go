@@ -61,6 +61,21 @@ func init() {
 	rootCmd.ValidArgsFunction = completeRemotePath
 }
 
+// unescapeShellPath removes common shell escape sequences
+func unescapeShellPath(s string) string {
+	// Handle common shell escapes
+	s = strings.ReplaceAll(s, "\\ ", " ")
+	s = strings.ReplaceAll(s, "\\[", "[")
+	s = strings.ReplaceAll(s, "\\]", "]")
+	s = strings.ReplaceAll(s, "\\(", "(")
+	s = strings.ReplaceAll(s, "\\)", ")")
+	s = strings.ReplaceAll(s, "\\&", "&")
+	s = strings.ReplaceAll(s, "\\'", "'")
+	s = strings.ReplaceAll(s, "\\\"", "\"")
+	return s
+}
+
+
 // completeRemotePath provides dynamic completion for WebDAV remote paths
 func completeRemotePath(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	// Only complete first argument (the URL)
@@ -120,18 +135,34 @@ func completeRemoteFiles(toComplete string) ([]string, cobra.ShellCompDirective)
 		return nil, cobra.ShellCompDirectiveError
 	}
 
+	// Unescape shell escapes in the path for proper comparison
+	unescapedPath := unescapeShellPath(remotePath)
+
 	// Determine directory to list and prefix to filter
-	dirPath := filepath.Dir(remotePath)
+	dirPath := filepath.Dir(unescapedPath)
 	if dirPath == "." {
 		dirPath = "/"
 	}
-	baseName := filepath.Base(remotePath)
-	if strings.HasSuffix(toComplete, "/") {
-		dirPath = remotePath
-		baseName = ""
-	}
+	baseName := filepath.Base(unescapedPath)
 
 	ctx := context.Background()
+
+	// Check if the path ends with "/" OR if it's an existing directory
+	// This handles the case where zsh strips the trailing slash
+	if strings.HasSuffix(toComplete, "/") || strings.HasSuffix(unescapedPath, "/") {
+		dirPath = strings.TrimSuffix(unescapedPath, "/")
+		if dirPath == "" {
+			dirPath = "/"
+		}
+		baseName = ""
+	} else {
+		// Check if the path is an existing directory on the remote
+		if info, err := client.Stat(ctx, unescapedPath); err == nil && info.IsDir {
+			// It's a directory - list its contents
+			dirPath = unescapedPath
+			baseName = ""
+		}
+	}
 	files, err := client.List(ctx, dirPath)
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveError
@@ -139,14 +170,16 @@ func completeRemoteFiles(toComplete string) ([]string, cobra.ShellCompDirective)
 
 	var completions []string
 	prefix := serverName + ":"
+	// Ensure dirPath ends with exactly one slash
 	if dirPath != "/" {
-		prefix += dirPath + "/"
+		prefix += strings.TrimSuffix(dirPath, "/") + "/"
 	} else {
 		prefix += "/"
 	}
 
 	for _, f := range files {
 		if baseName == "" || strings.HasPrefix(f.Name, baseName) {
+			// Return the full path for completion
 			completion := prefix + f.Name
 			if f.IsDir {
 				completion += "/"
@@ -159,5 +192,15 @@ func completeRemoteFiles(toComplete string) ([]string, cobra.ShellCompDirective)
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
 
-	return completions, cobra.ShellCompDirectiveNoSpace
+	// Limit completions to avoid zsh prompt redraw issue with large lists
+	// zsh redraws prompt when showing too many completions (threshold ~40-50)
+	// Limit to 30 for safe margin; users can type more chars to filter
+	const maxCompletions = 30
+	if len(completions) > maxCompletions {
+		completions = completions[:maxCompletions]
+	}
+
+	// Use ShellCompDirectiveNoFileComp to prevent falling back to file completion
+	// Use ShellCompDirectiveNoSpace to not add space after directory completions
+	return completions, cobra.ShellCompDirectiveNoFileComp | cobra.ShellCompDirectiveNoSpace
 }

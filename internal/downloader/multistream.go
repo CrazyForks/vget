@@ -23,9 +23,9 @@ type MultiStreamConfig struct {
 // DefaultMultiStreamConfig returns sensible defaults similar to rclone
 func DefaultMultiStreamConfig() MultiStreamConfig {
 	return MultiStreamConfig{
-		Streams:    8,                  // 8 parallel streams
-		ChunkSize:  16 * 1024 * 1024,   // 16MB chunks
-		BufferSize: 128 * 1024,         // 128KB buffer per stream
+		Streams:    12,                 // 12 parallel streams
+		ChunkSize:  64 * 1024 * 1024,   // 64MB chunks
+		BufferSize: 1024 * 1024,        // 1MB buffer per stream
 	}
 }
 
@@ -67,13 +67,18 @@ type chunk struct {
 
 // MultiStreamDownload downloads a file using multiple parallel HTTP Range requests
 func MultiStreamDownload(ctx context.Context, url, output string, config MultiStreamConfig, state *downloadState) error {
-	// Create HTTP client with no timeout (we handle it per-request)
+	// Create HTTP client with optimized transport for high-speed downloads
 	client := &http.Client{
 		Timeout: 0,
 		Transport: &http.Transport{
 			MaxIdleConns:        config.Streams * 2,
 			MaxIdleConnsPerHost: config.Streams * 2,
+			MaxConnsPerHost:     config.Streams * 2,
 			IdleConnTimeout:     90 * time.Second,
+			DisableCompression:  true,              // Avoid CPU overhead for already compressed media
+			ForceAttemptHTTP2:   false,             // HTTP/1.1 is often faster for parallel downloads
+			WriteBufferSize:     64 * 1024,         // 64KB write buffer
+			ReadBufferSize:      64 * 1024,         // 64KB read buffer
 		},
 	}
 
@@ -179,6 +184,8 @@ func MultiStreamDownload(ctx context.Context, url, output string, config MultiSt
 }
 
 // calculateChunks divides the file into download chunks
+// Uses dynamic chunking - fixed chunk size regardless of file size
+// This keeps all workers busy throughout the download
 func calculateChunks(totalSize int64, streams int, chunkSize int64) []chunk {
 	var chunks []chunk
 
@@ -187,32 +194,23 @@ func calculateChunks(totalSize int64, streams int, chunkSize int64) []chunk {
 		return []chunk{{index: 0, start: 0, end: totalSize - 1}}
 	}
 
-	// Calculate number of chunks needed
-	numChunks := (totalSize + chunkSize - 1) / chunkSize
-
-	// Limit to reasonable number based on streams
-	maxChunks := int64(streams * 4) // Allow some queue depth
-	if numChunks > maxChunks {
-		// Recalculate chunk size to fit within maxChunks
-		chunkSize = (totalSize + maxChunks - 1) / maxChunks
-		numChunks = maxChunks
-	}
-
+	// Dynamic chunking: use fixed chunk size, create as many chunks as needed
+	// For a 13.5GB file with 64MB chunks = ~210 chunks
+	// With 12 workers, each processes ~17 chunks, staying busy throughout
 	var start int64
-	for i := int64(0); i < numChunks; i++ {
+	index := 0
+	for start < totalSize {
 		end := start + chunkSize - 1
 		if end >= totalSize {
 			end = totalSize - 1
 		}
 		chunks = append(chunks, chunk{
-			index: int(i),
+			index: index,
 			start: start,
 			end:   end,
 		})
 		start = end + 1
-		if start >= totalSize {
-			break
-		}
+		index++
 	}
 
 	return chunks
@@ -302,13 +300,18 @@ func RunMultiStreamDownloadTUI(url, output, displayID, lang string, config Multi
 
 // MultiStreamDownloadWithAuth downloads a file using multiple parallel HTTP Range requests with auth
 func MultiStreamDownloadWithAuth(ctx context.Context, url, authHeader, output string, totalSize int64, config MultiStreamConfig, state *downloadState) error {
-	// Create HTTP client
+	// Create HTTP client with optimized transport for high-speed downloads
 	client := &http.Client{
 		Timeout: 0,
 		Transport: &http.Transport{
 			MaxIdleConns:        config.Streams * 2,
 			MaxIdleConnsPerHost: config.Streams * 2,
+			MaxConnsPerHost:     config.Streams * 2,
 			IdleConnTimeout:     90 * time.Second,
+			DisableCompression:  true,              // Avoid CPU overhead for already compressed media
+			ForceAttemptHTTP2:   false,             // HTTP/1.1 is often faster for parallel downloads
+			WriteBufferSize:     64 * 1024,         // 64KB write buffer
+			ReadBufferSize:      64 * 1024,         // 64KB read buffer
 		},
 	}
 
