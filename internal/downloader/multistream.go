@@ -24,10 +24,10 @@ type MultiStreamConfig struct {
 // DefaultMultiStreamConfig returns sensible defaults similar to rclone
 func DefaultMultiStreamConfig() MultiStreamConfig {
 	return MultiStreamConfig{
-		Streams:    16,                // 16 parallel streams for better saturation
-		ChunkSize:  16 * 1024 * 1024,  // 16MB chunks - smaller to reduce tail latency
-		BufferSize: 1024 * 1024,       // 1MB buffer per stream
-		UseHTTP2:   true,              // Enable HTTP/2 by default for better multiplexing
+		Streams:    12,               // 12 parallel streams - balanced for stability
+		ChunkSize:  8 * 1024 * 1024,  // 8MB chunks - smaller for faster recovery on failure
+		BufferSize: 1024 * 1024,      // 1MB buffer per stream
+		UseHTTP2:   true,             // Enable HTTP/2 by default for better multiplexing
 	}
 }
 
@@ -281,22 +281,20 @@ func calculateChunks(totalSize int64, streams int, chunkSize int64) []chunk {
 	return chunks
 }
 
-// downloadChunk downloads a single chunk using HTTP Range request with retry logic
+// downloadChunk downloads a single chunk using HTTP Range request with resumable retry logic
+// Instead of restarting from byte 0 on failure, it resumes from the last successfully written byte
 func downloadChunk(ctx context.Context, client *http.Client, url string, file *os.File, c chunk, bufferSize int, state *multiStreamState) error {
-	const maxRetries = 5
+	const maxRetries = 10 // More retries since we resume, not restart
 	var lastErr error
-	var previousAttemptBytes int64
+	currentStart := c.start // Track where we are in the chunk
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if attempt > 0 {
-			// Subtract previously counted bytes since we're retrying the whole chunk
-			if previousAttemptBytes > 0 {
-				state.addBytes(-previousAttemptBytes)
-				previousAttemptBytes = 0
+			// Shorter backoff since we're resuming: 500ms, 1s, 2s, 4s... capped at 8s
+			backoff := time.Duration(1<<uint(attempt-1)) * 500 * time.Millisecond
+			if backoff > 8*time.Second {
+				backoff = 8 * time.Second
 			}
-
-			// Exponential backoff: 1s, 2s, 4s, 8s, 16s
-			backoff := time.Duration(1<<uint(attempt-1)) * time.Second
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -304,16 +302,34 @@ func downloadChunk(ctx context.Context, client *http.Client, url string, file *o
 			}
 		}
 
-		bytesWritten, err := downloadChunkOnce(ctx, client, url, file, c, bufferSize, state)
-		if err == nil {
-			return nil
+		// Create a sub-chunk from current position to end
+		subChunk := chunk{
+			index: c.index,
+			start: currentStart,
+			end:   c.end,
 		}
+
+		bytesWritten, newOffset, err := downloadChunkOnce(ctx, client, url, file, subChunk, bufferSize, state)
+		if err == nil {
+			return nil // Success!
+		}
+
 		lastErr = err
-		previousAttemptBytes = bytesWritten
+		// Update currentStart to resume from where we left off
+		// bytesWritten already added to state, so we keep that progress
+		if bytesWritten > 0 {
+			currentStart = newOffset
+		}
 
 		// Check if context was cancelled
 		if ctx.Err() != nil {
 			return ctx.Err()
+		}
+
+		// If we've made no progress at all in this attempt, count it as a real failure
+		// Otherwise, reset attempt counter since we made progress
+		if bytesWritten > 0 {
+			attempt = 0 // Reset retries when we make progress
 		}
 	}
 
@@ -321,11 +337,11 @@ func downloadChunk(ctx context.Context, client *http.Client, url string, file *o
 }
 
 // downloadChunkOnce performs a single attempt to download a chunk
-// Returns bytes written and any error
-func downloadChunkOnce(ctx context.Context, client *http.Client, url string, file *os.File, c chunk, bufferSize int, state *multiStreamState) (int64, error) {
+// Returns bytes written, final offset position, and any error
+func downloadChunkOnce(ctx context.Context, client *http.Client, url string, file *os.File, c chunk, bufferSize int, state *multiStreamState) (int64, int64, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return 0, err
+		return 0, c.start, err
 	}
 
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -333,12 +349,12 @@ func downloadChunkOnce(ctx context.Context, client *http.Client, url string, fil
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return 0, err
+		return 0, c.start, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusPartialContent && resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return 0, c.start, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
 	buf := make([]byte, bufferSize)
@@ -352,7 +368,7 @@ func downloadChunkOnce(ctx context.Context, client *http.Client, url string, fil
 			// Write at specific offset (thread-safe with pwrite)
 			written, writeErr := file.WriteAt(buf[:n], offset)
 			if writeErr != nil {
-				return totalWritten, fmt.Errorf("write failed: %w", writeErr)
+				return totalWritten, offset, fmt.Errorf("write failed: %w", writeErr)
 			}
 			offset += int64(written)
 			totalWritten += int64(written)
@@ -361,16 +377,16 @@ func downloadChunkOnce(ctx context.Context, client *http.Client, url string, fil
 		if readErr == io.EOF {
 			// Verify we got the full chunk
 			if offset < expectedEnd {
-				return totalWritten, fmt.Errorf("incomplete chunk: got %d bytes, expected %d", offset-c.start, expectedEnd-c.start)
+				return totalWritten, offset, fmt.Errorf("incomplete: got %d/%d bytes", offset-c.start, expectedEnd-c.start)
 			}
 			break
 		}
 		if readErr != nil {
-			return totalWritten, fmt.Errorf("read failed: %w", readErr)
+			return totalWritten, offset, fmt.Errorf("read failed: %w", readErr)
 		}
 	}
 
-	return totalWritten, nil
+	return totalWritten, offset, nil
 }
 
 // RunMultiStreamDownloadTUI runs a multi-stream download with TUI progress
@@ -516,22 +532,19 @@ func MultiStreamDownloadWithAuth(ctx context.Context, url, authHeader, output st
 }
 
 // downloadChunkWithAuth downloads a single chunk using HTTP Range request with auth
-// It includes retry logic for transient failures
+// It includes resumable retry logic - on failure, it resumes from the last written byte
 func downloadChunkWithAuth(ctx context.Context, client *http.Client, url, authHeader string, file *os.File, c chunk, bufferSize int, state *multiStreamState) error {
-	const maxRetries = 5
+	const maxRetries = 10 // More retries since we resume, not restart
 	var lastErr error
-	var previousAttemptBytes int64
+	currentStart := c.start // Track where we are in the chunk
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if attempt > 0 {
-			// Subtract previously counted bytes since we're retrying the whole chunk
-			if previousAttemptBytes > 0 {
-				state.addBytes(-previousAttemptBytes)
-				previousAttemptBytes = 0
+			// Shorter backoff since we're resuming: 500ms, 1s, 2s, 4s... capped at 8s
+			backoff := time.Duration(1<<uint(attempt-1)) * 500 * time.Millisecond
+			if backoff > 8*time.Second {
+				backoff = 8 * time.Second
 			}
-
-			// Exponential backoff: 1s, 2s, 4s, 8s, 16s
-			backoff := time.Duration(1<<uint(attempt-1)) * time.Second
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -539,16 +552,32 @@ func downloadChunkWithAuth(ctx context.Context, client *http.Client, url, authHe
 			}
 		}
 
-		bytesWritten, err := downloadChunkWithAuthOnce(ctx, client, url, authHeader, file, c, bufferSize, state)
-		if err == nil {
-			return nil
+		// Create a sub-chunk from current position to end
+		subChunk := chunk{
+			index: c.index,
+			start: currentStart,
+			end:   c.end,
 		}
+
+		bytesWritten, newOffset, err := downloadChunkWithAuthOnce(ctx, client, url, authHeader, file, subChunk, bufferSize, state)
+		if err == nil {
+			return nil // Success!
+		}
+
 		lastErr = err
-		previousAttemptBytes = bytesWritten
+		// Update currentStart to resume from where we left off
+		if bytesWritten > 0 {
+			currentStart = newOffset
+		}
 
 		// Check if context was cancelled
 		if ctx.Err() != nil {
 			return ctx.Err()
+		}
+
+		// Reset attempt counter when we make progress
+		if bytesWritten > 0 {
+			attempt = 0
 		}
 	}
 
@@ -556,11 +585,11 @@ func downloadChunkWithAuth(ctx context.Context, client *http.Client, url, authHe
 }
 
 // downloadChunkWithAuthOnce performs a single attempt to download a chunk
-// Returns bytes written and any error. Updates state in real-time for progress display.
-func downloadChunkWithAuthOnce(ctx context.Context, client *http.Client, url, authHeader string, file *os.File, c chunk, bufferSize int, state *multiStreamState) (int64, error) {
+// Returns bytes written, final offset, and any error
+func downloadChunkWithAuthOnce(ctx context.Context, client *http.Client, url, authHeader string, file *os.File, c chunk, bufferSize int, state *multiStreamState) (int64, int64, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return 0, err
+		return 0, c.start, err
 	}
 
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -571,17 +600,17 @@ func downloadChunkWithAuthOnce(ctx context.Context, client *http.Client, url, au
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return 0, err
+		return 0, c.start, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusPartialContent && resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return 0, c.start, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
 	buf := make([]byte, bufferSize)
 	offset := c.start
-	expectedEnd := c.end + 1 // end is inclusive, so we expect to read up to end+1
+	expectedEnd := c.end + 1 // end is inclusive
 	var totalWritten int64
 
 	for {
@@ -590,7 +619,7 @@ func downloadChunkWithAuthOnce(ctx context.Context, client *http.Client, url, au
 			// Write at specific offset (thread-safe with pwrite)
 			written, writeErr := file.WriteAt(buf[:n], offset)
 			if writeErr != nil {
-				return totalWritten, fmt.Errorf("write failed: %w", writeErr)
+				return totalWritten, offset, fmt.Errorf("write failed: %w", writeErr)
 			}
 			offset += int64(written)
 			totalWritten += int64(written)
@@ -600,16 +629,16 @@ func downloadChunkWithAuthOnce(ctx context.Context, client *http.Client, url, au
 		if readErr == io.EOF {
 			// Verify we got the full chunk
 			if offset < expectedEnd {
-				return totalWritten, fmt.Errorf("incomplete chunk: got %d bytes, expected %d", offset-c.start, expectedEnd-c.start)
+				return totalWritten, offset, fmt.Errorf("incomplete: got %d/%d bytes", offset-c.start, expectedEnd-c.start)
 			}
 			break
 		}
 		if readErr != nil {
-			return totalWritten, fmt.Errorf("read failed: %w", readErr)
+			return totalWritten, offset, fmt.Errorf("read failed: %w", readErr)
 		}
 	}
 
-	return totalWritten, nil
+	return totalWritten, offset, nil
 }
 
 // downloadWithAuthSingleStream falls back to single-stream download when Range not supported
