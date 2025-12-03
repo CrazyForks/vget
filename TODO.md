@@ -2,9 +2,9 @@
 
 ## Tomorrow's Tasks
 
-1. [ ] Self update - implement `vget update` command
+1. [x] Self update - implement `vget update` command
 2. [ ] Support m3u8 streaming format
-3. [ ] GoReleaser setup
+3. [x] GoReleaser setup
 4. [ ] Cross-platform builds:
    - macOS (Intel x86_64, Apple Silicon arm64)
    - Windows (Intel x86_64, ARM arm64)

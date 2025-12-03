@@ -15,9 +15,10 @@ import (
 )
 
 var (
-	output  string
-	quality string
-	info    bool
+	output    string
+	quality   string
+	info      bool
+	inputFile string
 )
 
 var rootCmd = &cobra.Command{
@@ -26,6 +27,15 @@ var rootCmd = &cobra.Command{
 	Version: version.Version,
 	Args:    cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		// Batch mode: read URLs from file
+		if inputFile != "" {
+			if err := runBatch(inputFile); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
+			return
+		}
+
 		if len(args) == 0 {
 			cmd.Help()
 			return
@@ -41,6 +51,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&output, "output", "o", "", "output filename")
 	rootCmd.Flags().StringVarP(&quality, "quality", "q", "", "preferred quality (e.g., 1080p, 720p)")
 	rootCmd.Flags().BoolVar(&info, "info", false, "show video info without downloading")
+	rootCmd.Flags().StringVarP(&inputFile, "file", "f", "", "read URLs from file (one per line)")
 }
 
 func Execute() error {
@@ -78,7 +89,7 @@ func runDownload(url string) error {
 	// Handle based on media type
 	switch m := media.(type) {
 	case *extractor.VideoMedia:
-		return downloadVideo(m, dl, t)
+		return downloadVideo(m, dl, t, cfg.Language)
 	case *extractor.AudioMedia:
 		return downloadAudio(m, dl)
 	case *extractor.ImageMedia:
@@ -189,7 +200,7 @@ func formatSize(b int64) string {
 	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
 }
 
-func downloadVideo(m *extractor.VideoMedia, dl *downloader.Downloader, t *i18n.Translations) error {
+func downloadVideo(m *extractor.VideoMedia, dl *downloader.Downloader, t *i18n.Translations, lang string) error {
 	// Info only mode
 	if info {
 		for i, f := range m.Formats {
@@ -201,7 +212,7 @@ func downloadVideo(m *extractor.VideoMedia, dl *downloader.Downloader, t *i18n.T
 	// Select best format (or by quality flag)
 	format := selectVideoFormat(m.Formats, quality)
 	if format == nil {
-		return fmt.Errorf(t.Download.NoFormats)
+		return fmt.Errorf("%s", t.Download.NoFormats)
 	}
 
 	fmt.Printf("  %s: %s (%s)\n", t.Download.SelectedFormat, format.Quality, format.Ext)
@@ -210,11 +221,21 @@ func downloadVideo(m *extractor.VideoMedia, dl *downloader.Downloader, t *i18n.T
 	outputFile := output
 	if outputFile == "" {
 		title := extractor.SanitizeFilename(m.Title)
-		if title != "" {
-			outputFile = fmt.Sprintf("%s.%s", title, format.Ext)
-		} else {
-			outputFile = fmt.Sprintf("%s.%s", m.ID, format.Ext)
+		// For m3u8, output as .ts (MPEG-TS container)
+		ext := format.Ext
+		if ext == "m3u8" {
+			ext = "ts"
 		}
+		if title != "" {
+			outputFile = fmt.Sprintf("%s.%s", title, ext)
+		} else {
+			outputFile = fmt.Sprintf("%s.%s", m.ID, ext)
+		}
+	}
+
+	// Use HLS downloader for m3u8 streams
+	if format.Ext == "m3u8" {
+		return downloader.RunHLSDownloadTUI(format.URL, outputFile, m.ID, lang)
 	}
 
 	return dl.Download(format.URL, outputFile, m.ID)

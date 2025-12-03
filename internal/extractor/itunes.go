@@ -22,8 +22,8 @@ func (e *iTunesExtractor) Name() string {
 var applePodcastRegex = regexp.MustCompile(`/(?:podcast/)?(?:[^/]+/)?id(\d+)`)
 
 func (e *iTunesExtractor) Match(u *url.URL) bool {
-	host := u.Hostname()
-	return host == "podcasts.apple.com"
+	// Host matching is done by registry
+	return true
 }
 
 func (e *iTunesExtractor) Extract(rawURL string) (Media, error) {
@@ -115,5 +115,7 @@ type iTunesLookupResult struct {
 }
 
 func init() {
-	Register(&iTunesExtractor{})
+	Register(&iTunesExtractor{},
+		"podcasts.apple.com",
+	)
 }

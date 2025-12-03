@@ -13,9 +13,8 @@ func (e *YouTubeExtractor) Name() string {
 }
 
 func (e *YouTubeExtractor) Match(u *url.URL) bool {
-	host := u.Hostname()
-	return host == "youtube.com" || host == "www.youtube.com" ||
-		host == "youtu.be" || host == "m.youtube.com"
+	// Host matching is done by registry
+	return true
 }
 
 func (e *YouTubeExtractor) Extract(url string) (Media, error) {
@@ -23,5 +22,9 @@ func (e *YouTubeExtractor) Extract(url string) (Media, error) {
 }
 
 func init() {
-	Register(&YouTubeExtractor{})
+	Register(&YouTubeExtractor{},
+		"youtube.com",
+		"youtu.be",
+		"m.youtube.com",
+	)
 }

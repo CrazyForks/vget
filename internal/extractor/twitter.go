@@ -40,11 +40,7 @@ func (t *TwitterExtractor) Name() string {
 
 // Match checks if URL is a Twitter/X status URL
 func (t *TwitterExtractor) Match(u *url.URL) bool {
-	host := u.Hostname()
-	if host != "twitter.com" && host != "www.twitter.com" && host != "x.com" && host != "www.x.com" {
-		return false
-	}
-	// Check path matches /username/status/id pattern
+	// Host matching is done by registry, check path pattern
 	return twitterURLRegex.MatchString(u.String())
 }
 
@@ -586,4 +582,13 @@ func getImageExtension(imageURL string) string {
 		return "gif"
 	}
 	return "jpg"
+}
+
+func init() {
+	Register(&TwitterExtractor{},
+		"twitter.com",
+		"x.com",
+		"mobile.twitter.com",
+		"mobile.x.com",
+	)
 }

@@ -13,8 +13,8 @@ func (e *TikTokExtractor) Name() string {
 }
 
 func (e *TikTokExtractor) Match(u *url.URL) bool {
-	host := u.Hostname()
-	return host == "tiktok.com" || host == "www.tiktok.com" || host == "vm.tiktok.com"
+	// Host matching is done by registry
+	return true
 }
 
 func (e *TikTokExtractor) Extract(url string) (Media, error) {
@@ -22,5 +22,8 @@ func (e *TikTokExtractor) Extract(url string) (Media, error) {
 }
 
 func init() {
-	Register(&TikTokExtractor{})
+	Register(&TikTokExtractor{},
+		"tiktok.com",
+		"vm.tiktok.com",
+	)
 }

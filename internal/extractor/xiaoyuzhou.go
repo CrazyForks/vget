@@ -18,10 +18,7 @@ func (e *XiaoyuzhouExtractor) Name() string {
 }
 
 func (e *XiaoyuzhouExtractor) Match(u *url.URL) bool {
-	host := u.Hostname()
-	if host != "xiaoyuzhoufm.com" && host != "www.xiaoyuzhoufm.com" {
-		return false
-	}
+	// Host matching is done by registry, check path pattern
 	return strings.HasPrefix(u.Path, "/episode/") || strings.HasPrefix(u.Path, "/podcast/")
 }
 
@@ -130,5 +127,7 @@ func (e *XiaoyuzhouExtractor) extractPodcast(_ string) (*AudioMedia, error) {
 
 
 func init() {
-	Register(&XiaoyuzhouExtractor{})
+	Register(&XiaoyuzhouExtractor{},
+		"xiaoyuzhoufm.com",
+	)
 }

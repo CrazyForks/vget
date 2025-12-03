@@ -13,8 +13,8 @@ func (e *InstagramExtractor) Name() string {
 }
 
 func (e *InstagramExtractor) Match(u *url.URL) bool {
-	host := u.Hostname()
-	return host == "instagram.com" || host == "www.instagram.com"
+	// Host matching is done by registry
+	return true
 }
 
 func (e *InstagramExtractor) Extract(url string) (Media, error) {
@@ -22,5 +22,7 @@ func (e *InstagramExtractor) Extract(url string) (Media, error) {
 }
 
 func init() {
-	Register(&InstagramExtractor{})
+	Register(&InstagramExtractor{},
+		"instagram.com",
+	)
 }

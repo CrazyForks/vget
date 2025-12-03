@@ -13,9 +13,8 @@ func (e *XiaohongshuExtractor) Name() string {
 }
 
 func (e *XiaohongshuExtractor) Match(u *url.URL) bool {
-	host := u.Hostname()
-	return host == "xiaohongshu.com" || host == "www.xiaohongshu.com" ||
-		host == "xhslink.com" || host == "www.xhslink.com"
+	// Host matching is done by registry, this is called after host match
+	return true
 }
 
 func (e *XiaohongshuExtractor) Extract(url string) (Media, error) {
@@ -23,5 +22,8 @@ func (e *XiaohongshuExtractor) Extract(url string) (Media, error) {
 }
 
 func init() {
-	Register(&XiaohongshuExtractor{})
+	Register(&XiaohongshuExtractor{},
+		"xiaohongshu.com",
+		"xhslink.com",
+	)
 }
