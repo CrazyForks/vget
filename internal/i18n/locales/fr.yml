@@ -70,3 +70,14 @@ search:
   selected: "Sélectionnés"
   help: "↑/↓ naviguer • espace sélectionner • entrée télécharger • q quitter"
   help_podcast: "↑/↓ naviguer • espace sélectionner • entrée parcourir • q quitter"
+
+twitter:
+  enter_auth_token: "Entrez auth_token"
+  auth_saved: "auth_token Twitter enregistré."
+  auth_can_download: "Vous pouvez maintenant télécharger du contenu réservé aux adultes."
+  auth_cleared: "Authentification Twitter supprimée."
+  auth_required: "auth_token est requis"
+  nsfw_login_required: "Le contenu réservé aux adultes nécessite une connexion."
+  protected_tweet: "Le tweet protégé nécessite une autorisation."
+  tweet_unavailable: "Tweet non disponible."
+  auth_hint: "Exécutez 'vget config twitter set' pour configurer votre auth token."

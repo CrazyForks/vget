@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -78,9 +79,36 @@ func runDownload(url string) error {
 		return fmt.Errorf("%s: %s", t.Errors.NoExtractor, url)
 	}
 
+	// Configure Twitter extractor with auth if available
+	if twitterExt, ok := ext.(*extractor.TwitterExtractor); ok {
+		if cfg.Twitter.AuthToken != "" {
+			twitterExt.SetAuth(cfg.Twitter.AuthToken)
+		}
+	}
+
 	// Extract media info with spinner
 	media, err := runExtractWithSpinner(ext, url, cfg.Language)
 	if err != nil {
+		// Handle Twitter-specific errors with translated messages
+		var twitterErr *extractor.TwitterError
+		if errors.As(err, &twitterErr) {
+			var msg string
+			switch twitterErr.Code {
+			case extractor.TwitterErrorNSFW:
+				msg = t.Twitter.NsfwLoginRequired
+			case extractor.TwitterErrorProtected:
+				msg = t.Twitter.ProtectedTweet
+			case extractor.TwitterErrorUnavailable:
+				msg = t.Twitter.TweetUnavailable
+			default:
+				msg = twitterErr.Message
+			}
+			// Show auth hint if not authenticated
+			if cfg.Twitter.AuthToken == "" {
+				return fmt.Errorf("%s\n%s", msg, t.Twitter.AuthHint)
+			}
+			return fmt.Errorf("%s", msg)
+		}
 		return err
 	}
 

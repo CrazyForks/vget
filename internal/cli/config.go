@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/guiyumin/vget/internal/config"
+	"github.com/guiyumin/vget/internal/i18n"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -38,6 +39,11 @@ var configShowCmd = &cobra.Command{
 			for name, server := range cfg.WebDAVServers {
 				fmt.Printf("  %s: %s\n", name, server.URL)
 			}
+		}
+
+		if cfg.Twitter.AuthToken != "" {
+			fmt.Println("\nTwitter:")
+			fmt.Printf("  auth_token: %s...%s\n", cfg.Twitter.AuthToken[:4], cfg.Twitter.AuthToken[len(cfg.Twitter.AuthToken)-4:])
 		}
 	},
 }
@@ -204,6 +210,72 @@ func orDefault(s, def string) string {
 	return s
 }
 
+// --- Twitter auth management ---
+
+var configTwitterCmd = &cobra.Command{
+	Use:   "twitter",
+	Short: "Manage Twitter/X authentication",
+}
+
+var configTwitterSetCmd = &cobra.Command{
+	Use:   "set",
+	Short: "Set Twitter auth token for NSFW content",
+	Long: `Set Twitter authentication token to download age-restricted content.
+
+To get your auth_token:
+  1. Open x.com in your browser and log in
+  2. Open DevTools (F12) → Application → Cookies → x.com
+  3. Find 'auth_token' and copy its value
+
+Example:
+  vget config twitter set
+  vget config twitter set --token YOUR_AUTH_TOKEN`,
+	Run: func(cmd *cobra.Command, args []string) {
+		cfg := config.LoadOrDefault()
+		t := i18n.T(cfg.Language)
+
+		token, _ := cmd.Flags().GetString("token")
+		if token == "" {
+			reader := bufio.NewReader(os.Stdin)
+			fmt.Printf("%s: ", t.Twitter.EnterAuthToken)
+			input, _ := reader.ReadString('\n')
+			token = strings.TrimSpace(input)
+		}
+
+		if token == "" {
+			fmt.Fprintln(os.Stderr, t.Twitter.AuthRequired)
+			os.Exit(1)
+		}
+
+		cfg.Twitter.AuthToken = token
+
+		if err := config.Save(cfg); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to save: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Println(t.Twitter.AuthSaved)
+		fmt.Println(t.Twitter.AuthCanDownload)
+	},
+}
+
+var configTwitterClearCmd = &cobra.Command{
+	Use:   "clear",
+	Short: "Remove Twitter authentication",
+	Run: func(cmd *cobra.Command, args []string) {
+		cfg := config.LoadOrDefault()
+		t := i18n.T(cfg.Language)
+		cfg.Twitter.AuthToken = ""
+
+		if err := config.Save(cfg); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to save: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Println(t.Twitter.AuthCleared)
+	},
+}
+
 func init() {
 	// config subcommands
 	configCmd.AddCommand(configShowCmd)
@@ -215,6 +287,12 @@ func init() {
 	configWebdavCmd.AddCommand(configWebdavDeleteCmd)
 	configWebdavCmd.AddCommand(configWebdavShowCmd)
 	configCmd.AddCommand(configWebdavCmd)
+
+	// config twitter subcommands
+	configTwitterSetCmd.Flags().String("token", "", "auth_token value")
+	configTwitterCmd.AddCommand(configTwitterSetCmd)
+	configTwitterCmd.AddCommand(configTwitterClearCmd)
+	configCmd.AddCommand(configTwitterCmd)
 
 	rootCmd.AddCommand(configCmd)
 }

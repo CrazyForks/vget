@@ -19,6 +19,7 @@ type Translations struct {
 	Download     DownloadTranslations     `yaml:"download"`
 	Errors       ErrorTranslations        `yaml:"errors"`
 	Search       SearchTranslations       `yaml:"search"`
+	Twitter      TwitterTranslations      `yaml:"twitter"`
 }
 
 type ConfigTranslations struct {
@@ -96,6 +97,18 @@ type SearchTranslations struct {
 	Selected          string `yaml:"selected"`
 	Help              string `yaml:"help"`
 	HelpPodcast       string `yaml:"help_podcast"`
+}
+
+type TwitterTranslations struct {
+	EnterAuthToken    string `yaml:"enter_auth_token"`
+	AuthSaved         string `yaml:"auth_saved"`
+	AuthCanDownload   string `yaml:"auth_can_download"`
+	AuthCleared       string `yaml:"auth_cleared"`
+	AuthRequired      string `yaml:"auth_required"`
+	NsfwLoginRequired string `yaml:"nsfw_login_required"`
+	ProtectedTweet    string `yaml:"protected_tweet"`
+	TweetUnavailable  string `yaml:"tweet_unavailable"`
+	AuthHint          string `yaml:"auth_hint"`
 }
 
 var (

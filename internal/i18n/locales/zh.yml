@@ -70,3 +70,14 @@ search:
   selected: "已选"
   help: "↑/↓ 移动 • 空格 选择 • 回车 下载 • q 退出"
   help_podcast: "↑/↓ 移动 • 空格 选择 • 回车 查看剧集 • q 退出"
+
+twitter:
+  enter_auth_token: "请输入 auth_token"
+  auth_saved: "Twitter auth_token 已保存。"
+  auth_can_download: "现在可以下载年龄限制内容了。"
+  auth_cleared: "Twitter 认证已清除。"
+  auth_required: "auth_token 不能为空"
+  nsfw_login_required: "年龄限制内容需要登录。"
+  protected_tweet: "受保护的推文需要授权。"
+  tweet_unavailable: "推文不可用。"
+  auth_hint: "运行 'vget config twitter set' 设置 auth token。"

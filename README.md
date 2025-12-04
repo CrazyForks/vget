@@ -65,6 +65,19 @@ vget ls pikpak:/Movies                     # List remote directory
 | Apple Podcasts | Audio (Podcast) | Supported |
 | Xiaohongshu    | Video/Image     | Supported |
 
+### Twitter/X Age-Restricted Content
+
+To download age-restricted (NSFW) content from Twitter/X, you need to set your auth token:
+
+1. Open x.com in your browser and log in
+2. Open DevTools (F12) → Application → Cookies → x.com
+3. Find `auth_token` and copy its value
+4. Run:
+   ```bash
+   vget config twitter set
+   # paste your auth_token when prompted
+   ```
+
 ## Configuration
 
 Config file location:

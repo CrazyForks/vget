@@ -70,3 +70,14 @@ search:
   selected: "選択中"
   help: "↑/↓ 移動 • スペース 選択 • Enter ダウンロード • q 終了"
   help_podcast: "↑/↓ 移動 • スペース 選択 • Enter 表示 • q 終了"
+
+twitter:
+  enter_auth_token: "auth_tokenを入力してください"
+  auth_saved: "Twitter auth_tokenを保存しました。"
+  auth_can_download: "年齢制限のあるコンテンツをダウンロードできるようになりました。"
+  auth_cleared: "Twitter認証をクリアしました。"
+  auth_required: "auth_tokenは必須です"
+  nsfw_login_required: "年齢制限コンテンツにはログインが必要です。"
+  protected_tweet: "保護されたツイートには認証が必要です。"
+  tweet_unavailable: "ツイートは利用できません。"
+  auth_hint: "'vget config twitter set' を実行して auth token を設定してください。"

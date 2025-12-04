@@ -54,6 +54,15 @@ type Config struct {
 
 	// WebDAV servers configuration
 	WebDAVServers map[string]WebDAVServer `yaml:"webdavServers,omitempty"`
+
+	// Twitter/X configuration
+	Twitter TwitterConfig `yaml:"twitter,omitempty"`
+}
+
+// TwitterConfig holds Twitter/X authentication settings
+type TwitterConfig struct {
+	// AuthToken is the auth_token cookie value from browser (for NSFW content)
+	AuthToken string `yaml:"auth_token,omitempty"`
 }
 
 // WebDAVServer represents a WebDAV server configuration

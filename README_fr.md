@@ -63,6 +63,19 @@ vget ls pikpak:/Movies                     # Lister un répertoire distant
 | Xiaoyuzhou FM  | Audio (Podcast) | Supporté   |
 | Apple Podcasts | Audio (Podcast) | Supporté   |
 
+### Contenu Twitter/X réservé aux adultes
+
+Pour télécharger du contenu avec restriction d'âge (NSFW) de Twitter/X, vous devez configurer votre auth token :
+
+1. Ouvrez x.com dans votre navigateur et connectez-vous
+2. Ouvrez DevTools (F12) → Application → Cookies → x.com
+3. Trouvez `auth_token` et copiez sa valeur
+4. Exécutez :
+   ```bash
+   vget config twitter set
+   # collez votre auth_token quand demandé
+   ```
+
 ## Configuration
 
 Emplacement du fichier de configuration :

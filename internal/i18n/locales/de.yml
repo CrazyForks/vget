@@ -70,3 +70,14 @@ search:
   selected: "Ausgewählt"
   help: "↑/↓ navigieren • Leertaste auswählen • Enter herunterladen • q beenden"
   help_podcast: "↑/↓ navigieren • Leertaste auswählen • Enter durchsuchen • q beenden"
+
+twitter:
+  enter_auth_token: "auth_token eingeben"
+  auth_saved: "Twitter auth_token gespeichert."
+  auth_can_download: "Sie können jetzt altersbeschränkte Inhalte herunterladen."
+  auth_cleared: "Twitter-Authentifizierung gelöscht."
+  auth_required: "auth_token ist erforderlich"
+  nsfw_login_required: "Altersbeschränkte Inhalte erfordern eine Anmeldung."
+  protected_tweet: "Geschützter Tweet erfordert Autorisierung."
+  tweet_unavailable: "Tweet nicht verfügbar."
+  auth_hint: "Führen Sie 'vget config twitter set' aus, um Ihr auth token zu konfigurieren."

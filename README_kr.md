@@ -63,6 +63,19 @@ vget ls pikpak:/Movies                     # 원격 디렉토리 목록
 | 小宇宙 FM      | 오디오 (팟캐스트) | 지원됨 |
 | Apple Podcasts | 오디오 (팟캐스트) | 지원됨 |
 
+### Twitter/X 연령 제한 콘텐츠
+
+Twitter/X의 연령 제한(NSFW) 콘텐츠를 다운로드하려면 auth token을 설정해야 합니다:
+
+1. 브라우저에서 x.com을 열고 로그인
+2. 개발자 도구(F12) → Application → Cookies → x.com 열기
+3. `auth_token`을 찾아 값을 복사
+4. 실행:
+   ```bash
+   vget config twitter set
+   # 프롬프트에서 auth_token 붙여넣기
+   ```
+
 ## 설정
 
 설정 파일 위치:

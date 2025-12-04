@@ -27,10 +27,29 @@ var (
 	twitterURLRegex = regexp.MustCompile(`(?:twitter\.com|x\.com)/(?:[^/]+)/status/(\d+)`)
 )
 
+// Twitter-specific error types for i18n support
+type TwitterError struct {
+	Code    string // "nsfw", "protected", "unavailable"
+	Message string // Original message for fallback
+}
+
+func (e *TwitterError) Error() string {
+	return e.Message
+}
+
+// Error code constants
+const (
+	TwitterErrorNSFW        = "nsfw"
+	TwitterErrorProtected   = "protected"
+	TwitterErrorUnavailable = "unavailable"
+)
+
 // TwitterExtractor handles Twitter/X media extraction
 type TwitterExtractor struct {
 	client     *http.Client
 	guestToken string
+	authToken  string // auth_token cookie for authenticated requests
+	csrfToken  string // ct0 cookie for CSRF protection
 }
 
 // Name returns the extractor name
@@ -42,6 +61,16 @@ func (t *TwitterExtractor) Name() string {
 func (t *TwitterExtractor) Match(u *url.URL) bool {
 	// Host matching is done by registry, check path pattern
 	return twitterURLRegex.MatchString(u.String())
+}
+
+// SetAuth sets authentication credentials for accessing restricted content
+func (t *TwitterExtractor) SetAuth(authToken string) {
+	t.authToken = authToken
+}
+
+// IsAuthenticated returns true if auth credentials are set
+func (t *TwitterExtractor) IsAuthenticated() bool {
+	return t.authToken != ""
 }
 
 // Extract retrieves media from a Twitter/X URL
@@ -60,13 +89,22 @@ func (t *TwitterExtractor) Extract(urlStr string) (Media, error) {
 	}
 	tweetID := matches[1]
 
+	// If authenticated, use GraphQL API directly (supports NSFW content)
+	if t.IsAuthenticated() {
+		media, err := t.fetchFromGraphQLAuth(tweetID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch tweet: %w", err)
+		}
+		return media, nil
+	}
+
 	// Try syndication API first (simpler, no auth needed for public tweets)
 	media, err := t.fetchFromSyndication(tweetID)
 	if err == nil {
 		return media, nil
 	}
 
-	// Fallback to GraphQL API
+	// Fallback to GraphQL API with guest token
 	if err := t.fetchGuestToken(); err != nil {
 		return nil, fmt.Errorf("failed to get guest token: %w", err)
 	}
@@ -195,6 +233,117 @@ func (t *TwitterExtractor) fetchFromGraphQL(tweetID string) (Media, error) {
 	req.Header.Set("x-guest-token", t.guestToken)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
+
+	resp, err := t.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("GraphQL request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return t.parseGraphQLResponse(body, tweetID)
+}
+
+// fetchCsrfToken fetches the ct0 CSRF token by making a request to Twitter
+func (t *TwitterExtractor) fetchCsrfToken() error {
+	req, err := http.NewRequest("GET", "https://x.com", nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
+	req.AddCookie(&http.Cookie{Name: "auth_token", Value: t.authToken})
+
+	resp, err := t.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	for _, cookie := range resp.Cookies() {
+		if cookie.Name == "ct0" {
+			t.csrfToken = cookie.Value
+			return nil
+		}
+	}
+
+	return fmt.Errorf("could not obtain CSRF token")
+}
+
+// fetchFromGraphQLAuth uses the GraphQL API with authentication (for NSFW content)
+func (t *TwitterExtractor) fetchFromGraphQLAuth(tweetID string) (Media, error) {
+	// Fetch CSRF token if not already set
+	if t.csrfToken == "" {
+		if err := t.fetchCsrfToken(); err != nil {
+			return nil, fmt.Errorf("failed to get CSRF token: %w", err)
+		}
+	}
+
+	variables := map[string]interface{}{
+		"tweetId":                tweetID,
+		"withCommunity":          false,
+		"includePromotedContent": false,
+		"withVoice":              false,
+	}
+
+	// Features from yt-dlp (actively maintained)
+	features := map[string]interface{}{
+		"creator_subscriptions_tweet_preview_api_enabled":                         true,
+		"tweetypie_unmention_optimization_enabled":                                true,
+		"responsive_web_edit_tweet_api_enabled":                                   true,
+		"graphql_is_translatable_rweb_tweet_is_translatable_enabled":              true,
+		"view_counts_everywhere_api_enabled":                                      true,
+		"longform_notetweets_consumption_enabled":                                 true,
+		"responsive_web_twitter_article_tweet_consumption_enabled":                false,
+		"tweet_awards_web_tipping_enabled":                                        false,
+		"freedom_of_speech_not_reach_fetch_enabled":                               true,
+		"standardized_nudges_misinfo":                                             true,
+		"tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled": true,
+		"longform_notetweets_rich_text_read_enabled":                              true,
+		"longform_notetweets_inline_media_enabled":                                true,
+		"responsive_web_graphql_exclude_directive_enabled":                        true,
+		"verified_phone_label_enabled":                                            false,
+		"responsive_web_media_download_video_enabled":                             false,
+		"responsive_web_graphql_skip_user_profile_image_extensions_enabled":       false,
+		"responsive_web_graphql_timeline_navigation_enabled":                      true,
+		"responsive_web_enhance_cards_enabled":                                    false,
+	}
+
+	variablesJSON, _ := json.Marshal(variables)
+	featuresJSON, _ := json.Marshal(features)
+
+	params := url.Values{}
+	params.Set("variables", string(variablesJSON))
+	params.Set("features", string(featuresJSON))
+
+	reqURL := twitterGraphQLURL + "?" + params.Encode()
+
+	req, err := http.NewRequest("GET", reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Set authentication headers
+	req.Header.Set("Authorization", "Bearer "+twitterBearerToken)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
+	req.Header.Set("x-twitter-auth-type", "OAuth2Session")
+	req.Header.Set("x-twitter-client-language", "en")
+	req.Header.Set("x-twitter-active-user", "yes")
+	req.Header.Set("x-csrf-token", t.csrfToken)
+
+	// Set cookies for authentication
+	req.AddCookie(&http.Cookie{Name: "auth_token", Value: t.authToken})
+	req.AddCookie(&http.Cookie{Name: "ct0", Value: t.csrfToken})
 
 	resp, err := t.client.Do(req)
 	if err != nil {
@@ -353,18 +502,19 @@ func (t *TwitterExtractor) parseGraphQLResponse(body []byte, tweetID string) (Me
 		if result.Tombstone != nil && result.Tombstone.Text.Text != "" {
 			msg = result.Tombstone.Text.Text
 		}
-		return nil, fmt.Errorf("%s", msg)
+		return nil, &TwitterError{Code: TwitterErrorUnavailable, Message: msg}
 	case "TweetUnavailable":
 		switch result.Reason {
 		case "NsfwLoggedOut":
-			return nil, fmt.Errorf("age-restricted content requires login")
+			return nil, &TwitterError{Code: TwitterErrorNSFW, Message: "age-restricted content requires login"}
 		case "Protected":
-			return nil, fmt.Errorf("protected tweet requires authorization")
+			return nil, &TwitterError{Code: TwitterErrorProtected, Message: "protected tweet requires authorization"}
 		default:
+			msg := "tweet is unavailable"
 			if result.Reason != "" {
-				return nil, fmt.Errorf("tweet unavailable: %s", result.Reason)
+				msg = fmt.Sprintf("tweet unavailable: %s", result.Reason)
 			}
-			return nil, fmt.Errorf("tweet is unavailable")
+			return nil, &TwitterError{Code: TwitterErrorUnavailable, Message: msg}
 		}
 	}
 
