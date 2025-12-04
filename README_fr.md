@@ -33,7 +33,7 @@ Téléchargez `vget-windows-amd64.exe` depuis [Releases](https://github.com/guiy
 | `vget [url]`                       | Télécharger des médias (`-o`, `-q`, `--info`) |
 | `vget ls <remote>:<path>`          | Lister un répertoire distant (`--json`) |
 | `vget init`                        | Assistant de configuration interactif |
-| `vget update`                      | Mise à jour automatique               |
+| `vget update`                      | Mise à jour (`sudo` sur Mac/Linux)    |
 | `vget search --podcast <query>`    | Rechercher des podcasts               |
 | `vget completion [shell]`          | Générer un script d'autocomplétion    |
 | `vget config show`                 | Afficher la configuration             |
@@ -89,6 +89,20 @@ Exécutez `vget init` pour créer le fichier de configuration de manière intera
 
 ```yaml
 language: fr # en, zh, jp, kr, es, fr, de
+```
+
+## Mise à jour
+
+Pour mettre à jour vget vers la dernière version :
+
+**macOS / Linux :**
+```bash
+sudo vget update
+```
+
+**Windows (exécuter PowerShell en tant qu'Administrateur) :**
+```powershell
+vget update
 ```
 
 ## Langues

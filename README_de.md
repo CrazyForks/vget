@@ -33,7 +33,7 @@ Laden Sie `vget-windows-amd64.exe` von [Releases](https://github.com/guiyumin/vg
 | `vget [url]`                       | Medien herunterladen (`-o`, `-q`, `--info`) |
 | `vget ls <remote>:<path>`          | Remote-Verzeichnis auflisten (`--json`) |
 | `vget init`                        | Interaktiver Konfigurationsassistent  |
-| `vget update`                      | Automatische Aktualisierung           |
+| `vget update`                      | Aktualisieren (`sudo` auf Mac/Linux)  |
 | `vget search --podcast <query>`    | Podcasts suchen                       |
 | `vget completion [shell]`          | Shell-Vervollständigung generieren    |
 | `vget config show`                 | Konfiguration anzeigen                |
@@ -89,6 +89,20 @@ Führen Sie `vget init` aus, um die Konfigurationsdatei interaktiv zu erstellen,
 
 ```yaml
 language: de # en, zh, jp, kr, es, fr, de
+```
+
+## Aktualisierung
+
+Um vget auf die neueste Version zu aktualisieren:
+
+**macOS / Linux:**
+```bash
+sudo vget update
+```
+
+**Windows (PowerShell als Administrator ausführen):**
+```powershell
+vget update
 ```
 
 ## Sprachen

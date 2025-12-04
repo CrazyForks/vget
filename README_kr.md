@@ -33,7 +33,7 @@ sudo mv vget /usr/local/bin/
 | `vget [url]`                       | 미디어 다운로드 (`-o`, `-q`, `--info`) |
 | `vget ls <remote>:<path>`          | 원격 디렉토리 목록 (`--json`)         |
 | `vget init`                        | 대화형 설정 마법사                    |
-| `vget update`                      | 자동 업데이트                         |
+| `vget update`                      | 자동 업데이트 (Mac/Linux는 `sudo` 필요) |
 | `vget search --podcast <query>`    | 팟캐스트 검색                         |
 | `vget completion [shell]`          | 쉘 자동완성 스크립트 생성             |
 | `vget config show`                 | 설정 표시                             |
@@ -89,6 +89,20 @@ Twitter/X의 연령 제한(NSFW) 콘텐츠를 다운로드하려면 auth token�
 
 ```yaml
 language: kr # en, zh, jp, kr, es, fr, de
+```
+
+## 업데이트
+
+vget을 최신 버전으로 업데이트:
+
+**macOS / Linux:**
+```bash
+sudo vget update
+```
+
+**Windows (관리자 권한으로 PowerShell 실행):**
+```powershell
+vget update
 ```
 
 ## 언어

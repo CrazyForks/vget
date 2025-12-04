@@ -33,7 +33,7 @@ sudo mv vget /usr/local/bin/
 | `vget [url]`                       | 下载媒体 (`-o`, `-q`, `--info`)       |
 | `vget ls <remote>:<path>`          | 列出远程目录 (`--json`)               |
 | `vget init`                        | 交互式配置向导                        |
-| `vget update`                      | 自动更新                              |
+| `vget update`                      | 自动更新（Mac/Linux 需使用 `sudo`）   |
 | `vget search --podcast <query>`    | 搜索播客                              |
 | `vget completion [shell]`          | 生成 shell 补全脚本                   |
 | `vget config show`                 | 显示配置                              |
@@ -91,6 +91,20 @@ vget ls pikpak:/Movies                     # 列出远程目录
 
 ```yaml
 language: zh # en, zh, jp, kr, es, fr, de
+```
+
+## 更新
+
+将 vget 更新到最新版本：
+
+**macOS / Linux:**
+```bash
+sudo vget update
+```
+
+**Windows（以管理员身份运行 PowerShell）:**
+```powershell
+vget update
 ```
 
 ## 语言

@@ -33,7 +33,7 @@ sudo mv vget /usr/local/bin/
 | `vget [url]`                       | メディアをダウンロード (`-o`, `-q`, `--info`) |
 | `vget ls <remote>:<path>`          | リモートディレクトリを一覧表示 (`--json`) |
 | `vget init`                        | 対話式設定ウィザード                  |
-| `vget update`                      | 自動更新                              |
+| `vget update`                      | 自動更新（Mac/Linux は `sudo` が必要）|
 | `vget search --podcast <query>`    | ポッドキャスト検索                    |
 | `vget completion [shell]`          | シェル補完スクリプトを生成            |
 | `vget config show`                 | 設定を表示                            |
@@ -89,6 +89,20 @@ Twitter/X の年齢制限（NSFW）コンテンツをダウンロードするに
 
 ```yaml
 language: jp # en, zh, jp, kr, es, fr, de
+```
+
+## 更新
+
+vget を最新バージョンに更新：
+
+**macOS / Linux:**
+```bash
+sudo vget update
+```
+
+**Windows（管理者として PowerShell を実行）:**
+```powershell
+vget update
 ```
 
 ## 言語
