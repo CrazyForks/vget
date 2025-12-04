@@ -340,15 +340,16 @@ func (e *XiaohongshuExtractor) createLauncher(headless bool) *launcher.Launcher 
 	return l
 }
 
-// getUserDataDir returns the persistent browser data directory for XHS
-// Located at ~/.config/vget/xhs-browser/
+// getUserDataDir returns the persistent browser data directory
+// Located at ~/.config/vget/browser/
+// This is shared across all extractors that need browser automation
 func (e *XiaohongshuExtractor) getUserDataDir() string {
 	configDir, err := config.ConfigDir()
 	if err != nil {
 		// Fallback to temp dir if config dir unavailable
-		return filepath.Join(os.TempDir(), "vget-xhs-browser")
+		return filepath.Join(os.TempDir(), "vget-browser")
 	}
-	return filepath.Join(configDir, "xhs-browser")
+	return filepath.Join(configDir, "browser")
 }
 
 func (e *XiaohongshuExtractor) loadCookies(browser *rod.Browser) {

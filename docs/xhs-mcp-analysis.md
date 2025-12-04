@@ -167,7 +167,7 @@ The Xiaohongshu extractor has been implemented in vget. See `internal/extractor/
 
 1. **Isolated Browser** - Uses Rod's Chromium, NOT system Chrome
    - Browser binary: `~/.cache/rod/browser/`
-   - User data: `~/.config/vget/xhs-browser/`
+   - User data: `~/.config/vget/browser/` (shared by all extractors)
    - No interference with user's Chrome profiles
 
 2. **Login Wait** - If content requires login:

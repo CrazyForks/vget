@@ -93,7 +93,7 @@ The XHS extractor (`internal/extractor/xiaohongshu.go`) uses browser automation:
 
 - **Browser**: Rod's auto-downloaded Chromium (NOT system Chrome)
 - **Binary location**: `~/.cache/rod/browser/`
-- **User data**: `~/.config/vget/xhs-browser/` (persistent between runs)
+- **User data**: `~/.config/vget/browser/` (persistent, shared by all extractors)
 - **Stealth**: Uses `go-rod/stealth` for anti-bot detection
 
 **Important**: Never use system Chrome profiles with browser automation - it can corrupt session data.
