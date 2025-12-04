@@ -79,6 +79,9 @@ func (t *TwitterExtractor) Extract(urlStr string) (Media, error) {
 	if t.client == nil {
 		t.client = &http.Client{
 			Timeout: 30 * time.Second,
+			Transport: &http.Transport{
+				Proxy: http.ProxyFromEnvironment,
+			},
 		}
 	}
 

@@ -55,6 +55,9 @@ var (
 func ParseM3U8(m3u8URL string) (*M3U8Playlist, error) {
 	client := &http.Client{
 		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+		},
 	}
 
 	req, err := http.NewRequest("GET", m3u8URL, nil)

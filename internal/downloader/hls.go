@@ -194,6 +194,7 @@ func downloadSegmentsOrdered(ctx context.Context, segments []Segment, file *os.F
 	client := &http.Client{
 		Timeout: 60 * time.Second,
 		Transport: &http.Transport{
+			Proxy:               http.ProxyFromEnvironment,
 			MaxIdleConnsPerHost: config.Workers * 2,
 			DisableCompression:  true,
 		},
@@ -304,7 +305,12 @@ func downloadSegment(client *http.Client, url string, decryptKey, decryptIV []by
 
 // fetchKey fetches the encryption key from the URL
 func fetchKey(url string) ([]byte, error) {
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+		},
+	}
 	resp, err := client.Get(url)
 	if err != nil {
 		return nil, err

@@ -145,6 +145,7 @@ func MultiStreamDownload(ctx context.Context, url, output string, config MultiSt
 	client := &http.Client{
 		Timeout: 0,
 		Transport: &http.Transport{
+			Proxy:               http.ProxyFromEnvironment,
 			MaxIdleConns:        0,                 // Unlimited idle connections
 			MaxIdleConnsPerHost: config.Streams*2 + 10,
 			MaxConnsPerHost:     0,                 // Unlimited connections per host (like rclone)
@@ -432,6 +433,7 @@ func MultiStreamDownloadWithAuth(ctx context.Context, url, authHeader, output st
 	client := &http.Client{
 		Timeout: 0,
 		Transport: &http.Transport{
+			Proxy:               http.ProxyFromEnvironment,
 			MaxIdleConns:        0,                 // Unlimited idle connections
 			MaxIdleConnsPerHost: config.Streams*2 + 10,
 			MaxConnsPerHost:     0,                 // Unlimited connections per host (like rclone)

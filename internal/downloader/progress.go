@@ -253,7 +253,12 @@ func calculateETA(remaining int64, speed float64) string {
 
 // RunDownloadTUI runs the download with a TUI progress display
 func RunDownloadTUI(url, output, videoID, lang string) error {
-	client := &http.Client{Timeout: 0}
+	client := &http.Client{
+		Timeout: 0,
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+		},
+	}
 
 	state := &downloadState{
 		startTime: time.Now(),

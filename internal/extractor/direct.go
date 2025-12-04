@@ -31,6 +31,9 @@ func (d *DirectExtractor) Extract(urlStr string) (Media, error) {
 	if d.client == nil {
 		d.client = &http.Client{
 			Timeout: 30 * time.Second,
+			Transport: &http.Transport{
+				Proxy: http.ProxyFromEnvironment,
+			},
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				// Follow redirects but limit to 10
 				if len(via) >= 10 {

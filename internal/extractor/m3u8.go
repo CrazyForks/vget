@@ -35,6 +35,9 @@ func (m *M3U8Extractor) Extract(urlStr string) (Media, error) {
 	if m.client == nil {
 		m.client = &http.Client{
 			Timeout: 30 * time.Second,
+			Transport: &http.Transport{
+				Proxy: http.ProxyFromEnvironment,
+			},
 		}
 	}
 

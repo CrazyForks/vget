@@ -69,14 +69,12 @@ func (m *model) getStepTitle() string {
 	case 0:
 		return t.Config.Language
 	case 1:
-		return t.Config.Proxy
-	case 2:
 		return t.Config.OutputDir
-	case 3:
+	case 2:
 		return t.Config.Format
-	case 4:
+	case 3:
 		return t.Config.Quality
-	case 5:
+	case 4:
 		return t.Config.Confirm
 	}
 	return ""
@@ -88,18 +86,16 @@ func (m *model) getStepDescription() string {
 	case 0:
 		return t.Config.LanguageDesc
 	case 1:
-		return t.Config.ProxyDesc
-	case 2:
 		cwd, err := os.Getwd()
 		if err != nil {
 			cwd = "current directory"
 		}
 		return fmt.Sprintf("%s (. = %s)", t.Config.OutputDirDesc, cwd)
-	case 3:
+	case 2:
 		return t.Config.FormatDesc
-	case 4:
+	case 3:
 		return t.Config.QualityDesc
-	case 5:
+	case 4:
 		return t.Config.ConfirmDesc
 	}
 	return ""
@@ -114,14 +110,14 @@ func (m *model) getOptions() []struct{ label, value string } {
 			opts[i] = struct{ label, value string }{lang.Name, lang.Code}
 		}
 		return opts
-	case 3:
+	case 2:
 		return []struct{ label, value string }{
 			{"MP4 " + t.Config.Recommended, "mp4"},
 			{"WebM", "webm"},
 			{"MKV", "mkv"},
 			{t.Config.BestAvailable, "best"},
 		}
-	case 4:
+	case 3:
 		return []struct{ label, value string }{
 			{t.Config.BestAvailable, "best"},
 			{"4K (2160p)", "2160p"},
@@ -129,7 +125,7 @@ func (m *model) getOptions() []struct{ label, value string } {
 			{"720p", "720p"},
 			{"480p", "480p"},
 		}
-	case 5:
+	case 4:
 		return []struct{ label, value string }{
 			{t.Config.YesSave, "yes"},
 			{t.Config.NoCancel, "no"},
@@ -139,14 +135,12 @@ func (m *model) getOptions() []struct{ label, value string } {
 }
 
 func (m *model) isInputStep() bool {
-	return m.currentStep == 1 || m.currentStep == 2
+	return m.currentStep == 1 // Only output dir is input step now
 }
 
 func (m *model) getPlaceholder() string {
 	switch m.currentStep {
 	case 1:
-		return "http://127.0.0.1:7890"
-	case 2:
 		if cwd, err := os.Getwd(); err == nil {
 			return cwd
 		}
@@ -159,8 +153,6 @@ func (m *model) setCursorFromConfig() {
 	if m.isInputStep() {
 		switch m.currentStep {
 		case 1:
-			m.inputBuffer = m.config.Proxy
-		case 2:
 			m.inputBuffer = m.config.OutputDir
 		}
 		m.inputCursor = len(m.inputBuffer)
@@ -171,9 +163,9 @@ func (m *model) setCursorFromConfig() {
 	switch m.currentStep {
 	case 0:
 		currentValue = m.config.Language
-	case 3:
+	case 2:
 		currentValue = m.config.Format
-	case 4:
+	case 3:
 		currentValue = m.config.Quality
 	}
 
@@ -215,7 +207,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "right", "enter":
 			m.saveCurrentValue()
 
-			if m.currentStep == 5 {
+			if m.currentStep == 4 {
 				// Confirmation step
 				if m.cursor == 0 {
 					m.confirmed = true
@@ -273,8 +265,6 @@ func (m *model) saveCurrentValue() {
 	if m.isInputStep() {
 		switch m.currentStep {
 		case 1:
-			m.config.Proxy = m.inputBuffer
-		case 2:
 			m.config.OutputDir = m.inputBuffer
 		}
 		return
@@ -286,9 +276,9 @@ func (m *model) saveCurrentValue() {
 		switch m.currentStep {
 		case 0:
 			m.config.Language = value
-		case 3:
+		case 2:
 			m.config.Format = value
-		case 4:
+		case 3:
 			m.config.Quality = value
 		}
 	}
@@ -303,7 +293,7 @@ func (m model) View() string {
 	b.WriteString("\n\n")
 
 	// Progress indicator
-	progress := fmt.Sprintf(t.Config.StepOf, m.currentStep+1, 6)
+	progress := fmt.Sprintf(t.Config.StepOf, m.currentStep+1, 5)
 	b.WriteString(stepStyle.Render(progress))
 	b.WriteString("\n\n")
 
@@ -314,7 +304,7 @@ func (m model) View() string {
 	b.WriteString("\n\n")
 
 	// Content
-	if m.currentStep == 5 {
+	if m.currentStep == 4 {
 		// Review step
 		b.WriteString(m.renderReview())
 		b.WriteString("\n")
@@ -367,10 +357,6 @@ func (m model) renderReview() string {
 	var b strings.Builder
 	t := m.t()
 
-	proxy := m.config.Proxy
-	if proxy == "" {
-		proxy = t.Config.ProxyNone
-	}
 	outputDir := m.config.OutputDir
 	if outputDir == "" || outputDir == "." {
 		if cwd, err := os.Getwd(); err == nil {
@@ -385,7 +371,6 @@ func (m model) renderReview() string {
 		value string
 	}{
 		{t.ConfigReview.Language, getLanguageName(m.config.Language)},
-		{t.ConfigReview.Proxy, proxy},
 		{t.ConfigReview.OutputDir, outputDir},
 		{t.ConfigReview.Format, m.config.Format},
 		{t.ConfigReview.Quality, m.config.Quality},
