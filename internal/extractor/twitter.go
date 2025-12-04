@@ -346,6 +346,28 @@ func (t *TwitterExtractor) parseGraphQLResponse(body []byte, tweetID string) (Me
 		return nil, fmt.Errorf("tweet not found or not accessible")
 	}
 
+	// Handle different result types
+	switch result.TypeName {
+	case "TweetTombstone":
+		msg := "tweet is unavailable"
+		if result.Tombstone != nil && result.Tombstone.Text.Text != "" {
+			msg = result.Tombstone.Text.Text
+		}
+		return nil, fmt.Errorf("%s", msg)
+	case "TweetUnavailable":
+		switch result.Reason {
+		case "NsfwLoggedOut":
+			return nil, fmt.Errorf("age-restricted content requires login")
+		case "Protected":
+			return nil, fmt.Errorf("protected tweet requires authorization")
+		default:
+			if result.Reason != "" {
+				return nil, fmt.Errorf("tweet unavailable: %s", result.Reason)
+			}
+			return nil, fmt.Errorf("tweet is unavailable")
+		}
+	}
+
 	// Handle tweet with visibility results
 	legacy := result.Legacy
 	if legacy == nil && result.Tweet != nil {
@@ -353,7 +375,7 @@ func (t *TwitterExtractor) parseGraphQLResponse(body []byte, tweetID string) (Me
 	}
 
 	if legacy == nil {
-		return nil, fmt.Errorf("could not find tweet data")
+		return nil, fmt.Errorf("could not find tweet data (type: %s)", result.TypeName)
 	}
 
 	title := truncateText(legacy.FullText, 100)
@@ -480,10 +502,16 @@ type graphQLResponse struct {
 }
 
 type graphQLTweetResult struct {
-	TypeName string              `json:"__typename"`
-	Legacy   *graphQLLegacy      `json:"legacy"`
-	Core     *graphQLCore        `json:"core"`
-	Tweet    *graphQLTweetResult `json:"tweet"` // For TweetWithVisibilityResults
+	TypeName  string              `json:"__typename"`
+	Legacy    *graphQLLegacy      `json:"legacy"`
+	Core      *graphQLCore        `json:"core"`
+	Tweet     *graphQLTweetResult `json:"tweet"`     // For TweetWithVisibilityResults
+	Reason    string              `json:"reason"`    // For TweetUnavailable
+	Tombstone *struct {
+		Text struct {
+			Text string `json:"text"`
+		} `json:"text"`
+	} `json:"tombstone"` // For TweetTombstone
 }
 
 type graphQLCore struct {
