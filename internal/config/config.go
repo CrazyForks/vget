@@ -2,8 +2,10 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -182,7 +184,36 @@ func Init() error {
 func LoadOrDefault() *Config {
 	cfg, err := Load()
 	if err != nil {
-		return DefaultConfig()
+		cfg = DefaultConfig()
 	}
+	loadEnvProxy(cfg)
 	return cfg
+}
+
+// loadEnvProxy loads proxy settings from environment
+func loadEnvProxy(cfg *Config) {
+	envKeys := []string{
+		"ALL_PROXY", "all_proxy",
+		"HTTPS_PROXY", "https_proxy",
+		"HTTP_PROXY", "http_proxy",
+	}
+
+	for _, key := range envKeys {
+		val := os.Getenv(key)
+		cleanVal := strings.TrimSpace(val)
+		if cleanVal == "" {
+			continue
+		}
+
+		u, err := url.Parse(cleanVal)
+		if err != nil {
+			continue
+		}
+
+		switch strings.ToLower(u.Scheme) {
+		case "http", "https", "socks5":
+			cfg.Proxy = cleanVal
+			return
+		}
+	}
 }
