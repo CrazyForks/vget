@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/guiyumin/vget/internal/config"
 	"github.com/guiyumin/vget/internal/downloader"
@@ -76,7 +77,19 @@ func runDownload(url string) error {
 	// Find matching extractor
 	ext := extractor.Match(url)
 	if ext == nil {
-		return fmt.Errorf("%s: %s", t.Errors.NoExtractor, url)
+		// Try sites.yml for unknown sites
+		sitesConfig, err := config.LoadSites()
+		if err != nil {
+			return fmt.Errorf("failed to load sites.yml: %w", err)
+		}
+		if sitesConfig == nil {
+			return fmt.Errorf("%s: %s\n\033[33m%s\033[0m", t.Errors.NoExtractor, url, t.Errors.NoSitesYml)
+		}
+		site := sitesConfig.MatchSite(url)
+		if site == nil {
+			return fmt.Errorf("%s: %s\n\033[33m%s\033[0m", t.Errors.NoExtractor, url, t.Errors.SiteNotInYml)
+		}
+		ext = extractor.NewBrowserExtractor(site)
 	}
 
 	// Configure Twitter extractor with auth if available
@@ -263,7 +276,18 @@ func downloadVideo(m *extractor.VideoMedia, dl *downloader.Downloader, t *i18n.T
 
 	// Use HLS downloader for m3u8 streams
 	if format.Ext == "m3u8" {
-		return downloader.RunHLSDownloadTUI(format.URL, outputFile, m.ID, lang)
+		// Create directory with title to keep things organized
+		title := extractor.SanitizeFilename(m.Title)
+		if title == "" {
+			title = m.ID
+		}
+		if err := os.MkdirAll(title, 0755); err != nil {
+			return fmt.Errorf("failed to create directory: %w", err)
+		}
+		// Put output file inside the directory
+		outputFile = filepath.Join(title, filepath.Base(outputFile))
+		fmt.Printf("  Output directory: %s/\n", title)
+		return downloader.RunHLSDownloadWithHeadersTUI(format.URL, outputFile, m.ID, lang, format.Headers)
 	}
 
 	return dl.Download(format.URL, outputFile, m.ID)

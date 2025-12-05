@@ -20,6 +20,7 @@ type Translations struct {
 	Errors       ErrorTranslations        `yaml:"errors"`
 	Search       SearchTranslations       `yaml:"search"`
 	Twitter      TwitterTranslations      `yaml:"twitter"`
+	Sites        SitesTranslations        `yaml:"sites"`
 }
 
 type ConfigTranslations struct {
@@ -84,6 +85,8 @@ type ErrorTranslations struct {
 	ExtractionFailed string `yaml:"extraction_failed"`
 	DownloadFailed   string `yaml:"download_failed"`
 	NoExtractor      string `yaml:"no_extractor"`
+	NoSitesYml       string `yaml:"no_sites_yml"`
+	SiteNotInYml     string `yaml:"site_not_in_yml"`
 }
 
 type SearchTranslations struct {
@@ -109,6 +112,19 @@ type TwitterTranslations struct {
 	ProtectedTweet    string `yaml:"protected_tweet"`
 	TweetUnavailable  string `yaml:"tweet_unavailable"`
 	AuthHint          string `yaml:"auth_hint"`
+}
+
+type SitesTranslations struct {
+	ConfigureSite   string `yaml:"configure_site"`
+	DomainMatch     string `yaml:"domain_match"`
+	SelectType      string `yaml:"select_type"`
+	OnlyM3u8ForNow  string `yaml:"only_m3u8_for_now"`
+	ExistingSites   string `yaml:"existing_sites"`
+	SiteAdded       string `yaml:"site_added"`
+	SavedTo         string `yaml:"saved_to"`
+	Cancelled       string `yaml:"cancelled"`
+	EnterConfirm    string `yaml:"enter_confirm"`
+	EscCancel       string `yaml:"esc_cancel"`
 }
 
 var (

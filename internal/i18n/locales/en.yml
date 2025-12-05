@@ -58,6 +58,8 @@ errors:
   extraction_failed: "Extraction failed"
   download_failed: "Download failed"
   no_extractor: "No extractor found for this URL"
+  no_sites_yml: "Create sites.yml to configure unknown sites. Run 'vget config sites' for help."
+  site_not_in_yml: "Site not found in sites.yml. Run 'vget config sites add' to add it."
 
 search:
   results_for: "Search results for"
@@ -81,3 +83,15 @@ twitter:
   protected_tweet: "Protected tweet requires authorization."
   tweet_unavailable: "Tweet is unavailable."
   auth_hint: "Run 'vget config twitter set' to set your auth token."
+
+sites:
+  configure_site: "Configure Site"
+  domain_match: "Domain match (e.g., kanav.ad):"
+  select_type: "Select type:"
+  only_m3u8_for_now: "(only m3u8 for now)"
+  existing_sites: "Existing sites in ./sites.yml:"
+  site_added: "Site added"
+  saved_to: "Saved to ./sites.yml"
+  cancelled: "Cancelled"
+  enter_confirm: "enter confirm"
+  esc_cancel: "esc cancel"

@@ -58,6 +58,8 @@ errors:
   extraction_failed: "추출 실패"
   download_failed: "다운로드 실패"
   no_extractor: "이 URL에 대한 추출기를 찾을 수 없습니다"
+  no_sites_yml: "Create sites.yml to configure unknown sites. Run 'vget config sites' for help."
+  site_not_in_yml: "Site not found in sites.yml. Run 'vget config sites add' to add it."
 
 search:
   results_for: "검색 결과"

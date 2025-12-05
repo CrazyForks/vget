@@ -58,6 +58,8 @@ errors:
   extraction_failed: "解析に失敗しました"
   download_failed: "ダウンロードに失敗しました"
   no_extractor: "このURLに対応する解析器がありません"
+  no_sites_yml: "sites.yml を作成してください。'vget config sites' でヘルプを表示。"
+  site_not_in_yml: "sites.yml にこのサイトがありません。'vget config sites add' で追加。"
 
 search:
   results_for: "検索結果"

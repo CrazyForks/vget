@@ -58,6 +58,8 @@ errors:
   extraction_failed: "解析失败"
   download_failed: "下载失败"
   no_extractor: "没有找到适用于此URL的解析器"
+  no_sites_yml: "请创建 sites.yml 配置未知网站。运行 'vget config sites' 获取帮助。"
+  site_not_in_yml: "sites.yml 中未找到此网站。运行 'vget config sites add' 添加。"
 
 search:
   results_for: "搜索结果"
@@ -81,3 +83,15 @@ twitter:
   protected_tweet: "受保护的推文需要授权。"
   tweet_unavailable: "推文不可用。"
   auth_hint: "运行 'vget config twitter set' 设置 auth token。"
+
+sites:
+  configure_site: "配置网站"
+  domain_match: "域名匹配 (例如 kanav.ad):"
+  select_type: "选择类型:"
+  only_m3u8_for_now: "(目前仅支持 m3u8)"
+  existing_sites: "已配置的网站 (./sites.yml):"
+  site_added: "网站已添加"
+  saved_to: "已保存到 ./sites.yml"
+  cancelled: "已取消"
+  enter_confirm: "回车确认"
+  esc_cancel: "esc 取消"

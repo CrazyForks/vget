@@ -58,6 +58,8 @@ errors:
   extraction_failed: "Échec de l'extraction"
   download_failed: "Échec du téléchargement"
   no_extractor: "Aucun extracteur trouvé pour cette URL"
+  no_sites_yml: "Create sites.yml to configure unknown sites. Run 'vget config sites' for help."
+  site_not_in_yml: "Site not found in sites.yml. Run 'vget config sites add' to add it."
 
 search:
   results_for: "Résultats de recherche"

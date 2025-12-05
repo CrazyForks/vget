@@ -46,6 +46,7 @@ func RegisterFallback(e Extractor) {
 }
 
 // Match finds the extractor for a URL using O(1) hostname lookup
+// Returns nil for unknown hosts (caller should check sites.yml)
 func Match(rawURL string) Extractor {
 	u, err := url.Parse(rawURL)
 	if err != nil {
@@ -78,8 +79,8 @@ func Match(rawURL string) Extractor {
 		}
 	}
 
-	// Fallback for unknown hosts or unmatched paths
-	return fallbackExtractor
+	// Unknown host - return nil so caller can check sites.yml
+	return nil
 }
 
 // List returns all unique registered extractors

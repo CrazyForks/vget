@@ -53,10 +53,17 @@ var (
 
 // ParseM3U8 parses an m3u8 playlist from a URL
 func ParseM3U8(m3u8URL string) (*M3U8Playlist, error) {
+	return ParseM3U8WithHeaders(m3u8URL, nil)
+}
+
+// ParseM3U8WithHeaders parses an m3u8 playlist from a URL with custom headers
+func ParseM3U8WithHeaders(m3u8URL string, headers map[string]string) (*M3U8Playlist, error) {
 	client := &http.Client{
-		Timeout: 30 * time.Second,
+		Timeout: 60 * time.Second,
 		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
+			Proxy:                  http.ProxyFromEnvironment,
+			ResponseHeaderTimeout:  30 * time.Second,
+			IdleConnTimeout:        90 * time.Second,
 		},
 	}
 
@@ -65,6 +72,11 @@ func ParseM3U8(m3u8URL string) (*M3U8Playlist, error) {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
+
+	// Apply custom headers
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {

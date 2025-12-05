@@ -56,13 +56,18 @@ func (s *hlsState) incDownloaded() {
 
 // RunHLSDownloadTUI downloads an HLS stream with TUI progress
 func RunHLSDownloadTUI(m3u8URL, output, displayID, lang string) error {
+	return RunHLSDownloadWithHeadersTUI(m3u8URL, output, displayID, lang, nil)
+}
+
+// RunHLSDownloadWithHeadersTUI downloads an HLS stream with custom headers and TUI progress
+func RunHLSDownloadWithHeadersTUI(m3u8URL, output, displayID, lang string, headers map[string]string) error {
 	state := &downloadState{startTime: time.Now()}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Start download in background
 	go func() {
-		err := downloadHLS(ctx, m3u8URL, output, state, DefaultHLSConfig())
+		err := downloadHLSWithHeaders(ctx, m3u8URL, output, state, DefaultHLSConfig(), headers)
 		if err != nil {
 			state.setError(err)
 		} else {
@@ -88,8 +93,13 @@ func RunHLSDownloadTUI(m3u8URL, output, displayID, lang string) error {
 
 // downloadHLS downloads an HLS stream
 func downloadHLS(ctx context.Context, m3u8URL, output string, state *downloadState, config HLSConfig) error {
+	return downloadHLSWithHeaders(ctx, m3u8URL, output, state, config, nil)
+}
+
+// downloadHLSWithHeaders downloads an HLS stream with custom headers
+func downloadHLSWithHeaders(ctx context.Context, m3u8URL, output string, state *downloadState, config HLSConfig, headers map[string]string) error {
 	// Parse the m3u8 playlist
-	playlist, err := ParseM3U8(m3u8URL)
+	playlist, err := ParseM3U8WithHeaders(m3u8URL, headers)
 	if err != nil {
 		return fmt.Errorf("failed to parse m3u8: %w", err)
 	}
@@ -100,7 +110,7 @@ func downloadHLS(ctx context.Context, m3u8URL, output string, state *downloadSta
 		if variant == nil {
 			return fmt.Errorf("no variants found in master playlist")
 		}
-		playlist, err = ParseM3U8(variant.URL)
+		playlist, err = ParseM3U8WithHeaders(variant.URL, headers)
 		if err != nil {
 			return fmt.Errorf("failed to parse variant playlist: %w", err)
 		}
@@ -114,7 +124,7 @@ func downloadHLS(ctx context.Context, m3u8URL, output string, state *downloadSta
 	var decryptKey []byte
 	var decryptIV []byte
 	if playlist.IsEncrypted && playlist.KeyURL != "" {
-		decryptKey, err = fetchKey(playlist.KeyURL)
+		decryptKey, err = fetchKeyWithHeaders(playlist.KeyURL, headers)
 		if err != nil {
 			return fmt.Errorf("failed to fetch encryption key: %w", err)
 		}
@@ -160,7 +170,7 @@ func downloadHLS(ctx context.Context, m3u8URL, output string, state *downloadSta
 
 	// Download segments
 	// We need to maintain order, so we download in parallel but write sequentially
-	err = downloadSegmentsOrdered(ctx, playlist.Segments, file, decryptKey, decryptIV, hlsState, config)
+	err = downloadSegmentsOrdered(ctx, playlist.Segments, file, decryptKey, decryptIV, hlsState, config, headers)
 	if err != nil {
 		return err
 	}
@@ -170,7 +180,7 @@ func downloadHLS(ctx context.Context, m3u8URL, output string, state *downloadSta
 
 // downloadSegmentsOrdered downloads segments in parallel but writes them in order
 func downloadSegmentsOrdered(ctx context.Context, segments []Segment, file *os.File,
-	decryptKey, decryptIV []byte, hlsState *hlsState, config HLSConfig) error {
+	decryptKey, decryptIV []byte, hlsState *hlsState, config HLSConfig, headers map[string]string) error {
 
 	type segmentResult struct {
 		index int
@@ -213,7 +223,7 @@ func downloadSegmentsOrdered(ctx context.Context, segments []Segment, file *os.F
 				default:
 				}
 
-				data, err := downloadSegment(client, seg.URL, decryptKey, decryptIV, seg.Index, config.BufferSize)
+				data, err := downloadSegment(client, seg.URL, decryptKey, decryptIV, seg.Index, config.BufferSize, headers)
 				resultsChan <- segmentResult{
 					index: seg.Index,
 					data:  data,
@@ -270,12 +280,17 @@ func downloadSegmentsOrdered(ctx context.Context, segments []Segment, file *os.F
 }
 
 // downloadSegment downloads a single segment
-func downloadSegment(client *http.Client, url string, decryptKey, decryptIV []byte, index, bufferSize int) ([]byte, error) {
+func downloadSegment(client *http.Client, url string, decryptKey, decryptIV []byte, index, bufferSize int, headers map[string]string) ([]byte, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
+
+	// Apply custom headers
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -305,13 +320,30 @@ func downloadSegment(client *http.Client, url string, decryptKey, decryptIV []by
 
 // fetchKey fetches the encryption key from the URL
 func fetchKey(url string) ([]byte, error) {
+	return fetchKeyWithHeaders(url, nil)
+}
+
+// fetchKeyWithHeaders fetches the encryption key from the URL with custom headers
+func fetchKeyWithHeaders(url string, headers map[string]string) ([]byte, error) {
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 		},
 	}
-	resp, err := client.Get(url)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
+
+	// Apply custom headers
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}

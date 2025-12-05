@@ -7,6 +7,9 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/guiyumin/vget/internal/config"
 	"github.com/guiyumin/vget/internal/i18n"
 	"github.com/spf13/cobra"
@@ -276,6 +279,198 @@ var configTwitterClearCmd = &cobra.Command{
 	},
 }
 
+// --- Sites management ---
+
+var configSitesCmd = &cobra.Command{
+	Use:   "sites",
+	Short: "Configure sites.yml for browser-based extraction",
+	Long: `Add a site that requires browser-based extraction.
+
+sites.yml is saved in the current directory and configures which
+sites should use browser automation to discover m3u8 URLs.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runSitesWizard()
+	},
+}
+
+// Sites wizard TUI styles
+var (
+	sitesFocusedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("86"))
+	sitesBlurredStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	sitesHelpStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	sitesContainerStyle = lipgloss.NewStyle().Padding(1, 2)
+)
+
+type sitesModel struct {
+	step      int // 0: input domain, 1: select type
+	textInput textinput.Model
+	cursor    int
+	types     []string
+	done      bool
+	cancelled bool
+	lang      string
+}
+
+func initialSitesModel(lang string) sitesModel {
+	ti := textinput.New()
+	ti.Placeholder = "kanav.ad"
+	ti.Focus()
+	ti.CharLimit = 100
+	ti.Width = 40
+	ti.PromptStyle = sitesFocusedStyle
+	ti.TextStyle = sitesFocusedStyle
+	ti.Cursor.Style = sitesFocusedStyle
+
+	return sitesModel{
+		step:      0,
+		textInput: ti,
+		types:     []string{"m3u8"},
+		lang:      lang,
+	}
+}
+
+func (m sitesModel) t() *i18n.Translations {
+	return i18n.T(m.lang)
+}
+
+func (m sitesModel) Init() tea.Cmd {
+	return textinput.Blink
+}
+
+func (m sitesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "esc":
+			m.cancelled = true
+			return m, tea.Quit
+
+		case "enter":
+			if m.step == 0 {
+				if strings.TrimSpace(m.textInput.Value()) == "" {
+					return m, nil
+				}
+				m.step = 1
+				m.textInput.Blur()
+			} else {
+				m.done = true
+				return m, tea.Quit
+			}
+			return m, nil
+
+		case "up":
+			if m.step == 1 && m.cursor > 0 {
+				m.cursor--
+			}
+			return m, nil
+
+		case "down":
+			if m.step == 1 && m.cursor < len(m.types)-1 {
+				m.cursor++
+			}
+			return m, nil
+		}
+	}
+
+	if m.step == 0 {
+		m.textInput, cmd = m.textInput.Update(msg)
+	}
+
+	return m, cmd
+}
+
+func (m sitesModel) View() string {
+	var b strings.Builder
+	t := m.t()
+
+	if m.step == 0 {
+		b.WriteString(sitesFocusedStyle.Render(t.Sites.DomainMatch))
+		b.WriteString("\n\n")
+		b.WriteString(m.textInput.View())
+	} else {
+		b.WriteString(fmt.Sprintf("Domain: %s\n\n", sitesFocusedStyle.Render(m.textInput.Value())))
+		b.WriteString(sitesFocusedStyle.Render(t.Sites.SelectType))
+		b.WriteString(" ")
+		b.WriteString(sitesHelpStyle.Render(t.Sites.OnlyM3u8ForNow))
+		b.WriteString("\n\n")
+		for i, tp := range m.types {
+			cursor := "  "
+			style := sitesBlurredStyle
+			if i == m.cursor {
+				cursor = sitesFocusedStyle.Render("> ")
+				style = sitesFocusedStyle
+			}
+			b.WriteString(cursor)
+			b.WriteString(style.Render(tp))
+			b.WriteString("\n")
+		}
+	}
+
+	b.WriteString("\n")
+	b.WriteString(sitesHelpStyle.Render(t.Sites.EnterConfirm + " • " + t.Sites.EscCancel))
+
+	return sitesContainerStyle.Render(b.String())
+}
+
+func runSitesWizard() error {
+	// Load user config for language
+	userCfg := config.LoadOrDefault()
+	t := i18n.T(userCfg.Language)
+
+	// Load existing sites config
+	cfg, err := config.LoadSites()
+	if err != nil {
+		return err
+	}
+	if cfg == nil {
+		cfg = &config.SitesConfig{}
+	}
+
+	// Show existing sites
+	if len(cfg.Sites) > 0 {
+		fmt.Println(t.Sites.ExistingSites)
+		for _, site := range cfg.Sites {
+			fmt.Printf("  %s → %s\n", site.Match, site.Type)
+		}
+		fmt.Println()
+	}
+
+	// Run TUI
+	p := tea.NewProgram(initialSitesModel(userCfg.Language))
+	finalModel, err := p.Run()
+	if err != nil {
+		return err
+	}
+
+	m := finalModel.(sitesModel)
+	if m.cancelled {
+		fmt.Println(t.Sites.Cancelled)
+		return nil
+	}
+
+	match := strings.TrimSpace(m.textInput.Value())
+	mediaType := m.types[m.cursor]
+
+	// Check for duplicate
+	for _, site := range cfg.Sites {
+		if site.Match == match {
+			return fmt.Errorf("site '%s' already exists", match)
+		}
+	}
+
+	cfg.AddSite(match, mediaType)
+
+	if err := config.SaveSites(cfg); err != nil {
+		return err
+	}
+
+	fmt.Printf("\n✓ %s: %s (type: %s)\n", t.Sites.SiteAdded, match, mediaType)
+	fmt.Println(t.Sites.SavedTo)
+	return nil
+}
+
 func init() {
 	// config subcommands
 	configCmd.AddCommand(configShowCmd)
@@ -293,6 +488,9 @@ func init() {
 	configTwitterCmd.AddCommand(configTwitterSetCmd)
 	configTwitterCmd.AddCommand(configTwitterClearCmd)
 	configCmd.AddCommand(configTwitterCmd)
+
+	// config sites (single TUI command)
+	configCmd.AddCommand(configSitesCmd)
 
 	rootCmd.AddCommand(configCmd)
 }

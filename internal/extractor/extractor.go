@@ -60,6 +60,7 @@ type VideoFormat struct {
 	Width   int
 	Height  int
 	Bitrate int
+	Headers map[string]string // Custom headers for download (e.g., Referer)
 }
 
 // QualityLabel returns a human-readable quality label
