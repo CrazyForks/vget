@@ -1,141 +1,181 @@
-# Telegram Support Research
+# Telegram Support
 
-Research notes on adding Telegram video/media download support to vget.
+Implementation plan for Telegram media download support in vget.
 
-## Technical Feasibility
+## Overview
 
-### Challenges
+vget aims to be an all-in-one media downloader. Telegram support is part of this vision, even though `tdl` (6k+ stars) exists as a dedicated tool.
 
-1. **Authentication Required** - Telegram videos (especially from private channels/groups) require user authentication via MTProto protocol or Bot API
-2. **No Public URLs** - Unlike Twitter/YouTube, Telegram doesn't expose direct media URLs. Videos are accessed through Telegram's encrypted API
-3. **API Credentials Required** - Must register at https://my.telegram.org to get `api_id` and `api_hash`. Using someone else's credentials risks account ban.
+**Approach**: Desktop session import only, using Telegram Desktop's API credentials.
 
-### Comparison with Other Platforms
+## Technical Background
 
-| Platform | Difficulty | Why |
-|----------|------------|-----|
-| Twitter | Easy | Public API endpoints |
-| YouTube | Medium | yt-dlp patterns work |
-| Xiaoyuzhou | Easy | RSS/public API |
-| **Telegram** | **Hard** | Auth + MTProto protocol |
-
-## Reference Implementation: tdl
-
-Analyzed the `tdl` project (github.com/iyear/tdl) - a mature Go CLI for Telegram downloads.
-
-### Architecture
+### How Telegram Auth Works
 
 ```
-CLI Layer (cmd/)
-    ↓
-Application Layer (app/)
-    ↓
-Core Services (core/)
-    ↓
-Package Utilities (pkg/)
+api_id + api_hash  =  identifies THE APP (vget)
+user session       =  identifies THE USER's account
 ```
 
-### Core Dependency
+- Sessions are tied to the `api_id` they were created with
+- Desktop session import reuses existing login from Telegram Desktop
+- No phone/SMS verification needed if user has Desktop installed
+
+### API Credentials
+
+Two sets of credentials for different login methods:
 
 ```go
-github.com/gotd/td  // Pure Go MTProto 2.0 implementation
+const (
+    // vget's own registered credentials (for phone login)
+    VgetAppID   = XXXXXXX  // TODO: fill in registered api_id
+    VgetAppHash = "..."    // TODO: fill in registered api_hash
+
+    // Telegram Desktop's credentials (for desktop session import)
+    TelegramDesktopAppID   = 2040
+    TelegramDesktopAppHash = "b18441a1ff607e10a989891a5462e627"
+)
 ```
 
-### Authentication Methods
+### Login Methods & Ban Risk
 
-| Method | How it works |
-|--------|--------------|
-| **Desktop Import** | Reads encrypted `tdata/` from Telegram Desktop |
-| **Phone + Code** | Interactive SMS verification |
-| **QR Code** | Scan with mobile app |
+| Method | API Credentials | Ban Risk | Why |
+|--------|-----------------|----------|-----|
+| Phone + SMS | vget's own | **Zero** | Fresh session with registered app |
+| Desktop import | Desktop's (2040) | Low | Reusing session, same app identity |
 
-### API Credentials Handling
+Recommended: Phone login for maximum safety.
 
-From `pkg/tclient/app.go`:
+## Dependencies
 
 ```go
-var Apps = map[string]App{
-    // application created by tdl author
-    AppBuiltin: {AppID: 15055931, AppHash: "..."},
-
-    // official Telegram Desktop credentials
-    AppDesktop: {AppID: 2040, AppHash: "..."},
-}
+github.com/gotd/td                    // Pure Go MTProto 2.0 implementation
+github.com/gotd/td/session/tdesktop   // Desktop session import
 ```
 
-### Risk Levels
+## Implementation Plan
 
-| Approach | Risk | Why |
-|----------|------|-----|
-| Your own API ID | Low | Telegram knows it's you |
-| Desktop import + Desktop API ID | Low | Consistent app identity |
-| Using shared/builtin ID | Medium | Shared across all users |
-| Hardcoding random ID | High | Suspicious to Telegram |
+### Phase 1: MVP
 
-### Key Components Worth Borrowing
+#### 1. Session Management Commands
 
-1. **Iterator + Resume Pattern** - Fingerprinting dialogs, storing finished indices
-2. **Data Center Pooling** - Lazy connection initialization, per-DC clients
-3. **Middleware Architecture** - Retry, recovery, flood-wait as composable layers
-4. **Message Link Parsing** - Handles various `t.me/...` URL formats
+```bash
+vget telegram login             # Interactive prompt (choose method)
+vget telegram login --cli       # Phone + SMS directly (zero ban risk)
+vget telegram login --desktop   # Import from Desktop directly (low ban risk)
+vget telegram logout            # Clear stored session
+vget telegram status            # Show login state
+```
 
-## Implementation Options for vget
+**Interactive prompt (default):**
 
-### Option 1: Native Implementation
+```
+? How would you like to login?
 
-Import `gotd/td` directly into vget.
+  > [1] Phone + SMS (recommended)
+        Uses vget's registered API credentials
+        Ban risk: None
 
-**Pros:**
-- Full control, native integration
-- Same patterns as other extractors
+    [2] Import from Telegram Desktop
+        Requires Telegram Desktop installed and logged in
+        Ban risk: Low (reuses existing session)
+```
 
-**Cons:**
-- Auth flow complexity (phone, 2FA, sessions)
-- ~500-800+ lines for minimal implementation
-- Session management, DC pooling, flood-wait handling
+**Phone login flow (`--cli`):**
+1. User enters phone number
+2. Telegram sends verification code:
+   - **Primary**: In-app message to existing Telegram sessions (Desktop/mobile)
+   - **Fallback**: SMS (if no active sessions or user requests it)
+3. User enters code
+4. (Optional) Enters 2FA password if enabled
+5. Session created with vget's API credentials
 
-### Option 2: Shell out to tdl
+**Desktop import flow (`--desktop`):**
+- Read Desktop's `tdata/` directory
+  - macOS: `~/Library/Application Support/Telegram Desktop/tdata/`
+  - Linux: `~/.local/share/TelegramDesktop/tdata/`
+  - Windows: `%APPDATA%/Telegram Desktop/tdata/`
+- Import session with Desktop's API credentials
 
-Detect `t.me` URLs and delegate to `tdl`.
+**Session storage:** `~/.config/vget/telegram/`
 
-**Pros:**
-- Zero implementation effort
-- Handles all edge cases
+#### 2. URL Parsing
 
-**Cons:**
-- External dependency
-- Less integrated UX
+Support these `t.me` formats:
 
-### Option 3: Desktop Session Import Only
+| Format | Example | Type |
+|--------|---------|------|
+| Public channel | `https://t.me/channel/123` | Public |
+| Private channel | `https://t.me/c/123456789/123` | Private |
+| User/bot post | `https://t.me/username/123` | Public |
+| Single from album | `https://t.me/channel/123?single` | Public |
 
-Use Telegram Desktop's API ID with session import.
+#### 3. Single Message Download
 
-**Pros:**
-- Lower friction (no phone verification if Desktop installed)
-- Lower ban risk (consistent app identity)
+```bash
+vget https://t.me/somechannel/456
+```
 
-**Cons:**
-- Requires Telegram Desktop
-- Still significant implementation
+- Extract media (video/audio/document) from one message
+- Download with progress bar (existing Bubbletea infrastructure)
+- Save to current directory or `-o` path
 
-## Decision
+#### 4. Media Type Detection
 
-**Not pursuing Telegram support for now.** Reasons:
+```go
+MediaTypeVideo     // .mp4, .mov
+MediaTypeAudio     // .mp3, .ogg voice messages
+MediaTypeDocument  // .pdf, .zip, etc.
+MediaTypePhoto     // .jpg (lower priority)
+```
 
-1. High complexity vs. payoff
-2. API credential requirement adds user friction
-3. Ban risk if implemented incorrectly
-4. `tdl` already exists and works well
-5. Better ROI focusing on other platforms
+### Phase 2: Nice-to-Have
 
-## Alternative for Users
+| Feature | Description |
+|---------|-------------|
+| Batch download | `vget https://t.me/channel/100-200` (range) |
+| Resume | Continue interrupted downloads |
+| Album support | Download all media from grouped messages |
+| Channel dump | `vget https://t.me/channel --all` |
 
-Users needing Telegram downloads should use:
-- **Telegram Desktop** - Built-in "Save as..." and auto-download
-- **tdl** - `go install github.com/iyear/tdl@latest`
+## File Structure
+
+```
+internal/extractor/
+├── telegram.go          # Extractor implementation
+├── telegram_auth.go     # Session import/management
+├── telegram_parser.go   # URL parsing
+
+internal/cli/
+├── telegram.go          # login/logout/status commands
+```
+
+## vget vs tdl
+
+| Aspect | tdl | vget |
+|--------|-----|------|
+| Scope | Telegram-only | Multi-platform |
+| Features | Many advanced (batch, resume, takeout) | Simple: paste URL, get media |
+| Philosophy | Power tool | All-in-one simplicity |
+
+## Reference Implementation
+
+The `tdl` project (github.com/iyear/tdl) was analyzed for patterns:
+
+### Worth Borrowing
+
+1. **URL Parsing** (`pkg/tmessage/parse.go`) - handles various t.me formats
+2. **Media Extraction** (`core/tmedia/media.go`) - unified media type abstraction
+3. **Middleware Pattern** - retry, recovery, flood-wait as composable layers
+
+### Skip for MVP
+
+- Iterator + Resume pattern (Phase 2)
+- Data Center pooling (overkill for single downloads)
+- Takeout mode (for bulk exports)
 
 ## References
 
 - tdl source: https://github.com/iyear/tdl
 - gotd/td (MTProto library): https://github.com/gotd/td
-- Telegram API registration: https://my.telegram.org
+- Telegram Desktop session format: https://github.com/nickoala/tdesktop-session
