@@ -68,30 +68,62 @@ func (e *BrowserExtractor) Extract(rawURL string) (Media, error) {
 	page := stealth.MustPage(browser)
 	defer page.MustClose()
 
-	// Enable Network domain to capture ALL requests (including from Workers)
+	// Enable Network domain to capture requests
 	_ = proto.NetworkEnable{}.Call(page)
+
+	// Also enable Fetch domain to intercept at lower level
+	_ = proto.FetchEnable{
+		Patterns: []*proto.FetchRequestPattern{
+			{URLPattern: "*"},
+		},
+	}.Call(page)
 
 	var mediaURL string
 	var mu sync.Mutex
 	done := make(chan struct{})
 	closed := false
+	listenerReady := make(chan struct{})
 
 	// Listen for network requests at CDP level
-	go page.EachEvent(func(e *proto.NetworkRequestWillBeSent) {
-		reqURL := e.Request.URL
-		if strings.Contains(strings.ToLower(reqURL), targetExt) {
-			mu.Lock()
-			if mediaURL == "" {
-				mediaURL = reqURL
-				fmt.Printf("Captured: %s\n", reqURL)
-				if !closed {
-					closed = true
-					close(done)
+	go func() {
+		wait := page.EachEvent(
+			func(e *proto.NetworkRequestWillBeSent) {
+				reqURL := e.Request.URL
+				if strings.Contains(strings.ToLower(reqURL), targetExt) {
+					mu.Lock()
+					if mediaURL == "" {
+						mediaURL = reqURL
+						if !closed {
+							closed = true
+							close(done)
+						}
+					}
+					mu.Unlock()
 				}
-			}
-			mu.Unlock()
-		}
-	})()
+			},
+			func(e *proto.FetchRequestPaused) {
+				reqURL := e.Request.URL
+				// Continue the request
+				_ = proto.FetchContinueRequest{RequestID: e.RequestID}.Call(page)
+				if strings.Contains(strings.ToLower(reqURL), targetExt) {
+					mu.Lock()
+					if mediaURL == "" {
+						mediaURL = reqURL
+						if !closed {
+							closed = true
+							close(done)
+						}
+					}
+					mu.Unlock()
+				}
+			},
+		)
+		close(listenerReady) // Signal that listener is registered
+		wait()               // Block until page closes
+	}()
+
+	// Wait for listener to be ready before navigating
+	<-listenerReady
 
 	// Navigate
 	_ = page.Navigate(rawURL)
@@ -107,15 +139,12 @@ func (e *BrowserExtractor) Extract(rawURL string) (Media, error) {
 
 	// If not found via interception, try fallback methods
 	if mediaURL == "" {
-		fmt.Println("Trying fallback: performance_api")
 		mediaURL = e.findM3U8InPerformance(page, targetExt)
 	}
 	if mediaURL == "" {
-		fmt.Println("Trying fallback: video_player")
 		mediaURL = e.findM3U8FromVideoPlayer(page)
 	}
 	if mediaURL == "" {
-		fmt.Println("Trying fallback: page_source")
 		html, _ := page.HTML()
 		mediaURL = e.findM3U8InSource(html)
 	}
@@ -163,7 +192,6 @@ func (e *BrowserExtractor) Extract(rawURL string) (Media, error) {
 
 // findM3U8InPerformance uses the browser's Performance API to find resource requests
 func (e *BrowserExtractor) findM3U8InPerformance(page *rod.Page, targetExt string) string {
-	// Query the Performance API for all resource entries
 	result, err := page.Eval(`() => {
 		return performance.getEntriesByType('resource')
 			.map(r => r.name)
@@ -173,7 +201,6 @@ func (e *BrowserExtractor) findM3U8InPerformance(page *rod.Page, targetExt strin
 		return ""
 	}
 
-	// Parse the result
 	arr := result.Value.Arr()
 	for _, v := range arr {
 		url := v.String()
@@ -187,15 +214,10 @@ func (e *BrowserExtractor) findM3U8InPerformance(page *rod.Page, targetExt strin
 
 // findM3U8InSource searches for m3u8 URLs in page HTML/JavaScript source
 func (e *BrowserExtractor) findM3U8InSource(html string) string {
-	// Common patterns for m3u8 URLs in page source
 	patterns := []string{
-		// Direct m3u8 URL patterns
 		`https?://[^"'\s<>]+\.m3u8[^"'\s<>]*`,
-		// URL in quotes
 		`["']([^"']*\.m3u8[^"']*)["']`,
-		// source attribute
 		`src\s*[=:]\s*["']([^"']*\.m3u8[^"']*)["']`,
-		// file/url parameter
 		`(?:file|url|source|src)\s*[=:]\s*["']([^"']+)["']`,
 	}
 
@@ -210,17 +232,14 @@ func (e *BrowserExtractor) findM3U8InSource(html string) string {
 				url = match[0]
 			}
 
-			// Must contain m3u8
 			if !strings.Contains(strings.ToLower(url), ".m3u8") {
 				continue
 			}
 
-			// Skip data URLs and invalid URLs
 			if strings.HasPrefix(url, "data:") {
 				continue
 			}
 
-			// Clean up the URL
 			url = strings.TrimSpace(url)
 			if url != "" {
 				return url
@@ -233,18 +252,14 @@ func (e *BrowserExtractor) findM3U8InSource(html string) string {
 
 // findM3U8FromVideoPlayer queries the video player for its source URL
 func (e *BrowserExtractor) findM3U8FromVideoPlayer(page *rod.Page) string {
-	// Try to get the source from various video player APIs
 	result, err := page.Eval(`() => {
-		// Check for HLS.js
-		if (window.Hls && window.hls) {
-			return window.hls.url || '';
-		}
 		// Check for video.js
 		const vjsPlayer = document.querySelector('.video-js');
 		if (vjsPlayer && vjsPlayer.player) {
 			const src = vjsPlayer.player.currentSrc();
 			if (src && src.includes('.m3u8')) return src;
 		}
+
 		// Check video element sources
 		const video = document.querySelector('video');
 		if (video) {
@@ -252,6 +267,7 @@ func (e *BrowserExtractor) findM3U8FromVideoPlayer(page *rod.Page) string {
 			const source = video.querySelector('source[src*=".m3u8"]');
 			if (source) return source.src;
 		}
+
 		// Check for any global player variable
 		if (window.player && window.player.src) {
 			const src = typeof window.player.src === 'function' ? window.player.src() : window.player.src;
