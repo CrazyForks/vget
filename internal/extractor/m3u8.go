@@ -88,7 +88,3 @@ func generateM3U8ID(urlStr string) string {
 	return base
 }
 
-// M3U8 URLs are handled by extension check in registry.Match()
-// which routes .m3u8 files to the fallback (DirectExtractor)
-// The DirectExtractor then detects the m3u8 type and the CLI
-// routes it to the HLS downloader

@@ -12,6 +12,9 @@ var extractorsByHost = map[string]Extractor{}
 // fallbackExtractor handles direct file URLs and unknown hosts
 var fallbackExtractor Extractor
 
+// m3u8Extractor handles m3u8 URLs specifically (no HEAD request validation)
+var m3u8Extractor = &M3U8Extractor{}
+
 // directDownloadExtensions are file extensions that bypass host-based extractors
 var directDownloadExtensions = map[string]bool{
 	// Video
@@ -56,6 +59,10 @@ func Match(rawURL string) Extractor {
 	// Check if it's a direct file URL first (skip host-based extractors)
 	ext := strings.ToLower(path.Ext(u.Path))
 	if directDownloadExtensions[ext] {
+		// Use specialized m3u8 extractor for HLS streams (no HEAD validation needed)
+		if ext == ".m3u8" || ext == ".m3u" {
+			return m3u8Extractor
+		}
 		return fallbackExtractor
 	}
 
