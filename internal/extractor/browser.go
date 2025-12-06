@@ -36,12 +36,6 @@ func (e *BrowserExtractor) Match(u *url.URL) bool {
 	return true // Called only when site matches
 }
 
-// capturedRequest holds information about an intercepted request
-type capturedRequest struct {
-	url     string
-	headers map[string]string
-}
-
 func (e *BrowserExtractor) Extract(rawURL string) (Media, error) {
 	if e.site == nil {
 		return nil, fmt.Errorf("no site configuration provided")
@@ -74,31 +68,63 @@ func (e *BrowserExtractor) Extract(rawURL string) (Media, error) {
 	page := stealth.MustPage(browser)
 	defer page.MustClose()
 
-	// Try multiple strategies in order
-	strategies := []struct {
-		name string
-		fn   func() string
-	}{
-		{"fetch_intercept", func() string { return e.strategyFetchIntercept(page, rawURL, targetExt) }},
-		{"network_hijack", func() string { return e.strategyNetworkHijack(page, rawURL, pageOrigin, targetExt) }},
-		{"video_player", func() string { return e.findM3U8FromVideoPlayer(page) }},
-		{"performance_api", func() string { return e.findM3U8InPerformance(page, targetExt) }},
-		{"page_source", func() string { html, _ := page.HTML(); return e.findM3U8InSource(html) }},
-	}
+	// Enable Network domain to capture ALL requests (including from Workers)
+	_ = proto.NetworkEnable{}.Call(page)
 
 	var mediaURL string
-	for _, strategy := range strategies {
-		fmt.Printf("Trying strategy: %s\n", strategy.name)
-		mediaURL = strategy.fn()
-		if mediaURL != "" {
-			fmt.Printf("Found via %s: %s\n", strategy.name, mediaURL)
-			break
+	var mu sync.Mutex
+	done := make(chan struct{})
+	closed := false
+
+	// Listen for network requests at CDP level
+	go page.EachEvent(func(e *proto.NetworkRequestWillBeSent) {
+		reqURL := e.Request.URL
+		if strings.Contains(strings.ToLower(reqURL), targetExt) {
+			mu.Lock()
+			if mediaURL == "" {
+				mediaURL = reqURL
+				fmt.Printf("Captured: %s\n", reqURL)
+				if !closed {
+					closed = true
+					close(done)
+				}
+			}
+			mu.Unlock()
 		}
+	})()
+
+	// Navigate
+	_ = page.Navigate(rawURL)
+	_ = page.WaitLoad()
+
+	// Wait for capture or timeout
+	select {
+	case <-done:
+		// Found
+	case <-time.After(15 * time.Second):
+		// Timeout
+	}
+
+	// If not found via interception, try fallback methods
+	if mediaURL == "" {
+		fmt.Println("Trying fallback: performance_api")
+		mediaURL = e.findM3U8InPerformance(page, targetExt)
+	}
+	if mediaURL == "" {
+		fmt.Println("Trying fallback: video_player")
+		mediaURL = e.findM3U8FromVideoPlayer(page)
+	}
+	if mediaURL == "" {
+		fmt.Println("Trying fallback: page_source")
+		html, _ := page.HTML()
+		mediaURL = e.findM3U8InSource(html)
 	}
 
 	if mediaURL == "" {
 		return nil, fmt.Errorf("no %s request captured", e.site.Type)
 	}
+
+	fmt.Printf("Found: %s\n", mediaURL)
 
 	// Extract page title
 	title := page.MustEval(`() => document.title`).String()
@@ -133,124 +159,6 @@ func (e *BrowserExtractor) Extract(rawURL string) (Media, error) {
 			},
 		},
 	}, nil
-}
-
-// strategyFetchIntercept injects a fetch interceptor before page loads
-func (e *BrowserExtractor) strategyFetchIntercept(page *rod.Page, rawURL, targetExt string) string {
-	// Inject script to intercept fetch calls before any JS runs
-	page.MustEvalOnNewDocument(`
-		window.__capturedM3U8 = [];
-		const originalFetch = window.fetch;
-		window.fetch = function(...args) {
-			const url = args[0]?.url || args[0] || '';
-			if (url.toLowerCase().includes('.m3u8')) {
-				window.__capturedM3U8.push(url);
-			}
-			return originalFetch.apply(this, args);
-		};
-		// Also intercept XMLHttpRequest
-		const originalOpen = XMLHttpRequest.prototype.open;
-		XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-			if (url.toLowerCase().includes('.m3u8')) {
-				window.__capturedM3U8.push(url);
-			}
-			return originalOpen.call(this, method, url, ...rest);
-		};
-	`)
-
-	_ = page.Navigate(rawURL)
-	_ = page.WaitLoad()
-	time.Sleep(3 * time.Second) // Wait for video player to init
-
-	// Get captured URLs
-	result, err := page.Eval(`() => window.__capturedM3U8 || []`)
-	if err != nil {
-		return ""
-	}
-
-	arr := result.Value.Arr()
-	for _, v := range arr {
-		url := v.String()
-		if strings.Contains(strings.ToLower(url), targetExt) {
-			return url
-		}
-	}
-
-	return ""
-}
-
-// strategyNetworkHijack uses HijackRequests to intercept network requests
-func (e *BrowserExtractor) strategyNetworkHijack(page *rod.Page, rawURL, _, targetExt string) string {
-	var result string
-	var mu sync.Mutex
-	done := make(chan struct{})
-	closed := false
-
-	router := page.HijackRequests()
-
-	router.MustAdd("*", func(ctx *rod.Hijack) {
-		reqURL := ctx.Request.URL().String()
-		if strings.Contains(strings.ToLower(reqURL), targetExt) {
-			mu.Lock()
-			if result == "" {
-				result = reqURL
-				if !closed {
-					closed = true
-					close(done)
-				}
-			}
-			mu.Unlock()
-		}
-		ctx.ContinueRequest(&proto.FetchContinueRequest{})
-	})
-
-	go router.Run()
-
-	// Wait a moment for hijack to be ready
-	time.Sleep(100 * time.Millisecond)
-
-	_ = page.Navigate(rawURL)
-	_ = page.WaitLoad()
-
-	select {
-	case <-done:
-	case <-time.After(15 * time.Second):
-	}
-
-	router.Stop()
-	return result
-}
-
-// strategyNetworkEvents uses Network domain events to capture requests
-func (e *BrowserExtractor) strategyNetworkEvents(page *rod.Page, browser *rod.Browser, rawURL, pageOrigin, targetExt string) string {
-	var result string
-	var mu sync.Mutex
-	done := make(chan struct{})
-
-	_ = proto.NetworkEnable{}.Call(page)
-
-	wait := browser.EachEvent(func(ev *proto.NetworkRequestWillBeSent) {
-		reqURL := ev.Request.URL
-		if strings.Contains(strings.ToLower(reqURL), targetExt) {
-			mu.Lock()
-			if result == "" {
-				result = reqURL
-				close(done)
-			}
-			mu.Unlock()
-		}
-	})
-
-	go wait()
-
-	_ = page.Reload()
-
-	select {
-	case <-done:
-	case <-time.After(10 * time.Second):
-	}
-
-	return result
 }
 
 // findM3U8InPerformance uses the browser's Performance API to find resource requests
@@ -320,21 +228,6 @@ func (e *BrowserExtractor) findM3U8InSource(html string) string {
 		}
 	}
 
-	return ""
-}
-
-// extractM3U8FromJSON extracts m3u8 URL from JSON response body
-func extractM3U8FromJSON(body string) string {
-	// Look for m3u8 URLs in the JSON
-	re := regexp.MustCompile(`https?://[^"'\s]+\.m3u8[^"'\s]*`)
-	matches := re.FindAllString(body, -1)
-	for _, match := range matches {
-		// Clean up any trailing quotes or escaped chars
-		match = strings.TrimRight(match, `"'\`)
-		if strings.Contains(match, ".m3u8") {
-			return match
-		}
-	}
 	return ""
 }
 
