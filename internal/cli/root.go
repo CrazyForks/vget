@@ -79,19 +79,17 @@ func runDownload(url string) error {
 	// Find matching extractor
 	ext := extractor.Match(url)
 	if ext == nil {
-		// Try sites.yml for unknown sites
-		sitesConfig, err := config.LoadSites()
-		if err != nil {
-			return fmt.Errorf("failed to load sites.yml: %w", err)
+		// Try sites.yml for configured sites first
+		sitesConfig, _ := config.LoadSites()
+		if sitesConfig != nil {
+			if site := sitesConfig.MatchSite(url); site != nil {
+				ext = extractor.NewBrowserExtractor(site, visible)
+			}
 		}
-		if sitesConfig == nil {
-			return fmt.Errorf("%s: %s\n\033[33m%s\033[0m", t.Errors.NoExtractor, url, t.Errors.NoSitesYml)
+		// Fall back to generic m3u8 detection for unknown sites
+		if ext == nil {
+			ext = extractor.NewGenericBrowserExtractor(visible)
 		}
-		site := sitesConfig.MatchSite(url)
-		if site == nil {
-			return fmt.Errorf("%s: %s\n\033[33m%s\033[0m", t.Errors.NoExtractor, url, t.Errors.SiteNotInYml)
-		}
-		ext = extractor.NewBrowserExtractor(site, visible)
 	}
 
 	// Configure Twitter extractor with auth if available

@@ -28,6 +28,14 @@ func NewBrowserExtractor(site *config.Site, visible bool) *BrowserExtractor {
 	return &BrowserExtractor{site: site, visible: visible}
 }
 
+// NewGenericBrowserExtractor creates a browser extractor for unknown sites (defaults to m3u8)
+func NewGenericBrowserExtractor(visible bool) *BrowserExtractor {
+	return &BrowserExtractor{
+		site:    &config.Site{Type: "m3u8"},
+		visible: visible,
+	}
+}
+
 func (e *BrowserExtractor) Name() string {
 	return "browser"
 }
@@ -51,7 +59,7 @@ func (e *BrowserExtractor) Extract(rawURL string) (Media, error) {
 	// Determine what extension to look for
 	targetExt := "." + e.site.Type // e.g., ".m3u8", ".mp4"
 
-	fmt.Printf("Looking for %s requests...\n", e.site.Type)
+	fmt.Printf("Detecting %s stream...\n", e.site.Type)
 
 	// Launch browser
 	l := e.createLauncher(!e.visible) // headless unless --visible flag
@@ -150,7 +158,7 @@ func (e *BrowserExtractor) Extract(rawURL string) (Media, error) {
 	}
 
 	if mediaURL == "" {
-		return nil, fmt.Errorf("no %s request captured", e.site.Type)
+		return nil, fmt.Errorf("website not supported (no %s stream found)", e.site.Type)
 	}
 
 	fmt.Printf("Found: %s\n", mediaURL)

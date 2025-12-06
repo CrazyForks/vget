@@ -85,8 +85,6 @@ type ErrorTranslations struct {
 	ExtractionFailed string `yaml:"extraction_failed"`
 	DownloadFailed   string `yaml:"download_failed"`
 	NoExtractor      string `yaml:"no_extractor"`
-	NoSitesYml       string `yaml:"no_sites_yml"`
-	SiteNotInYml     string `yaml:"site_not_in_yml"`
 }
 
 type SearchTranslations struct {

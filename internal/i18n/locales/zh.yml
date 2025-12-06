@@ -58,8 +58,6 @@ errors:
   extraction_failed: "解析失败"
   download_failed: "下载失败"
   no_extractor: "没有找到适用于此URL的解析器"
-  no_sites_yml: "请创建 sites.yml 配置未知网站。运行 'vget config sites' 获取帮助。"
-  site_not_in_yml: "sites.yml 中未找到此网站。运行 'vget config sites add' 添加。"
 
 search:
   results_for: "搜索结果"
