@@ -311,7 +311,7 @@ func downloadVideo(m *extractor.VideoMedia, dl *downloader.Downloader, t *i18n.T
 	}
 
 	// Use headers if provided by the extractor
-	if format.Headers != nil && len(format.Headers) > 0 {
+	if len(format.Headers) > 0 {
 		return dl.DownloadWithHeaders(format.URL, outputFile, m.ID, format.Headers)
 	}
 	return dl.Download(format.URL, outputFile, m.ID)
@@ -334,7 +334,7 @@ func downloadVideoAndAudio(format *extractor.VideoFormat, outputFile, videoID st
 	// Download video with headers if provided
 	fmt.Println("  Downloading video stream...")
 	var err error
-	if format.Headers != nil && len(format.Headers) > 0 {
+	if len(format.Headers) > 0 {
 		err = dl.DownloadWithHeaders(format.URL, videoFile, videoID+"-video", format.Headers)
 	} else {
 		err = dl.Download(format.URL, videoFile, videoID+"-video")
@@ -345,7 +345,7 @@ func downloadVideoAndAudio(format *extractor.VideoFormat, outputFile, videoID st
 
 	// Download audio with headers if provided
 	fmt.Println("  Downloading audio stream...")
-	if format.Headers != nil && len(format.Headers) > 0 {
+	if len(format.Headers) > 0 {
 		err = dl.DownloadWithHeaders(format.AudioURL, audioFile, videoID+"-audio", format.Headers)
 	} else {
 		err = dl.Download(format.AudioURL, audioFile, videoID+"-audio")
