@@ -305,6 +305,10 @@ func downloadVideo(m *extractor.VideoMedia, dl *downloader.Downloader, t *i18n.T
 		return downloadVideoAndAudio(format, outputFile, m.ID, dl)
 	}
 
+	// Use headers if provided by the extractor
+	if format.Headers != nil && len(format.Headers) > 0 {
+		return dl.DownloadWithHeaders(format.URL, outputFile, m.ID, format.Headers)
+	}
 	return dl.Download(format.URL, outputFile, m.ID)
 }
 

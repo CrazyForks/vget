@@ -282,6 +282,11 @@ func (e *XiaohongshuExtractor) extractVideo(id, title, uploader string, detail x
 				URL:     videoURL,
 				Quality: "best",
 				Ext:     "mp4",
+				Headers: map[string]string{
+					"Referer":    "https://www.xiaohongshu.com/",
+					"Origin":     "https://www.xiaohongshu.com",
+					"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+				},
 			},
 		},
 	}, nil

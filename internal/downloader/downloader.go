@@ -20,7 +20,12 @@ func New(lang string) *Downloader {
 
 // Download downloads a file from URL to the specified path using TUI
 func (d *Downloader) Download(url, output, videoID string) error {
-	return RunDownloadTUI(url, output, videoID, d.lang)
+	return RunDownloadTUI(url, output, videoID, d.lang, nil)
+}
+
+// DownloadWithHeaders downloads a file from URL with custom headers
+func (d *Downloader) DownloadWithHeaders(url, output, videoID string, headers map[string]string) error {
+	return RunDownloadTUI(url, output, videoID, d.lang, headers)
 }
 
 // DownloadFromReader downloads from an io.ReadCloser to the specified path using TUI

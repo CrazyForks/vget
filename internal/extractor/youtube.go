@@ -455,6 +455,13 @@ func (e *YouTubeExtractor) callInnertubeAPI(videoID string, session *YouTubeSess
 func (e *YouTubeExtractor) parseResponse(resp *InnertubeResponse) (Media, error) {
 	var formats []VideoFormat
 
+	// YouTube iOS headers - must match the client used in Innertube API request
+	youtubeHeaders := map[string]string{
+		"User-Agent": "com.google.ios.youtube/20.11.6 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X;)",
+		"Referer":    "https://www.youtube.com/",
+		"Origin":     "https://www.youtube.com",
+	}
+
 	// Find best audio tracks (one for mp4, one for webm)
 	var bestMP4Audio, bestWebMAudio string
 	var bestMP4Bitrate, bestWebMBitrate int
@@ -480,6 +487,7 @@ func (e *YouTubeExtractor) parseResponse(resp *InnertubeResponse) (Media, error)
 			URL:     resp.StreamingData.HLSManifestURL,
 			Quality: "auto (HLS)",
 			Ext:     "m3u8",
+			Headers: youtubeHeaders,
 		})
 	}
 
@@ -501,6 +509,7 @@ func (e *YouTubeExtractor) parseResponse(resp *InnertubeResponse) (Media, error)
 			Width:   f.Width,
 			Height:  f.Height,
 			Bitrate: f.Bitrate,
+			Headers: youtubeHeaders,
 		})
 	}
 
@@ -543,6 +552,7 @@ func (e *YouTubeExtractor) parseResponse(resp *InnertubeResponse) (Media, error)
 			Width:    f.Width,
 			Height:   f.Height,
 			Bitrate:  f.Bitrate,
+			Headers:  youtubeHeaders,
 		})
 	}
 

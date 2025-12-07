@@ -170,7 +170,7 @@ func MultiStreamDownload(ctx context.Context, url, output string, config MultiSt
 
 	// Fall back to single-stream if range not supported
 	if !supportsRange {
-		return downloadWithProgress(client, url, output, state)
+		return downloadWithProgress(client, url, output, state, nil)
 	}
 
 	state.update(0, totalSize)

@@ -258,7 +258,7 @@ func calculateETA(remaining int64, speed float64) string {
 }
 
 // RunDownloadTUI runs the download with a TUI progress display
-func RunDownloadTUI(url, output, videoID, lang string) error {
+func RunDownloadTUI(url, output, videoID, lang string, headers map[string]string) error {
 	client := &http.Client{
 		Timeout: 0,
 		Transport: &http.Transport{
@@ -272,7 +272,7 @@ func RunDownloadTUI(url, output, videoID, lang string) error {
 
 	// Start download in background
 	go func() {
-		err := downloadWithProgress(client, url, output, state)
+		err := downloadWithProgress(client, url, output, state, headers)
 		if err != nil {
 			state.setError(err)
 		} else {
@@ -297,18 +297,22 @@ func RunDownloadTUI(url, output, videoID, lang string) error {
 	return nil
 }
 
-func downloadWithProgress(client *http.Client, url, output string, state *downloadState) error {
+func downloadWithProgress(client *http.Client, url, output string, state *downloadState, headers map[string]string) error {
 	// Create HTTP request
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Use iOS User-Agent to match the Innertube API request
-	// YouTube stream URLs are tied to the client that requested them
-	req.Header.Set("User-Agent", "com.google.ios.youtube/20.11.6 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X;)")
-	req.Header.Set("Referer", "https://www.youtube.com/")
-	req.Header.Set("Origin", "https://www.youtube.com")
+	// Use custom headers if provided, otherwise use generic browser headers
+	if len(headers) > 0 {
+		for key, value := range headers {
+			req.Header.Set(key, value)
+		}
+	} else {
+		// Generic browser headers as default
+		req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	}
 
 	// Execute request
 	resp, err := client.Do(req)
