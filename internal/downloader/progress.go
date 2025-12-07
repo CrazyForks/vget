@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -188,11 +189,16 @@ func (m downloadModel) View() string {
 
 	if done {
 		elapsed, avgSpeed := m.state.getFinal()
+		// Display full path
+		displayPath := m.output
+		if absPath, err := filepath.Abs(m.output); err == nil {
+			displayPath = absPath
+		}
 		return fmt.Sprintf("\n  %s %s\n  %s: %s (%s)\n  %s: %s  |  %s: %s/s\n\n",
 			doneStyle.Render("✓"),
 			m.t.Download.Completed,
 			m.t.Download.FileSaved,
-			m.output,
+			displayPath,
 			formatBytes(current),
 			m.t.Download.Elapsed,
 			formatDuration(elapsed),
@@ -468,7 +474,11 @@ func RunTelegramDownloadTUI(urlStr, outputPath, lang string, downloadFn Telegram
 	}
 
 	if result != nil {
-		fmt.Printf("  Saved: %s\n", result.Filename)
+		displayPath := result.Filename
+		if absPath, err := filepath.Abs(result.Filename); err == nil {
+			displayPath = absPath
+		}
+		fmt.Printf("  Saved: %s\n", displayPath)
 	}
 
 	return nil
