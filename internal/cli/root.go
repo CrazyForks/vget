@@ -105,6 +105,11 @@ func runDownload(url string) error {
 		}
 	}
 
+	// Configure visible mode for extractors that support it (e.g., YouTube)
+	if visibleExt, ok := ext.(extractor.VisibleSetter); ok && visible {
+		visibleExt.SetVisible(visible)
+	}
+
 	// Extract media info with spinner
 	media, err := runExtractWithSpinner(ext, url, cfg.Language)
 	if err != nil {
@@ -326,15 +331,26 @@ func downloadVideoAndAudio(format *extractor.VideoFormat, outputFile, videoID st
 	videoFile := outputFile // keep original name for video
 	audioFile := baseName + "." + audioExt
 
-	// Download video
+	// Download video with headers if provided
 	fmt.Println("  Downloading video stream...")
-	if err := dl.Download(format.URL, videoFile, videoID+"-video"); err != nil {
+	var err error
+	if format.Headers != nil && len(format.Headers) > 0 {
+		err = dl.DownloadWithHeaders(format.URL, videoFile, videoID+"-video", format.Headers)
+	} else {
+		err = dl.Download(format.URL, videoFile, videoID+"-video")
+	}
+	if err != nil {
 		return fmt.Errorf("failed to download video: %w", err)
 	}
 
-	// Download audio
+	// Download audio with headers if provided
 	fmt.Println("  Downloading audio stream...")
-	if err := dl.Download(format.AudioURL, audioFile, videoID+"-audio"); err != nil {
+	if format.Headers != nil && len(format.Headers) > 0 {
+		err = dl.DownloadWithHeaders(format.AudioURL, audioFile, videoID+"-audio", format.Headers)
+	} else {
+		err = dl.Download(format.AudioURL, audioFile, videoID+"-audio")
+	}
+	if err != nil {
 		return fmt.Errorf("failed to download audio: %w", err)
 	}
 
