@@ -4,6 +4,7 @@
 
 1. [ ] `vget serve -d` - HTTP server mode
 2. [ ] Dockerfile for NAS deployment
+3. [ ] kuaidi100 - Bring Your Own Key (API is expensive)
 
 ## Features
 
@@ -71,7 +72,7 @@
 - [ ] USPS tracking
   - [ ] Scraping (default, no setup)
   - [ ] API mode (user provides own keys in config.yml)
-- [ ] kuaidi100
+  - [ ] kuaidi100 - Bring Your Own Key (API is expensive)
 
 ## DevOps
 
