@@ -2,13 +2,8 @@
 
 ## Tomorrow's Tasks
 
-1. [x] Self update - implement `vget update` command
-2. [ ] Support m3u8 streaming format
-3. [x] GoReleaser setup
-4. [ ] Cross-platform builds:
-   - macOS (Intel x86_64, Apple Silicon arm64)
-   - Windows (Intel x86_64, ARM arm64)
-   - Linux (x86, amd64, arm64)
+1. [ ] `vget serve -d` - HTTP server mode
+2. [ ] Dockerfile for NAS deployment
 
 ## Features
 
@@ -17,8 +12,8 @@
   - Proxy settings
   - Default output directory
   - Default format/quality
-- [ ] Self update
-- [ ] m3u8 streaming support
+- [x] Self update
+- [x] m3u8 streaming support
 - [ ] Bulk download from txt file
   - Read URLs from txt file
   - Sequential or parallel processing
@@ -36,6 +31,10 @@
 - [ ] Rate limiting
 - [ ] Cookie/auth support
 - [ ] Metadata embedding
+- [ ] `vget serve -d` - HTTP server mode
+  - REST API for remote downloads
+  - Run as background daemon
+  - Web UI for submitting URLs
 - [ ] WebDAV client integration
   - Connect to PikPak, other WebDAV-compatible cloud storage
   - Upload downloaded files directly to cloud
@@ -50,8 +49,8 @@
   - [ ] Podcast listing (all episodes)
 - [ ] YouTube
 - [ ] TikTok
-- [ ] Apple Podcasts
-- [ ] Xiaohongshu (小红书/RED)
+- [x] Apple Podcasts
+- [x] Xiaohongshu (小红书/RED)
   - Requires browser automation (Rod) + cookie auth
   - Reference: [xpzouying/xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp) (7.2k stars, stable 1+ year)
   - Extraction approach:
@@ -72,7 +71,12 @@
 - [ ] USPS tracking
   - [ ] Scraping (default, no setup)
   - [ ] API mode (user provides own keys in config.yml)
+- [ ] kuaidi100
 
 ## DevOps
 
-- [ ] GoReleaser + GitHub Actions for tagged releases
+- [x] GoReleaser + GitHub Actions for tagged releases
+- [ ] Dockerfile for NAS deployment
+  - Multi-stage build for minimal image
+  - Support for Synology/QNAP/TrueNAS
+  - docker-compose.yml example
