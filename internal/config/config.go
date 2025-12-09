@@ -121,12 +121,22 @@ func (c *Config) DeleteWebDAVServer(name string) {
 	}
 }
 
+// DefaultDownloadDir returns the default download directory
+// Uses ~/Downloads/vget on all platforms
+func DefaultDownloadDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "./downloads"
+	}
+	return filepath.Join(home, "Downloads", "vget")
+}
+
 // DefaultConfig returns a config with sensible defaults
 func DefaultConfig() *Config {
 	return &Config{
 		Language:         "en",
 		Proxy:            "",
-		OutputDir:        ".",
+		OutputDir:        DefaultDownloadDir(),
 		Format:           "mp4",
 		Quality:          "best",
 		FilenameTemplate: "{{.ID}}.{{.Ext}}",

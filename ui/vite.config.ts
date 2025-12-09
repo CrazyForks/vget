@@ -10,6 +10,7 @@ export default defineConfig({
       '/download': 'http://localhost:8080',
       '/status': 'http://localhost:8080',
       '/jobs': 'http://localhost:8080',
+      '/config': 'http://localhost:8080',
     },
   },
 })

@@ -18,7 +18,14 @@ import (
 )
 
 // XiaohongshuExtractor handles Xiaohongshu video/image downloads using browser automation
-type XiaohongshuExtractor struct{}
+type XiaohongshuExtractor struct {
+	visible bool
+}
+
+// SetVisible configures whether to show the browser window
+func (e *XiaohongshuExtractor) SetVisible(visible bool) {
+	e.visible = visible
+}
 
 func (e *XiaohongshuExtractor) Name() string {
 	return "xiaohongshu"
@@ -113,8 +120,8 @@ func (e *XiaohongshuExtractor) resolveShortURL(shortURL string) (string, error) 
 }
 
 func (e *XiaohongshuExtractor) extractWithBrowser(targetURL, noteID string) (Media, error) {
-	// Launch browser (non-headless for now, to handle login if needed)
-	l := e.createLauncher(false)
+	// Launch browser (headless by default, visible with --visible flag)
+	l := e.createLauncher(!e.visible)
 	defer l.Cleanup()
 
 	fmt.Println("Launching browser...")

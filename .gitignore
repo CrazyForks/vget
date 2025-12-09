@@ -23,3 +23,5 @@ coverage.out
 # Temporary files
 *.tmp
 .vget-meta.json
+/tmp/
+/downloads/

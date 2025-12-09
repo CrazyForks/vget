@@ -79,6 +79,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/status/", s.handleStatus)
 	mux.HandleFunc("/jobs", s.handleJobs)
 	mux.HandleFunc("/jobs/", s.handleJobAction)
+	mux.HandleFunc("/config", s.handleConfig)
 
 	// Serve embedded UI if available
 	if distFS := GetDistFS(); distFS != nil {
@@ -371,6 +372,74 @@ func (s *Server) handleJobAction(w http.ResponseWriter, r *http.Request) {
 				Message: "job not found or cannot be cancelled",
 			})
 		}
+	default:
+		s.writeJSON(w, http.StatusMethodNotAllowed, Response{
+			Code:    405,
+			Data:    nil,
+			Message: "method not allowed",
+		})
+	}
+}
+
+// ConfigRequest is the request body for PUT /config
+type ConfigRequest struct {
+	OutputDir string `json:"output_dir,omitempty"`
+}
+
+func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		// Return current server config
+		s.writeJSON(w, http.StatusOK, Response{
+			Code: 200,
+			Data: map[string]interface{}{
+				"output_dir": s.outputDir,
+			},
+			Message: "config retrieved",
+		})
+
+	case http.MethodPut:
+		var req ConfigRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			s.writeJSON(w, http.StatusBadRequest, Response{
+				Code:    400,
+				Data:    nil,
+				Message: "invalid request body",
+			})
+			return
+		}
+
+		if req.OutputDir != "" {
+			// Validate the directory exists or can be created
+			if err := os.MkdirAll(req.OutputDir, 0755); err != nil {
+				s.writeJSON(w, http.StatusBadRequest, Response{
+					Code:    400,
+					Data:    nil,
+					Message: fmt.Sprintf("invalid output directory: %v", err),
+				})
+				return
+			}
+
+			// Update server's output directory
+			s.outputDir = req.OutputDir
+			s.jobQueue.outputDir = req.OutputDir
+
+			// Save to config file
+			cfg := config.LoadOrDefault()
+			cfg.Server.OutputDir = req.OutputDir
+			if err := config.Save(cfg); err != nil {
+				log.Printf("Warning: failed to save config: %v", err)
+			}
+		}
+
+		s.writeJSON(w, http.StatusOK, Response{
+			Code: 200,
+			Data: map[string]interface{}{
+				"output_dir": s.outputDir,
+			},
+			Message: "config updated",
+		})
+
 	default:
 		s.writeJSON(w, http.StatusMethodNotAllowed, Response{
 			Code:    405,

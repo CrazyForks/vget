@@ -1,120 +1,234 @@
-import { useState, useEffect, useCallback } from 'react'
-import './App.css'
+import { useState, useEffect, useCallback } from "react";
+import "./App.css";
+import logo from "./assets/logo.png";
 
-type JobStatus = 'queued' | 'downloading' | 'completed' | 'failed' | 'cancelled'
+type JobStatus =
+  | "queued"
+  | "downloading"
+  | "completed"
+  | "failed"
+  | "cancelled";
 
 interface Job {
-  id: string
-  url: string
-  status: JobStatus
-  progress: number
-  filename?: string
-  error?: string
+  id: string;
+  url: string;
+  status: JobStatus;
+  progress: number;
+  filename?: string;
+  error?: string;
 }
 
 interface ApiResponse<T> {
-  code: number
-  data: T
-  message: string
+  code: number;
+  data: T;
+  message: string;
 }
 
 interface HealthData {
-  status: string
-  version: string
+  status: string;
+  version: string;
+}
+
+interface ConfigData {
+  output_dir: string;
 }
 
 interface JobsData {
-  jobs: Job[]
+  jobs: Job[];
 }
 
 async function fetchHealth(): Promise<ApiResponse<HealthData>> {
-  const res = await fetch('/health')
-  return res.json()
+  const res = await fetch("/health");
+  return res.json();
 }
 
 async function fetchJobs(): Promise<ApiResponse<JobsData>> {
-  const res = await fetch('/jobs')
-  return res.json()
+  const res = await fetch("/jobs");
+  return res.json();
 }
 
-async function postDownload(url: string): Promise<ApiResponse<{ id: string; status: string }>> {
-  const res = await fetch('/download', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+async function fetchConfig(): Promise<ApiResponse<ConfigData>> {
+  const res = await fetch("/config");
+  return res.json();
+}
+
+async function updateConfig(
+  outputDir: string
+): Promise<ApiResponse<ConfigData>> {
+  const res = await fetch("/config", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ output_dir: outputDir }),
+  });
+  return res.json();
+}
+
+async function postDownload(
+  url: string
+): Promise<ApiResponse<{ id: string; status: string }>> {
+  const res = await fetch("/download", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url }),
-  })
-  return res.json()
+  });
+  return res.json();
 }
 
 async function deleteJob(id: string): Promise<ApiResponse<{ id: string }>> {
-  const res = await fetch(`/jobs/${id}`, { method: 'DELETE' })
-  return res.json()
+  const res = await fetch(`/jobs/${id}`, { method: "DELETE" });
+  return res.json();
 }
 
 function App() {
-  const [health, setHealth] = useState<HealthData | null>(null)
-  const [jobs, setJobs] = useState<Job[]>([])
-  const [url, setUrl] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
+  const [health, setHealth] = useState<HealthData | null>(null);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [url, setUrl] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [outputDir, setOutputDir] = useState("");
+  const [editingDir, setEditingDir] = useState(false);
+  const [newOutputDir, setNewOutputDir] = useState("");
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem("vget-theme");
+    return saved ? saved === "dark" : true;
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute(
+      "data-theme",
+      darkMode ? "dark" : "light"
+    );
+    localStorage.setItem("vget-theme", darkMode ? "dark" : "light");
+  }, [darkMode]);
 
   const refresh = useCallback(async () => {
     try {
-      const [healthRes, jobsRes] = await Promise.all([fetchHealth(), fetchJobs()])
-      if (healthRes.code === 200) setHealth(healthRes.data)
-      if (jobsRes.code === 200) setJobs(jobsRes.data.jobs || [])
+      const [healthRes, jobsRes, configRes] = await Promise.all([
+        fetchHealth(),
+        fetchJobs(),
+        fetchConfig(),
+      ]);
+      if (healthRes.code === 200) setHealth(healthRes.data);
+      if (jobsRes.code === 200) setJobs(jobsRes.data.jobs || []);
+      if (configRes.code === 200) setOutputDir(configRes.data.output_dir);
     } catch {
-      setHealth(null)
+      setHealth(null);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    refresh()
-    const interval = setInterval(refresh, 1000)
-    return () => clearInterval(interval)
-  }, [refresh])
+    refresh();
+    const interval = setInterval(refresh, 1000);
+    return () => clearInterval(interval);
+  }, [refresh]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!url.trim() || submitting) return
+    e.preventDefault();
+    if (!url.trim() || submitting) return;
 
-    setSubmitting(true)
+    setSubmitting(true);
     try {
-      const res = await postDownload(url.trim())
+      const res = await postDownload(url.trim());
       if (res.code === 200) {
-        setUrl('')
-        refresh()
+        setUrl("");
+        refresh();
       }
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }
+  };
 
   const handleCancel = async (id: string) => {
-    await deleteJob(id)
-    refresh()
-  }
+    await deleteJob(id);
+    refresh();
+  };
 
-  const isConnected = health?.status === 'ok'
+  const handleEditDir = () => {
+    setNewOutputDir(outputDir);
+    setEditingDir(true);
+  };
+
+  const handleSaveDir = async () => {
+    if (!newOutputDir.trim()) return;
+    const res = await updateConfig(newOutputDir.trim());
+    if (res.code === 200) {
+      setOutputDir(res.data.output_dir);
+      setEditingDir(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingDir(false);
+    setNewOutputDir("");
+  };
+
+  const isConnected = health?.status === "ok";
 
   const sortedJobs = [...jobs].sort((a, b) => {
     const order: Record<JobStatus, number> = {
-      downloading: 0, queued: 1, completed: 2, failed: 3, cancelled: 4
-    }
-    return (order[a.status] ?? 5) - (order[b.status] ?? 5)
-  })
+      downloading: 0,
+      queued: 1,
+      completed: 2,
+      failed: 3,
+      cancelled: 4,
+    };
+    return (order[a.status] ?? 5) - (order[b.status] ?? 5);
+  });
 
   return (
     <div className="container">
       <header className="header">
         <div className="header-left">
-          <span className={`status-dot ${isConnected ? 'ok' : 'error'}`} />
-          <h1>vget server</h1>
+          <img src={logo} alt="vget" className={`logo ${isConnected ? '' : 'disconnected'}`} />
+          <h1>Vget Server</h1>
         </div>
-        <span className="version">{health?.version || '...'}</span>
+        <div className="header-right">
+          <button
+            className="theme-toggle"
+            onClick={() => setDarkMode(!darkMode)}
+            title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {darkMode ? "☀️" : "🌙"}
+          </button>
+          <span className="version">{health?.version || "..."}</span>
+        </div>
       </header>
+
+      <div className="output-dir">
+        <span className="output-dir-label">Download to:</span>
+        <input
+          type="text"
+          className="output-dir-input"
+          value={editingDir ? newOutputDir : outputDir}
+          onChange={(e) => setNewOutputDir(e.target.value)}
+          onKeyDown={(e) => {
+            if (editingDir && e.key === "Enter") handleSaveDir();
+            if (editingDir && e.key === "Escape") handleCancelEdit();
+          }}
+          readOnly={!editingDir}
+          placeholder="..."
+        />
+        {editingDir ? (
+          <div className="output-dir-actions">
+            <button onClick={handleSaveDir} className="save-btn">
+              Save
+            </button>
+            <button onClick={handleCancelEdit} className="cancel-edit-btn">
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleEditDir}
+            className="edit-btn"
+            disabled={!isConnected}
+          >
+            Edit
+          </button>
+        )}
+      </div>
 
       <form className="download-form" onSubmit={handleSubmit}>
         <input
@@ -124,8 +238,11 @@ function App() {
           placeholder="Paste URL to download..."
           disabled={!isConnected || submitting}
         />
-        <button type="submit" disabled={!isConnected || !url.trim() || submitting}>
-          {submitting ? 'Adding...' : 'Download'}
+        <button
+          type="submit"
+          disabled={!isConnected || !url.trim() || submitting}
+        >
+          {submitting ? "Adding..." : "Download"}
         </button>
       </form>
 
@@ -145,17 +262,21 @@ function App() {
         ) : (
           <div className="jobs-list">
             {sortedJobs.map((job) => (
-              <JobCard key={job.id} job={job} onCancel={() => handleCancel(job.id)} />
+              <JobCard
+                key={job.id}
+                job={job}
+                onCancel={() => handleCancel(job.id)}
+              />
             ))}
           </div>
         )}
       </section>
     </div>
-  )
+  );
 }
 
 function JobCard({ job, onCancel }: { job: Job; onCancel: () => void }) {
-  const canCancel = job.status === 'queued' || job.status === 'downloading'
+  const canCancel = job.status === "queued" || job.status === "downloading";
 
   return (
     <div className="job-card">
@@ -164,25 +285,30 @@ function JobCard({ job, onCancel }: { job: Job; onCancel: () => void }) {
         <div className="job-actions">
           <span className={`status-badge ${job.status}`}>{job.status}</span>
           {canCancel && (
-            <button className="cancel-btn" onClick={onCancel}>Cancel</button>
+            <button className="cancel-btn" onClick={onCancel}>
+              Cancel
+            </button>
           )}
         </div>
       </div>
       <p className="job-url">{job.url}</p>
       {job.filename && <p className="job-filename">{job.filename}</p>}
-      {job.status === 'downloading' && (
+      {job.status === "downloading" && (
         <div className="progress-container">
           <div className="progress-bar">
-            <div className="progress-fill" style={{ width: `${job.progress}%` }} />
+            <div
+              className="progress-fill"
+              style={{ width: `${job.progress}%` }}
+            />
           </div>
           <span className="progress-text">{job.progress.toFixed(1)}%</span>
         </div>
       )}
-      {job.status === 'failed' && job.error && (
+      {job.status === "failed" && job.error && (
         <div className="error-message">{job.error}</div>
       )}
     </div>
-  )
+  );
 }
 
-export default App
+export default App;

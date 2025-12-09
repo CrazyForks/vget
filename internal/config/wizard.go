@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -86,11 +85,7 @@ func (m *model) getStepDescription() string {
 	case 0:
 		return t.Config.LanguageDesc
 	case 1:
-		cwd, err := os.Getwd()
-		if err != nil {
-			cwd = "current directory"
-		}
-		return fmt.Sprintf("%s (. = %s)", t.Config.OutputDirDesc, cwd)
+		return t.Config.OutputDirDesc
 	case 2:
 		return t.Config.FormatDesc
 	case 3:
@@ -138,22 +133,15 @@ func (m *model) isInputStep() bool {
 	return m.currentStep == 1 // Only output dir is input step now
 }
 
-func (m *model) getPlaceholder() string {
-	switch m.currentStep {
-	case 1:
-		if cwd, err := os.Getwd(); err == nil {
-			return cwd
-		}
-		return "."
-	}
-	return ""
-}
-
 func (m *model) setCursorFromConfig() {
 	if m.isInputStep() {
 		switch m.currentStep {
 		case 1:
-			m.inputBuffer = m.config.OutputDir
+			if m.config.OutputDir != "" {
+				m.inputBuffer = m.config.OutputDir
+			} else {
+				m.inputBuffer = DefaultDownloadDir()
+			}
 		}
 		m.inputCursor = len(m.inputBuffer)
 		return
@@ -312,12 +300,8 @@ func (m model) View() string {
 
 	if m.isInputStep() {
 		// Input field
-		display := m.inputBuffer
-		if display == "" {
-			display = stepStyle.Render(m.getPlaceholder())
-		}
 		b.WriteString(inputCursorStyle.Render("> "))
-		b.WriteString(inputStyle.Render(display))
+		b.WriteString(inputStyle.Render(m.inputBuffer))
 		b.WriteString(inputCursorStyle.Render("█"))
 		b.WriteString("\n")
 	} else {
@@ -358,12 +342,8 @@ func (m model) renderReview() string {
 	t := m.t()
 
 	outputDir := m.config.OutputDir
-	if outputDir == "" || outputDir == "." {
-		if cwd, err := os.Getwd(); err == nil {
-			outputDir = cwd
-		} else {
-			outputDir = "."
-		}
+	if outputDir == "" {
+		outputDir = DefaultDownloadDir()
 	}
 
 	lines := []struct {
@@ -405,7 +385,7 @@ func RunInitWizard() (*Config, error) {
 
 	// Set defaults for empty values
 	if result.config.OutputDir == "" {
-		result.config.OutputDir = "."
+		result.config.OutputDir = DefaultDownloadDir()
 	}
 
 	return result.config, nil
