@@ -292,7 +292,7 @@ The server uses the extractor system to handle different media:
 
 - **Video** (Twitter, YouTube, etc.) - Selects best format (prefers with audio, then highest bitrate)
 - **Audio** (podcasts, music)
-- **Images** (downloads first image from multi-image posts)
+- **Images** (downloads all images from multi-image posts)
 
 For unsupported URLs, falls back to `sites.yml` config or generic browser extractor.
 
