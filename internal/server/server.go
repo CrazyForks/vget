@@ -63,6 +63,17 @@ func NewServer(port int, outputDir, apiKey string, maxConcurrent int) *Server {
 
 // Start starts the HTTP server
 func (s *Server) Start() error {
+	// Warn if no config file exists
+	if !config.Exists() {
+		lang := s.cfg.Language
+		if lang == "" {
+			lang = "zh"
+		}
+		t := i18n.GetTranslations(lang)
+		log.Printf("⚠️  %s", t.Server.NoConfigWarning)
+		log.Printf("   %s", t.Server.RunInitHint)
+	}
+
 	// Ensure output directory exists
 	if err := os.MkdirAll(s.outputDir, 0755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
@@ -464,7 +475,7 @@ func (s *Server) handleI18n(w http.ResponseWriter, r *http.Request) {
 	// Get translations for the configured language
 	lang := s.cfg.Language
 	if lang == "" {
-		lang = "en"
+		lang = "zh"
 	}
 
 	t := i18n.GetTranslations(lang)
@@ -472,8 +483,10 @@ func (s *Server) handleI18n(w http.ResponseWriter, r *http.Request) {
 	s.writeJSON(w, http.StatusOK, Response{
 		Code: 200,
 		Data: map[string]interface{}{
-			"language": lang,
-			"ui":       t.UI,
+			"language":      lang,
+			"ui":            t.UI,
+			"server":        t.Server,
+			"config_exists": config.Exists(),
 		},
 		Message: "translations retrieved",
 	})

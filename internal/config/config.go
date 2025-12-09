@@ -134,7 +134,7 @@ func DefaultDownloadDir() string {
 // DefaultConfig returns a config with sensible defaults
 func DefaultConfig() *Config {
 	return &Config{
-		Language:         "en",
+		Language:         "zh",
 		Proxy:            "",
 		OutputDir:        DefaultDownloadDir(),
 		Format:           "mp4",

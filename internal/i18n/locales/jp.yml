@@ -100,3 +100,8 @@ ui:
   completed: "完了"
   failed: "失敗"
   cancelled: "キャンセル済"
+
+# サーバーメッセージ
+server:
+  no_config_warning: "設定ファイルが見つかりません。デフォルト設定を使用します。"
+  run_init_hint: "'vget init' を実行して対話的に設定してください。"

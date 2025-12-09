@@ -100,3 +100,8 @@ ui:
   completed: "terminé"
   failed: "échoué"
   cancelled: "annulé"
+
+# Messages du serveur
+server:
+  no_config_warning: "Fichier de configuration introuvable. Utilisation des paramètres par défaut."
+  run_init_hint: "Exécutez 'vget init' pour configurer vget de manière interactive."

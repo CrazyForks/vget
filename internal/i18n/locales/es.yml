@@ -100,3 +100,8 @@ ui:
   completed: "completado"
   failed: "fallido"
   cancelled: "cancelado"
+
+# Mensajes del servidor
+server:
+  no_config_warning: "No se encontró archivo de configuración. Usando configuración predeterminada."
+  run_init_hint: "Ejecute 'vget init' para configurar vget de forma interactiva."

@@ -56,9 +56,16 @@ interface UITranslations {
   cancelled: string;
 }
 
+interface ServerTranslations {
+  no_config_warning: string;
+  run_init_hint: string;
+}
+
 interface I18nData {
   language: string;
   ui: UITranslations;
+  server: ServerTranslations;
+  config_exists: boolean;
 }
 
 const defaultTranslations: UITranslations = {
@@ -78,6 +85,11 @@ const defaultTranslations: UITranslations = {
   completed: "completed",
   failed: "failed",
   cancelled: "cancelled",
+};
+
+const defaultServerTranslations: ServerTranslations = {
+  no_config_warning: "No config file found. Using default settings.",
+  run_init_hint: "Run 'vget init' to configure vget interactively.",
 };
 
 async function fetchHealth(): Promise<ApiResponse<HealthData>> {
@@ -141,6 +153,8 @@ function App() {
     return saved ? saved === "dark" : true;
   });
   const [t, setT] = useState<UITranslations>(defaultTranslations);
+  const [serverT, setServerT] = useState<ServerTranslations>(defaultServerTranslations);
+  const [configExists, setConfigExists] = useState(true);
 
   useEffect(() => {
     document.documentElement.setAttribute(
@@ -161,7 +175,11 @@ function App() {
       if (healthRes.code === 200) setHealth(healthRes.data);
       if (jobsRes.code === 200) setJobs(jobsRes.data.jobs || []);
       if (configRes.code === 200) setOutputDir(configRes.data.output_dir);
-      if (i18nRes.code === 200) setT(i18nRes.data.ui);
+      if (i18nRes.code === 200) {
+        setT(i18nRes.data.ui);
+        setServerT(i18nRes.data.server);
+        setConfigExists(i18nRes.data.config_exists);
+      }
     } catch {
       setHealth(null);
     } finally {
@@ -250,6 +268,16 @@ function App() {
           <span className="version">{health?.version || "..."}</span>
         </div>
       </header>
+
+      {!configExists && (
+        <div className="warning-banner">
+          <span className="warning-icon">⚠️</span>
+          <div className="warning-text">
+            <p>{serverT.no_config_warning}</p>
+            <p className="warning-hint">{serverT.run_init_hint}</p>
+          </div>
+        </div>
+      )}
 
       <div className="output-dir">
         <span className="output-dir-label">{t.download_to}</span>

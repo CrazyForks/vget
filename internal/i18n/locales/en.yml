@@ -112,3 +112,8 @@ ui:
   completed: "completed"
   failed: "failed"
   cancelled: "cancelled"
+
+# Server messages
+server:
+  no_config_warning: "No config file found. Using default settings."
+  run_init_hint: "Run 'vget init' to configure vget interactively."

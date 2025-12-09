@@ -22,6 +22,7 @@ type Translations struct {
 	Twitter      TwitterTranslations      `yaml:"twitter"`
 	Sites        SitesTranslations        `yaml:"sites"`
 	UI           UITranslations           `yaml:"ui"`
+	Server       ServerTranslations       `yaml:"server"`
 }
 
 type ConfigTranslations struct {
@@ -146,10 +147,16 @@ type UITranslations struct {
 	Cancelled   string `yaml:"cancelled" json:"cancelled"`
 }
 
+// ServerTranslations holds translations for server messages
+type ServerTranslations struct {
+	NoConfigWarning string `yaml:"no_config_warning" json:"no_config_warning"`
+	RunInitHint     string `yaml:"run_init_hint" json:"run_init_hint"`
+}
+
 var (
 	translationsCache = make(map[string]*Translations)
 	cacheMutex        sync.RWMutex
-	defaultLang       = "en"
+	defaultLang       = "zh"
 )
 
 // SupportedLanguages returns all available language codes
@@ -157,8 +164,8 @@ var SupportedLanguages = []struct {
 	Code string
 	Name string
 }{
-	{"en", "English"},
 	{"zh", "中文"},
+	{"en", "English"},
 	{"jp", "日本語"},
 	{"kr", "한국어"},
 	{"es", "Español"},
