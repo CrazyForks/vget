@@ -93,3 +93,22 @@ sites:
   cancelled: "已取消"
   enter_confirm: "回车确认"
   esc_cancel: "esc 取消"
+
+# Web UI 翻译
+ui:
+  download_to: "下载到："
+  edit: "编辑"
+  save: "保存"
+  cancel: "取消"
+  paste_url: "粘贴下载链接..."
+  download: "下载"
+  adding: "添加中..."
+  jobs: "任务"
+  total: "个"
+  no_downloads: "暂无下载任务"
+  paste_hint: "在上方粘贴链接开始下载"
+  queued: "排队中"
+  downloading: "下载中"
+  completed: "已完成"
+  failed: "失败"
+  cancelled: "已取消"

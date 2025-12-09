@@ -81,3 +81,22 @@ twitter:
   protected_tweet: "Le tweet protégé nécessite une autorisation."
   tweet_unavailable: "Tweet non disponible."
   auth_hint: "Exécutez 'vget config twitter set' pour configurer votre auth token."
+
+# Traductions de l'interface web
+ui:
+  download_to: "Télécharger dans :"
+  edit: "Modifier"
+  save: "Enregistrer"
+  cancel: "Annuler"
+  paste_url: "Coller l'URL à télécharger..."
+  download: "Télécharger"
+  adding: "Ajout..."
+  jobs: "Tâches"
+  total: "total"
+  no_downloads: "Aucun téléchargement"
+  paste_hint: "Collez une URL ci-dessus pour commencer"
+  queued: "en attente"
+  downloading: "téléchargement"
+  completed: "terminé"
+  failed: "échoué"
+  cancelled: "annulé"

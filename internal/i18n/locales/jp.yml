@@ -81,3 +81,22 @@ twitter:
   protected_tweet: "保護されたツイートには認証が必要です。"
   tweet_unavailable: "ツイートは利用できません。"
   auth_hint: "'vget config twitter set' を実行して auth token を設定してください。"
+
+# Web UI 翻訳
+ui:
+  download_to: "保存先："
+  edit: "編集"
+  save: "保存"
+  cancel: "キャンセル"
+  paste_url: "URLを貼り付け..."
+  download: "ダウンロード"
+  adding: "追加中..."
+  jobs: "ジョブ"
+  total: "件"
+  no_downloads: "ダウンロードはありません"
+  paste_hint: "上にURLを貼り付けて開始"
+  queued: "待機中"
+  downloading: "ダウンロード中"
+  completed: "完了"
+  failed: "失敗"
+  cancelled: "キャンセル済"

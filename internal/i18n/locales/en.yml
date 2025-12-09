@@ -93,3 +93,22 @@ sites:
   cancelled: "Cancelled"
   enter_confirm: "enter confirm"
   esc_cancel: "esc cancel"
+
+# Web UI translations
+ui:
+  download_to: "Download to:"
+  edit: "Edit"
+  save: "Save"
+  cancel: "Cancel"
+  paste_url: "Paste URL to download..."
+  download: "Download"
+  adding: "Adding..."
+  jobs: "Jobs"
+  total: "total"
+  no_downloads: "No downloads yet"
+  paste_hint: "Paste a URL above to get started"
+  queued: "queued"
+  downloading: "downloading"
+  completed: "completed"
+  failed: "failed"
+  cancelled: "cancelled"

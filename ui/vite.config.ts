@@ -11,6 +11,7 @@ export default defineConfig({
       '/status': 'http://localhost:8080',
       '/jobs': 'http://localhost:8080',
       '/config': 'http://localhost:8080',
+      '/i18n': 'http://localhost:8080',
     },
   },
 })

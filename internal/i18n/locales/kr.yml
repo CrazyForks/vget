@@ -81,3 +81,22 @@ twitter:
   protected_tweet: "보호된 트윗은 인증이 필요합니다."
   tweet_unavailable: "트윗을 사용할 수 없습니다."
   auth_hint: "'vget config twitter set'을 실행하여 auth token을 설정하세요."
+
+# Web UI 번역
+ui:
+  download_to: "저장 위치:"
+  edit: "편집"
+  save: "저장"
+  cancel: "취소"
+  paste_url: "URL을 붙여넣기..."
+  download: "다운로드"
+  adding: "추가 중..."
+  jobs: "작업"
+  total: "개"
+  no_downloads: "다운로드 없음"
+  paste_hint: "위에 URL을 붙여넣어 시작하세요"
+  queued: "대기 중"
+  downloading: "다운로드 중"
+  completed: "완료"
+  failed: "실패"
+  cancelled: "취소됨"

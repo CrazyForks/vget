@@ -37,6 +37,49 @@ interface JobsData {
   jobs: Job[];
 }
 
+interface UITranslations {
+  download_to: string;
+  edit: string;
+  save: string;
+  cancel: string;
+  paste_url: string;
+  download: string;
+  adding: string;
+  jobs: string;
+  total: string;
+  no_downloads: string;
+  paste_hint: string;
+  queued: string;
+  downloading: string;
+  completed: string;
+  failed: string;
+  cancelled: string;
+}
+
+interface I18nData {
+  language: string;
+  ui: UITranslations;
+}
+
+const defaultTranslations: UITranslations = {
+  download_to: "Download to:",
+  edit: "Edit",
+  save: "Save",
+  cancel: "Cancel",
+  paste_url: "Paste URL to download...",
+  download: "Download",
+  adding: "Adding...",
+  jobs: "Jobs",
+  total: "total",
+  no_downloads: "No downloads yet",
+  paste_hint: "Paste a URL above to get started",
+  queued: "queued",
+  downloading: "downloading",
+  completed: "completed",
+  failed: "failed",
+  cancelled: "cancelled",
+};
+
 async function fetchHealth(): Promise<ApiResponse<HealthData>> {
   const res = await fetch("/health");
   return res.json();
@@ -49,6 +92,11 @@ async function fetchJobs(): Promise<ApiResponse<JobsData>> {
 
 async function fetchConfig(): Promise<ApiResponse<ConfigData>> {
   const res = await fetch("/config");
+  return res.json();
+}
+
+async function fetchI18n(): Promise<ApiResponse<I18nData>> {
+  const res = await fetch("/i18n");
   return res.json();
 }
 
@@ -92,6 +140,7 @@ function App() {
     const saved = localStorage.getItem("vget-theme");
     return saved ? saved === "dark" : true;
   });
+  const [t, setT] = useState<UITranslations>(defaultTranslations);
 
   useEffect(() => {
     document.documentElement.setAttribute(
@@ -103,14 +152,16 @@ function App() {
 
   const refresh = useCallback(async () => {
     try {
-      const [healthRes, jobsRes, configRes] = await Promise.all([
+      const [healthRes, jobsRes, configRes, i18nRes] = await Promise.all([
         fetchHealth(),
         fetchJobs(),
         fetchConfig(),
+        fetchI18n(),
       ]);
       if (healthRes.code === 200) setHealth(healthRes.data);
       if (jobsRes.code === 200) setJobs(jobsRes.data.jobs || []);
       if (configRes.code === 200) setOutputDir(configRes.data.output_dir);
+      if (i18nRes.code === 200) setT(i18nRes.data.ui);
     } catch {
       setHealth(null);
     } finally {
@@ -181,8 +232,12 @@ function App() {
     <div className="container">
       <header className="header">
         <div className="header-left">
-          <img src={logo} alt="vget" className={`logo ${isConnected ? '' : 'disconnected'}`} />
-          <h1>Vget Server</h1>
+          <img
+            src={logo}
+            alt="vget"
+            className={`logo ${isConnected ? "" : "disconnected"}`}
+          />
+          <h1>VGet Server</h1>
         </div>
         <div className="header-right">
           <button
@@ -197,7 +252,7 @@ function App() {
       </header>
 
       <div className="output-dir">
-        <span className="output-dir-label">Download to:</span>
+        <span className="output-dir-label">{t.download_to}</span>
         <input
           type="text"
           className="output-dir-input"
@@ -213,10 +268,10 @@ function App() {
         {editingDir ? (
           <div className="output-dir-actions">
             <button onClick={handleSaveDir} className="save-btn">
-              Save
+              {t.save}
             </button>
             <button onClick={handleCancelEdit} className="cancel-edit-btn">
-              Cancel
+              {t.cancel}
             </button>
           </div>
         ) : (
@@ -225,7 +280,7 @@ function App() {
             className="edit-btn"
             disabled={!isConnected}
           >
-            Edit
+            {t.edit}
           </button>
         )}
       </div>
@@ -235,29 +290,29 @@ function App() {
           type="text"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          placeholder="Paste URL to download..."
+          placeholder={t.paste_url}
           disabled={!isConnected || submitting}
         />
         <button
           type="submit"
           disabled={!isConnected || !url.trim() || submitting}
         >
-          {submitting ? "Adding..." : "Download"}
+          {submitting ? t.adding : t.download}
         </button>
       </form>
 
       <section className="jobs-section">
         <div className="jobs-header">
-          <h2>Jobs</h2>
-          <span className="count">{jobs.length} total</span>
+          <h2>{t.jobs}</h2>
+          <span className="count">{jobs.length} {t.total}</span>
         </div>
 
         {loading ? (
           <div className="empty-state">Loading...</div>
         ) : sortedJobs.length === 0 ? (
           <div className="empty-state">
-            <p>No downloads yet</p>
-            <p className="hint">Paste a URL above to get started</p>
+            <p>{t.no_downloads}</p>
+            <p className="hint">{t.paste_hint}</p>
           </div>
         ) : (
           <div className="jobs-list">
@@ -266,6 +321,7 @@ function App() {
                 key={job.id}
                 job={job}
                 onCancel={() => handleCancel(job.id)}
+                t={t}
               />
             ))}
           </div>
@@ -275,18 +331,36 @@ function App() {
   );
 }
 
-function JobCard({ job, onCancel }: { job: Job; onCancel: () => void }) {
+function JobCard({
+  job,
+  onCancel,
+  t,
+}: {
+  job: Job;
+  onCancel: () => void;
+  t: UITranslations;
+}) {
   const canCancel = job.status === "queued" || job.status === "downloading";
+
+  const statusText: Record<JobStatus, string> = {
+    queued: t.queued,
+    downloading: t.downloading,
+    completed: t.completed,
+    failed: t.failed,
+    cancelled: t.cancelled,
+  };
 
   return (
     <div className="job-card">
       <div className="job-header">
         <code className="job-id">{job.id}</code>
         <div className="job-actions">
-          <span className={`status-badge ${job.status}`}>{job.status}</span>
+          <span className={`status-badge ${job.status}`}>
+            {statusText[job.status]}
+          </span>
           {canCancel && (
             <button className="cancel-btn" onClick={onCancel}>
-              Cancel
+              {t.cancel}
             </button>
           )}
         </div>

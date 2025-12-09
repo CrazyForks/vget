@@ -127,7 +127,7 @@ body {
 }
 
 .output-dir-label {
-  color: var(--text-dim);
+  color: var(--text-secondary);
   font-size: 0.875rem;
   white-space: nowrap;
 }
@@ -259,7 +259,7 @@ body {
 .jobs-section h2 {
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -271,7 +271,7 @@ body {
 }
 
 .jobs-header .count {
-  color: var(--text-dim);
+  color: var(--text-secondary);
   font-size: 0.875rem;
 }
 

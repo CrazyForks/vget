@@ -16,6 +16,7 @@ import (
 	"github.com/guiyumin/vget/internal/config"
 	"github.com/guiyumin/vget/internal/downloader"
 	"github.com/guiyumin/vget/internal/extractor"
+	"github.com/guiyumin/vget/internal/i18n"
 	"github.com/guiyumin/vget/internal/version"
 )
 
@@ -80,6 +81,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/jobs", s.handleJobs)
 	mux.HandleFunc("/jobs/", s.handleJobAction)
 	mux.HandleFunc("/config", s.handleConfig)
+	mux.HandleFunc("/i18n", s.handleI18n)
 
 	// Serve embedded UI if available
 	if distFS := GetDistFS(); distFS != nil {
@@ -447,6 +449,34 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			Message: "method not allowed",
 		})
 	}
+}
+
+func (s *Server) handleI18n(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.writeJSON(w, http.StatusMethodNotAllowed, Response{
+			Code:    405,
+			Data:    nil,
+			Message: "method not allowed",
+		})
+		return
+	}
+
+	// Get translations for the configured language
+	lang := s.cfg.Language
+	if lang == "" {
+		lang = "en"
+	}
+
+	t := i18n.GetTranslations(lang)
+
+	s.writeJSON(w, http.StatusOK, Response{
+		Code: 200,
+		Data: map[string]interface{}{
+			"language": lang,
+			"ui":       t.UI,
+		},
+		Message: "translations retrieved",
+	})
 }
 
 // Helper functions
