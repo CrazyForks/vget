@@ -478,3 +478,151 @@ server:
 - Schedules are evaluated on server startup and when modified
 - Scheduled jobs enter the same job queue as manual downloads
 - If server is stopped during scheduled time, missed runs are skipped (no catch-up)
+
+---
+
+## Service Installation (Planned)
+
+One-command installation for NAS and Linux servers.
+
+### Commands
+
+```bash
+sudo vget install      # Install as systemd service
+sudo vget uninstall    # Remove service
+vget install --help    # Show options
+```
+
+### Interactive TUI Flow
+
+When running `sudo vget install`, a Bubbletea TUI guides the user:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│   vget service installer                                    │
+│                                                             │
+│   This will install vget as a system service:               │
+│                                                             │
+│   ✓ Copy binary to /usr/local/bin/vget                      │
+│   ✓ Create systemd service at /etc/systemd/system/          │
+│   ✓ Enable auto-start on boot                               │
+│   ✓ Start the vget server                                   │
+│                                                             │
+│   Service configuration:                                    │
+│   ┌─────────────────────────────────────────────────────┐   │
+│   │  Port:        8080                                  │   │
+│   │  Output dir:  /var/lib/vget/downloads               │   │
+│   │  Run as user: vget                                  │   │
+│   └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│   [ Configure ]    [ Install ]    [ Cancel ]                │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Configuration Screen (if "Configure" selected)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│   Service Configuration                                     │
+│                                                             │
+│   Port:              8080                                   │
+│   Output directory:  /var/lib/vget/downloads                │
+│   Run as user:       vget  (will be created if needed)      │
+│   API key:           (none)                                 │
+│                                                             │
+│   Use arrow keys to navigate, Enter to edit                 │
+│                                                             │
+│   [ Back ]    [ Save & Install ]                            │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### What `vget install` Does
+
+1. **Pre-flight checks**
+   - Verify running as root (prompt for sudo if not)
+   - Check if systemd is available
+   - Check if service already exists (offer reinstall/update)
+
+2. **Setup**
+   - Create `vget` system user (if configured to run as non-root)
+   - Create output directory with proper permissions
+   - Copy binary to `/usr/local/bin/vget`
+
+3. **Service installation**
+   - Write service file to `/etc/systemd/system/vget.service`
+   - Write config to `/etc/vget/config.yml`
+   - Run `systemctl daemon-reload`
+   - Run `systemctl enable vget`
+   - Run `systemctl start vget`
+
+4. **Success screen**
+   ```
+   ┌─────────────────────────────────────────────────────────────┐
+   │                                                             │
+   │   ✓ vget service installed successfully!                   │
+   │                                                             │
+   │   WebUI:    http://localhost:8080                           │
+   │   Status:   sudo systemctl status vget                      │
+   │   Logs:     sudo journalctl -u vget -f                      │
+   │   Stop:     sudo systemctl stop vget                        │
+   │   Remove:   sudo vget uninstall                             │
+   │                                                             │
+   └─────────────────────────────────────────────────────────────┘
+   ```
+
+### Generated systemd Service File
+
+```ini
+# /etc/systemd/system/vget.service
+[Unit]
+Description=vget media downloader server
+After=network.target
+
+[Service]
+Type=simple
+User=vget
+Group=vget
+ExecStart=/usr/local/bin/vget serve --config /etc/vget/config.yml
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### CLI Flags (non-interactive mode)
+
+```bash
+# Skip TUI, use defaults
+sudo vget install --yes
+
+# Custom configuration
+sudo vget install --port 9000 --output /data/downloads --user root
+
+# Uninstall
+sudo vget uninstall
+```
+
+### Platform Support
+
+Currently only Linux with systemd is supported.
+
+On unsupported platforms, the command exits immediately with a helpful message:
+
+```
+$ vget install
+
+vget install is only supported on Linux with systemd.
+
+To run vget as a service on macOS, see:
+https://github.com/guiyumin/vget/blob/main/docs/manual-service-setup.md
+
+$ echo $?
+0
+```
+
+No TUI is shown - just a clear message and clean exit.
