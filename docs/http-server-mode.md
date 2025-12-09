@@ -51,7 +51,7 @@ output_dir: ~/Downloads/vget
 
 server:
   port: 8080
-  max_concurrent: 3
+  max_concurrent: 10
   api_key: "optional-secret-key"
 ```
 
@@ -277,7 +277,7 @@ Route to handler
     ↓
 POST /download → Add job to queue → Return job ID
     ↓
-Worker pool (max_concurrent workers, default 3)
+Worker pool (max_concurrent workers, default 10)
     ↓
 Worker picks job → extractor.Match(url) → ext.Extract(url) → download with progress
     ↓

@@ -73,7 +73,7 @@ type ServerConfig struct {
 	// Port is the HTTP listen port (default: 8080)
 	Port int `yaml:"port,omitempty"`
 
-	// MaxConcurrent is the max number of concurrent downloads (default: 3)
+	// MaxConcurrent is the max number of concurrent downloads (default: 10)
 	MaxConcurrent int `yaml:"max_concurrent,omitempty"`
 
 	// APIKey for authentication (optional, if set all requests must include X-API-Key header)

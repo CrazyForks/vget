@@ -56,7 +56,7 @@ type DownloadFunc func(ctx context.Context, url, outputPath string, progressFn f
 // NewJobQueue creates a new job queue with the specified concurrency
 func NewJobQueue(maxConcurrent int, outputDir string, downloadFn DownloadFunc) *JobQueue {
 	if maxConcurrent <= 0 {
-		maxConcurrent = 3
+		maxConcurrent = 10
 	}
 
 	jq := &JobQueue{

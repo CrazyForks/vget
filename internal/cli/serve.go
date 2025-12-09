@@ -106,7 +106,7 @@ func runServe() error {
 	// Resolve max concurrent (config > default)
 	maxConcurrent := cfg.Server.MaxConcurrent
 	if maxConcurrent <= 0 {
-		maxConcurrent = 3
+		maxConcurrent = 10
 	}
 
 	// Get API key from config
