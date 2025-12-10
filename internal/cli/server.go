@@ -329,10 +329,8 @@ func startDaemon(port int, outputDir string) error {
 	cmd.Stderr = logFile
 	cmd.Stdin = nil
 
-	// Detach from parent
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setsid: true,
-	}
+	// Detach from parent (platform-specific)
+	setSysProcAttr(cmd)
 
 	if err := cmd.Start(); err != nil {
 		logFile.Close()

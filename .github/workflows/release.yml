@@ -31,6 +31,8 @@ jobs:
       - name: Build UI
         run: |
           cd ui && npm install && npm run build
+          cd ..
+          mkdir -p internal/server/dist
           rm -rf internal/server/dist/*
           cp -r ui/dist/* internal/server/dist/
 
