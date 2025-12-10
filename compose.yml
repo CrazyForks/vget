@@ -1,6 +1,6 @@
 services:
   vget:
-    image: guiyumin/vget:latest
+    image: ghcr.io/guiyumin/vget:latest
     container_name: vget
     restart: unless-stopped
     ports:
