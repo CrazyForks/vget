@@ -84,6 +84,7 @@ twitter:
   deprecated_set: "'vget config twitter set' は非推奨です。"
   deprecated_clear: "'vget config twitter clear' は非推奨です。"
   deprecated_use_new: "代わりに使用してください：vget config set twitter.auth_token <value>"
+  deprecated_use_new_unset: "代わりに使用してください：vget config unset twitter.auth_token"
 
 # Web UI 翻訳
 ui:

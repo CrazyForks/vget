@@ -7,9 +7,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/guiyumin/vget/internal/config"
 	"github.com/guiyumin/vget/internal/i18n"
 	"github.com/spf13/cobra"
@@ -129,6 +126,47 @@ Examples:
 	},
 }
 
+// vget config unset KEY - unset/clear a config value
+var configUnsetCmd = &cobra.Command{
+	Use:   "unset <key>",
+	Short: "Unset a configuration value",
+	Long: `Unset (clear) a configuration value in config.yml.
+
+Supported keys:
+  language           Reset to empty (uses default)
+  proxy              Clear proxy setting
+  output_dir         Reset to empty (uses default)
+  format             Reset to empty (uses default)
+  quality            Reset to empty (uses default)
+  filename_template  Reset to empty (uses default)
+  twitter.auth_token Clear Twitter auth token
+  server.port        Reset to 0 (uses default)
+  server.max_concurrent  Reset to 0 (uses default)
+  server.api_key     Clear API key
+
+Examples:
+  vget config unset proxy
+  vget config unset twitter.auth_token`,
+	Args: cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		key := args[0]
+
+		cfg := config.LoadOrDefault()
+
+		if err := unsetConfigValue(cfg, key); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+
+		if err := config.Save(cfg); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to save config: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("Unset %s\n", key)
+	},
+}
+
 // setConfigValue sets a config value by key
 func setConfigValue(cfg *config.Config, key, value string) error {
 	switch key {
@@ -192,6 +230,35 @@ func getConfigValue(cfg *config.Config, key string) (string, error) {
 	default:
 		return "", fmt.Errorf("unknown config key: %s\nRun 'vget config get --help' to see supported keys", key)
 	}
+}
+
+// unsetConfigValue clears a config value by key
+func unsetConfigValue(cfg *config.Config, key string) error {
+	switch key {
+	case "language":
+		cfg.Language = ""
+	case "proxy":
+		cfg.Proxy = ""
+	case "output_dir":
+		cfg.OutputDir = ""
+	case "format":
+		cfg.Format = ""
+	case "quality":
+		cfg.Quality = ""
+	case "filename_template":
+		cfg.FilenameTemplate = ""
+	case "twitter.auth_token":
+		cfg.Twitter.AuthToken = ""
+	case "server.port":
+		cfg.Server.Port = 0
+	case "server.max_concurrent":
+		cfg.Server.MaxConcurrent = 0
+	case "server.api_key":
+		cfg.Server.APIKey = ""
+	default:
+		return fmt.Errorf("unknown config key: %s\nRun 'vget config unset --help' to see supported keys", key)
+	}
+	return nil
 }
 
 // --- WebDAV remote management ---
@@ -374,256 +441,34 @@ New syntax:
 		cfg := config.LoadOrDefault()
 		t := i18n.T(cfg.Language)
 
-		// Show deprecation warning
+		// Show deprecation warning and exit
 		fmt.Fprintf(os.Stderr, "⚠️  %s\n", t.Twitter.DeprecatedSet)
-		fmt.Fprintf(os.Stderr, "   %s\n\n", t.Twitter.DeprecatedUseNew)
-
-		token, _ := cmd.Flags().GetString("token")
-		if token == "" {
-			reader := bufio.NewReader(os.Stdin)
-			fmt.Printf("%s: ", t.Twitter.EnterAuthToken)
-			input, _ := reader.ReadString('\n')
-			token = strings.TrimSpace(input)
-		}
-
-		if token == "" {
-			fmt.Fprintln(os.Stderr, t.Twitter.AuthRequired)
-			os.Exit(1)
-		}
-
-		cfg.Twitter.AuthToken = token
-
-		if err := config.Save(cfg); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to save: %v\n", err)
-			os.Exit(1)
-		}
-
-		fmt.Println(t.Twitter.AuthSaved)
-		fmt.Println(t.Twitter.AuthCanDownload)
+		fmt.Fprintf(os.Stderr, "   %s\n", t.Twitter.DeprecatedUseNew)
+		os.Exit(1)
 	},
 }
 
 var configTwitterClearCmd = &cobra.Command{
 	Use:        "clear",
 	Short:      "Remove Twitter authentication (deprecated)",
-	Deprecated: "use 'vget config set twitter.auth_token \"\"' instead",
+	Deprecated: "use 'vget config unset twitter.auth_token' instead",
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := config.LoadOrDefault()
 		t := i18n.T(cfg.Language)
 
-		// Show deprecation warning
+		// Show deprecation warning and exit
 		fmt.Fprintf(os.Stderr, "⚠️  %s\n", t.Twitter.DeprecatedClear)
-		fmt.Fprintf(os.Stderr, "   %s\n\n", t.Twitter.DeprecatedUseNew)
-
-		cfg.Twitter.AuthToken = ""
-
-		if err := config.Save(cfg); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to save: %v\n", err)
-			os.Exit(1)
-		}
-
-		fmt.Println(t.Twitter.AuthCleared)
+		fmt.Fprintf(os.Stderr, "   %s\n", t.Twitter.DeprecatedUseNewUnset)
+		os.Exit(1)
 	},
 }
-
-// --- Sites management ---
-
-var configSitesCmd = &cobra.Command{
-	Use:   "sites",
-	Short: "Configure sites.yml for browser-based extraction",
-	Long: `Add a site that requires browser-based extraction.
-
-sites.yml is saved in the current directory and configures which
-sites should use browser automation to discover m3u8 URLs.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return runSitesWizard()
-	},
-}
-
-// Sites wizard TUI styles
-var (
-	sitesFocusedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("86"))
-	sitesBlurredStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-	sitesHelpStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-	sitesContainerStyle = lipgloss.NewStyle().Padding(1, 2)
-)
-
-type sitesModel struct {
-	step      int // 0: input domain, 1: select type
-	textInput textinput.Model
-	cursor    int
-	types     []string
-	done      bool
-	cancelled bool
-	lang      string
-}
-
-func initialSitesModel(lang string) sitesModel {
-	ti := textinput.New()
-	ti.Placeholder = "kanav.ad"
-	ti.Focus()
-	ti.CharLimit = 100
-	ti.Width = 40
-	ti.PromptStyle = sitesFocusedStyle
-	ti.TextStyle = sitesFocusedStyle
-	ti.Cursor.Style = sitesFocusedStyle
-
-	return sitesModel{
-		step:      0,
-		textInput: ti,
-		types:     []string{"m3u8"},
-		lang:      lang,
-	}
-}
-
-func (m sitesModel) t() *i18n.Translations {
-	return i18n.T(m.lang)
-}
-
-func (m sitesModel) Init() tea.Cmd {
-	return textinput.Blink
-}
-
-func (m sitesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
-
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "esc":
-			m.cancelled = true
-			return m, tea.Quit
-
-		case "enter":
-			if m.step == 0 {
-				if strings.TrimSpace(m.textInput.Value()) == "" {
-					return m, nil
-				}
-				m.step = 1
-				m.textInput.Blur()
-			} else {
-				m.done = true
-				return m, tea.Quit
-			}
-			return m, nil
-
-		case "up":
-			if m.step == 1 && m.cursor > 0 {
-				m.cursor--
-			}
-			return m, nil
-
-		case "down":
-			if m.step == 1 && m.cursor < len(m.types)-1 {
-				m.cursor++
-			}
-			return m, nil
-		}
-	}
-
-	if m.step == 0 {
-		m.textInput, cmd = m.textInput.Update(msg)
-	}
-
-	return m, cmd
-}
-
-func (m sitesModel) View() string {
-	var b strings.Builder
-	t := m.t()
-
-	if m.step == 0 {
-		b.WriteString(sitesFocusedStyle.Render(t.Sites.DomainMatch))
-		b.WriteString("\n\n")
-		b.WriteString(m.textInput.View())
-	} else {
-		b.WriteString(fmt.Sprintf("Domain: %s\n\n", sitesFocusedStyle.Render(m.textInput.Value())))
-		b.WriteString(sitesFocusedStyle.Render(t.Sites.SelectType))
-		b.WriteString(" ")
-		b.WriteString(sitesHelpStyle.Render(t.Sites.OnlyM3u8ForNow))
-		b.WriteString("\n\n")
-		for i, tp := range m.types {
-			cursor := "  "
-			style := sitesBlurredStyle
-			if i == m.cursor {
-				cursor = sitesFocusedStyle.Render("> ")
-				style = sitesFocusedStyle
-			}
-			b.WriteString(cursor)
-			b.WriteString(style.Render(tp))
-			b.WriteString("\n")
-		}
-	}
-
-	b.WriteString("\n")
-	b.WriteString(sitesHelpStyle.Render(t.Sites.EnterConfirm + " • " + t.Sites.EscCancel))
-
-	return sitesContainerStyle.Render(b.String())
-}
-
-func runSitesWizard() error {
-	// Load user config for language
-	userCfg := config.LoadOrDefault()
-	t := i18n.T(userCfg.Language)
-
-	// Load existing sites config
-	cfg, err := config.LoadSites()
-	if err != nil {
-		return err
-	}
-	if cfg == nil {
-		cfg = &config.SitesConfig{}
-	}
-
-	// Show existing sites
-	if len(cfg.Sites) > 0 {
-		fmt.Println(t.Sites.ExistingSites)
-		for _, site := range cfg.Sites {
-			fmt.Printf("  %s → %s\n", site.Match, site.Type)
-		}
-		fmt.Println()
-	}
-
-	// Run TUI
-	p := tea.NewProgram(initialSitesModel(userCfg.Language))
-	finalModel, err := p.Run()
-	if err != nil {
-		return err
-	}
-
-	m := finalModel.(sitesModel)
-	if m.cancelled {
-		fmt.Println(t.Sites.Cancelled)
-		return nil
-	}
-
-	match := strings.TrimSpace(m.textInput.Value())
-	mediaType := m.types[m.cursor]
-
-	// Check for duplicate
-	for _, site := range cfg.Sites {
-		if site.Match == match {
-			return fmt.Errorf("site '%s' already exists", match)
-		}
-	}
-
-	cfg.AddSite(match, mediaType)
-
-	if err := config.SaveSites(cfg); err != nil {
-		return err
-	}
-
-	fmt.Printf("\n✓ %s: %s (type: %s)\n", t.Sites.SiteAdded, match, mediaType)
-	fmt.Println(t.Sites.SavedTo)
-	return nil
-}
-
 func init() {
 	// config subcommands
 	configCmd.AddCommand(configShowCmd)
 	configCmd.AddCommand(configPathCmd)
 	configCmd.AddCommand(configSetCmd)
 	configCmd.AddCommand(configGetCmd)
+	configCmd.AddCommand(configUnsetCmd)
 
 	// config webdav subcommands
 	configWebdavCmd.AddCommand(configWebdavListCmd)
@@ -637,9 +482,6 @@ func init() {
 	configTwitterCmd.AddCommand(configTwitterSetCmd)
 	configTwitterCmd.AddCommand(configTwitterClearCmd)
 	configCmd.AddCommand(configTwitterCmd)
-
-	// config sites (single TUI command)
-	configCmd.AddCommand(configSitesCmd)
 
 	rootCmd.AddCommand(configCmd)
 }

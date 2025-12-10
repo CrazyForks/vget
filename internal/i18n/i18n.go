@@ -112,10 +112,11 @@ type TwitterTranslations struct {
 	NsfwLoginRequired string `yaml:"nsfw_login_required"`
 	ProtectedTweet    string `yaml:"protected_tweet"`
 	TweetUnavailable  string `yaml:"tweet_unavailable"`
-	AuthHint          string `yaml:"auth_hint"`
-	DeprecatedSet     string `yaml:"deprecated_set"`
-	DeprecatedClear   string `yaml:"deprecated_clear"`
-	DeprecatedUseNew  string `yaml:"deprecated_use_new"`
+	AuthHint             string `yaml:"auth_hint"`
+	DeprecatedSet        string `yaml:"deprecated_set"`
+	DeprecatedClear      string `yaml:"deprecated_clear"`
+	DeprecatedUseNew     string `yaml:"deprecated_use_new"`
+	DeprecatedUseNewUnset string `yaml:"deprecated_use_new_unset"`
 }
 
 type SitesTranslations struct {

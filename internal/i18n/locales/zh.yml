@@ -84,6 +84,7 @@ twitter:
   deprecated_set: "'vget config twitter set' 已弃用。"
   deprecated_clear: "'vget config twitter clear' 已弃用。"
   deprecated_use_new: "请使用：vget config set twitter.auth_token <value>"
+  deprecated_use_new_unset: "请使用：vget config unset twitter.auth_token"
 
 sites:
   configure_site: "配置网站"

@@ -84,6 +84,7 @@ twitter:
   deprecated_set: "'vget config twitter set' está obsoleto."
   deprecated_clear: "'vget config twitter clear' está obsoleto."
   deprecated_use_new: "Por favor usa: vget config set twitter.auth_token <value>"
+  deprecated_use_new_unset: "Por favor usa: vget config unset twitter.auth_token"
 
 # Traducciones de la interfaz web
 ui:

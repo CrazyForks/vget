@@ -84,6 +84,7 @@ twitter:
   deprecated_set: "'vget config twitter set'은 더 이상 사용되지 않습니다."
   deprecated_clear: "'vget config twitter clear'는 더 이상 사용되지 않습니다."
   deprecated_use_new: "대신 사용하세요: vget config set twitter.auth_token <value>"
+  deprecated_use_new_unset: "대신 사용하세요: vget config unset twitter.auth_token"
 
 # Web UI 번역
 ui:
