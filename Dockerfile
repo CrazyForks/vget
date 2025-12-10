@@ -33,13 +33,25 @@ FROM alpine:3.21
 # - ca-certificates: for HTTPS requests
 # - chromium: for browser-based extractors (XHS, etc.)
 # - font packages: for proper text rendering in headless browser
+# - python3/pip: for yt-dlp and youtube-dl
+# - ffmpeg: for merging video/audio streams
+# - nodejs: for yt-dlp JS challenge solving (N parameter)
 RUN apk add --no-cache \
     ca-certificates \
     chromium \
     font-noto-cjk \
     font-noto-emoji \
     tzdata \
-    su-exec
+    su-exec \
+    python3 \
+    py3-pip \
+    ffmpeg \
+    nodejs
+
+# Install yt-dlp and youtube-dl
+RUN pip3 install --no-cache-dir --break-system-packages \
+    yt-dlp \
+    youtube-dl
 
 # Create non-root user
 RUN addgroup -g 1000 vget && \

@@ -105,11 +105,6 @@ func runDownload(url string) error {
 		}
 	}
 
-	// Configure visible mode for extractors that support it (e.g., YouTube)
-	if visibleExt, ok := ext.(extractor.VisibleSetter); ok && visible {
-		visibleExt.SetVisible(visible)
-	}
-
 	// Extract media info with spinner
 	media, err := runExtractWithSpinner(ext, url, cfg.Language)
 	if err != nil {
