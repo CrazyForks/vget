@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -13,10 +14,11 @@ import (
 )
 
 var (
-	extractInfoStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("86"))
-	extractDoneStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-	extractErrStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-	extractHintStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("248"))
+	extractInfoStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("86"))
+	extractDoneStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	extractErrStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+	extractHintStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("248"))
+	extractMessageStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("33")) // blue for info messages
 )
 
 // extractState holds extraction state
@@ -107,6 +109,16 @@ func (m extractModel) View() string {
 	done, err, result := m.state.get()
 
 	if err != nil {
+		// Special handling for YouTube Docker requirement (info message, not error)
+		var ytErr *extractor.YouTubeDockerRequiredError
+		if errors.As(err, &ytErr) {
+			return fmt.Sprintf("\n  %s %s\n\n  %s\n    docker run -v ~/downloads:/downloads guiyumin/vget \"%s\"\n\n",
+				extractMessageStyle.Render("ℹ"),
+				m.t.YouTube.DockerRequired,
+				extractHintStyle.Render(m.t.YouTube.DockerHint),
+				ytErr.URL,
+			)
+		}
 		return fmt.Sprintf("\n  %s %s: %v\n\n",
 			extractErrStyle.Render("✗"),
 			m.t.Errors.ExtractionFailed,

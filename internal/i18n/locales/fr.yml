@@ -105,3 +105,8 @@ ui:
 server:
   no_config_warning: "Fichier de configuration introuvable. Utilisation des paramètres par défaut."
   run_init_hint: "Exécutez 'vget init' pour configurer vget de manière interactive."
+
+# Messages YouTube
+youtube:
+  docker_required: "Le téléchargement YouTube nécessite Docker."
+  docker_hint: "Exécutez vget dans Docker :"

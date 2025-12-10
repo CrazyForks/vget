@@ -108,6 +108,12 @@ func runDownload(url string) error {
 	// Extract media info with spinner
 	media, err := runExtractWithSpinner(ext, url, cfg.Language)
 	if err != nil {
+		// YouTube Docker requirement is already displayed in the TUI, don't show again
+		var ytErr *extractor.YouTubeDockerRequiredError
+		if errors.As(err, &ytErr) {
+			return nil // Message already shown, exit cleanly
+		}
+
 		// Handle Twitter-specific errors with translated messages
 		var twitterErr *extractor.TwitterError
 		if errors.As(err, &twitterErr) {

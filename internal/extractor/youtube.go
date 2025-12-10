@@ -9,6 +9,15 @@ import (
 	"strings"
 )
 
+// YouTubeDockerRequiredError indicates YouTube extraction needs Docker
+type YouTubeDockerRequiredError struct {
+	URL string
+}
+
+func (e *YouTubeDockerRequiredError) Error() string {
+	return "YouTube extraction requires Docker"
+}
+
 // ytdlpExtractor uses yt-dlp/youtube-dl for YouTube extraction (Docker only)
 type ytdlpExtractor struct{}
 
@@ -27,13 +36,7 @@ func (e *ytdlpExtractor) Match(u *url.URL) bool {
 
 func (e *ytdlpExtractor) Extract(urlStr string) (Media, error) {
 	if !isRunningInDocker() {
-		return nil, fmt.Errorf(`YouTube extraction requires Docker.
-
-Run vget in Docker for YouTube support:
-  docker run -v ~/downloads:/downloads guiyumin/vget "%s"
-
-Or use yt-dlp directly:
-  yt-dlp "%s"`, urlStr, urlStr)
+		return nil, &YouTubeDockerRequiredError{URL: urlStr}
 	}
 
 	// Try yt-dlp first, fall back to youtube-dl
