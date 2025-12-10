@@ -536,6 +536,10 @@ func (s *Server) downloadWithExtractor(ctx context.Context, url, filename string
 	var headers map[string]string
 
 	switch m := media.(type) {
+	case *extractor.YouTubeDirectDownload:
+		// YouTube: use yt-dlp directly for download
+		return extractor.DownloadWithYtdlp(m.URL, s.outputDir)
+
 	case *extractor.VideoMedia:
 		if len(m.Formats) == 0 {
 			return fmt.Errorf("no video formats available")
@@ -661,6 +665,15 @@ func (s *Server) downloadAndStream(w http.ResponseWriter, url, filename string) 
 	var outputFilename string
 
 	switch m := media.(type) {
+	case *extractor.YouTubeDirectDownload:
+		// YouTube requires yt-dlp; streaming not supported
+		s.writeJSON(w, http.StatusBadRequest, Response{
+			Code:    400,
+			Data:    nil,
+			Message: "YouTube streaming not supported. Use queued download instead.",
+		})
+		return
+
 	case *extractor.VideoMedia:
 		if len(m.Formats) == 0 {
 			s.writeJSON(w, http.StatusInternalServerError, Response{

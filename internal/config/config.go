@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -132,6 +133,11 @@ func (c *Config) DeleteWebDAVServer(name string) {
 // macOS: ~/Downloads/vget
 // Linux: ~/downloads
 func DefaultDownloadDir() string {
+	// Docker: use the default container path (users mount their volume here)
+	if isRunningInDocker() {
+		return "/home/vget/downloads"
+	}
+
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "./downloads"
@@ -144,6 +150,26 @@ func DefaultDownloadDir() string {
 		// Linux and others
 		return filepath.Join(home, "downloads")
 	}
+}
+
+// isRunningInDocker detects if we're running inside a Docker container
+func isRunningInDocker() bool {
+	// Check for .dockerenv file
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return true
+	}
+	// Check cgroup
+	if data, err := os.ReadFile("/proc/1/cgroup"); err == nil {
+		content := string(data)
+		if strings.Contains(content, "docker") || strings.Contains(content, "containerd") {
+			return true
+		}
+	}
+	// Check for kubernetes
+	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
+		return true
+	}
+	return false
 }
 
 // DefaultConfig returns a config with sensible defaults

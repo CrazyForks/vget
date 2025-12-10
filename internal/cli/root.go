@@ -141,6 +141,14 @@ func runDownload(url string) error {
 
 	// Handle based on media type
 	switch m := media.(type) {
+	case *extractor.YouTubeDirectDownload:
+		// YouTube: let yt-dlp handle the entire download (Docker only)
+		fmt.Printf("\n  %s Downloading with yt-dlp...\n\n", "⬇")
+		if err := extractor.DownloadWithYtdlp(m.URL, cfg.OutputDir); err != nil {
+			return fmt.Errorf("yt-dlp download failed: %w", err)
+		}
+		fmt.Printf("\n  %s %s\n\n", "✓", t.Download.Completed)
+		return nil
 	case *extractor.VideoMedia:
 		return downloadVideo(m, dl, t, cfg.Language)
 	case *extractor.AudioMedia:
