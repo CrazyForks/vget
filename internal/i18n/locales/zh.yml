@@ -121,4 +121,5 @@ server:
 # YouTube 消息
 youtube:
   docker_required: "YouTube 下载需要在 Docker 中运行。"
-  docker_hint: "请使用 Docker 运行 vget："
+  docker_hint_server: "部署 vget 服务器（推荐 NAS 用户）："
+  docker_hint_cli: "或直接通过命令行下载："

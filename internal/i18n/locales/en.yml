@@ -121,4 +121,5 @@ server:
 # YouTube messages
 youtube:
   docker_required: "YouTube extraction requires Docker."
-  docker_hint: "Run vget in Docker for YouTube support:"
+  docker_hint_server: "Run vget server in Docker (recommended for NAS):"
+  docker_hint_cli: "Or download directly via CLI:"

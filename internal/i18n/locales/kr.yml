@@ -109,4 +109,5 @@ server:
 # YouTube 메시지
 youtube:
   docker_required: "YouTube 다운로드에는 Docker가 필요합니다."
-  docker_hint: "Docker에서 vget을 실행하세요:"
+  docker_hint_server: "Docker에서 vget 서버 실행 (NAS 사용자 권장):"
+  docker_hint_cli: "또는 CLI로 직접 다운로드:"

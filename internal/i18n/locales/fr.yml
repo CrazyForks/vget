@@ -109,4 +109,5 @@ server:
 # Messages YouTube
 youtube:
   docker_required: "Le téléchargement YouTube nécessite Docker."
-  docker_hint: "Exécutez vget dans Docker :"
+  docker_hint_server: "Exécutez le serveur vget dans Docker (recommandé pour NAS) :"
+  docker_hint_cli: "Ou téléchargez directement via CLI :"

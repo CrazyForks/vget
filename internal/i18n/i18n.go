@@ -156,8 +156,9 @@ type ServerTranslations struct {
 
 // YouTubeTranslations holds translations for YouTube messages
 type YouTubeTranslations struct {
-	DockerRequired string `yaml:"docker_required"`
-	DockerHint     string `yaml:"docker_hint"`
+	DockerRequired   string `yaml:"docker_required"`
+	DockerHintServer string `yaml:"docker_hint_server"`
+	DockerHintCLI    string `yaml:"docker_hint_cli"`
 }
 
 var (
