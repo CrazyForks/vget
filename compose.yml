@@ -1,0 +1,12 @@
+services:
+  vget:
+    image: guiyumin/vget:latest
+    container_name: vget
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - /volume1/vget/downloads:/home/vget/downloads
+      - /volume1/vget/config:/home/vget/.config/vget
+    environment:
+      - TZ=Asia/Shanghai

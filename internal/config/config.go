@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"gopkg.in/yaml.v3"
 )
@@ -14,8 +15,16 @@ const (
 )
 
 // ConfigDir returns the standard config directory for vget.
-// All platforms: ~/.config/vget/
+// Windows: %APPDATA%\vget\
+// macOS/Linux: ~/.config/vget/
 func ConfigDir() (string, error) {
+	if runtime.GOOS == "windows" {
+		appData := os.Getenv("APPDATA")
+		if appData != "" {
+			return filepath.Join(appData, AppDirName), nil
+		}
+	}
+
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
@@ -119,13 +128,22 @@ func (c *Config) DeleteWebDAVServer(name string) {
 }
 
 // DefaultDownloadDir returns the default download directory
-// Uses ~/Downloads/vget on all platforms
+// Windows: ~/Downloads/vget
+// macOS: ~/Downloads/vget
+// Linux: ~/downloads
 func DefaultDownloadDir() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "./downloads"
 	}
-	return filepath.Join(home, "Downloads", "vget")
+
+	switch runtime.GOOS {
+	case "darwin", "windows":
+		return filepath.Join(home, "Downloads", "vget")
+	default:
+		// Linux and others
+		return filepath.Join(home, "downloads")
+	}
 }
 
 // DefaultConfig returns a config with sensible defaults

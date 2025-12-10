@@ -1,0 +1,42 @@
+# Build artifacts
+build/
+tmp/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# UI build artifacts (will be built in container)
+ui/node_modules/
+ui/dist/
+
+# Embedded UI dist (will be copied from ui-builder stage)
+internal/server/dist/
+
+# Development files
+.git/
+.gitignore
+.air.toml
+.vscode/
+.idea/
+*.md
+!README.md
+
+# Test files
+*_test.go
+**/*_test.go
+
+# Config and secrets
+*.env
+*.local
+config.yml
+config.yaml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker files (not needed inside container)
+Dockerfile
+docker-compose*.yml
+.dockerignore
