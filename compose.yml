@@ -1,12 +1,26 @@
+# vget Docker Compose
+#
+# Configure via .env file or environment variables:
+#   VGET_PORT=8080           # Web UI port
+#   VGET_DOWNLOADS=./downloads  # Download directory
+#   VGET_CONFIG=./config        # Config directory
+#   TZ=Asia/Shanghai            # Timezone
+#
+# Example paths by NAS:
+#   Synology:  /volume1/vget/downloads
+#   QNAP:      /share/vget/downloads
+#   Unraid:    /mnt/user/vget/downloads
+#   TrueNAS:   /mnt/pool/vget/downloads
+
 services:
   vget:
     image: ghcr.io/guiyumin/vget:latest
     container_name: vget
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "${VGET_PORT:-8080}:8080"
     volumes:
-      - /volume1/vget/downloads:/home/vget/downloads
-      - /volume1/vget/config:/home/vget/.config/vget
+      - ${VGET_DOWNLOADS:?Set VGET_DOWNLOADS in .env}:/home/vget/downloads
+      - ${VGET_CONFIG:?Set VGET_CONFIG in .env}:/home/vget/.config/vget
     environment:
-      - TZ=Asia/Shanghai
+      - TZ=${TZ:-Asia/Shanghai}

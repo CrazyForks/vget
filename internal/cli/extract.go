@@ -112,7 +112,7 @@ func (m extractModel) View() string {
 		// Special handling for YouTube Docker requirement (info message, not error)
 		var ytErr *extractor.YouTubeDockerRequiredError
 		if errors.As(err, &ytErr) {
-			return fmt.Sprintf("\n  %s %s\n\n  %s\n    docker run -d -p 8080:8080 -v ~/downloads:/home/vget/downloads guiyumin/vget\n\n  %s\n    docker run --rm -v ~/downloads:/home/vget/downloads guiyumin/vget \"%s\"\n\n",
+			return fmt.Sprintf("\n  %s %s\n\n  %s\n    docker run -d -p <port>:8080 -v ~/downloads:/home/vget/downloads ghcr.io/guiyumin/vget\n\n  %s\n    docker run --rm -v ~/downloads:/home/vget/downloads ghcr.io/guiyumin/vget \"%s\"\n\n",
 				extractMessageStyle.Render("ℹ"),
 				m.t.YouTube.DockerRequired,
 				extractHintStyle.Render(m.t.YouTube.DockerHintServer),
