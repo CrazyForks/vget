@@ -284,7 +284,8 @@ func downloadMultiVideo(m *extractor.MultiVideoMedia, dl *downloader.Downloader,
 
 	for i, video := range m.Videos {
 		fmt.Printf("\n  [%d/%d] %s\n", i+1, len(m.Videos), video.Title)
-		if err := downloadVideo(video, dl, t, lang, outputDir); err != nil {
+		// Pass index for multi-video to avoid filename collisions
+		if err := downloadVideoWithIndex(video, dl, t, lang, outputDir, i+1, len(m.Videos)); err != nil {
 			return fmt.Errorf("failed to download video %d: %w", i+1, err)
 		}
 	}
@@ -348,6 +349,82 @@ func downloadVideo(m *extractor.VideoMedia, dl *downloader.Downloader, t *i18n.T
 			return fmt.Errorf("failed to create directory: %w", err)
 		}
 		// Put output file inside the directory
+		outputFile = filepath.Join(baseDir, filepath.Base(outputFile))
+		fmt.Printf("  Output directory: %s/\n", baseDir)
+		return downloader.RunHLSDownloadWithHeadersTUI(format.URL, outputFile, m.ID, lang, format.Headers)
+	}
+
+	// Handle video+audio as separate downloads
+	if format.AudioURL != "" {
+		return downloadVideoAndAudio(format, outputFile, m.ID, dl)
+	}
+
+	// Use headers if provided by the extractor
+	if len(format.Headers) > 0 {
+		return dl.DownloadWithHeaders(format.URL, outputFile, m.ID, format.Headers)
+	}
+	return dl.Download(format.URL, outputFile, m.ID)
+}
+
+// downloadVideoWithIndex downloads a video with an index suffix in the filename (for multi-video posts)
+func downloadVideoWithIndex(m *extractor.VideoMedia, dl *downloader.Downloader, t *i18n.Translations, lang string, outputDir string, index, total int) error {
+	// Info only mode
+	if info {
+		for i, f := range m.Formats {
+			audioInfo := ""
+			if f.AudioURL != "" {
+				audioInfo = " [+audio]"
+			}
+			fmt.Printf("  [%d] %s %dx%d (%s)%s\n", i, f.Quality, f.Width, f.Height, f.Ext, audioInfo)
+		}
+		return nil
+	}
+
+	// Select best format (or by quality flag)
+	format := selectVideoFormat(m.Formats, quality)
+	if format == nil {
+		return fmt.Errorf("%s", t.Download.NoFormats)
+	}
+
+	fmt.Printf("  %s: %s (%s)\n", t.Download.SelectedFormat, format.Quality, format.Ext)
+
+	// Determine output filename
+	outputFile := output
+	if outputFile == "" {
+		title := extractor.SanitizeFilename(m.Title)
+		ext := format.Ext
+		if ext == "m3u8" {
+			ext = "ts"
+		}
+		baseName := title
+		if baseName == "" {
+			baseName = m.ID
+		}
+		// Add index suffix for multi-video
+		if total > 1 {
+			outputFile = fmt.Sprintf("%s_%d.%s", baseName, index, ext)
+		} else {
+			outputFile = fmt.Sprintf("%s.%s", baseName, ext)
+		}
+		// Prepend outputDir if configured
+		if outputDir != "" {
+			outputFile = filepath.Join(outputDir, outputFile)
+		}
+	}
+
+	// Use HLS downloader for m3u8 streams
+	if format.Ext == "m3u8" {
+		title := extractor.SanitizeFilename(m.Title)
+		if title == "" {
+			title = m.ID
+		}
+		baseDir := title
+		if outputDir != "" {
+			baseDir = filepath.Join(outputDir, title)
+		}
+		if err := os.MkdirAll(baseDir, 0755); err != nil {
+			return fmt.Errorf("failed to create directory: %w", err)
+		}
 		outputFile = filepath.Join(baseDir, filepath.Base(outputFile))
 		fmt.Printf("  Output directory: %s/\n", baseDir)
 		return downloader.RunHLSDownloadWithHeadersTUI(format.URL, outputFile, m.ID, lang, format.Headers)
