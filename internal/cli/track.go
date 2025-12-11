@@ -56,8 +56,7 @@ Configuration:
 
 func init() {
 	trackCmd.Flags().StringVar(&trackExpress, "express", "kuaidi100", "Express tracking service (default: kuaidi100)")
-	trackCmd.Flags().StringVarP(&trackCourier, "courier", "c", "", "Courier company code (required, e.g., sf, yt, zto)")
-	trackCmd.MarkFlagRequired("courier")
+	trackCmd.Flags().StringVarP(&trackCourier, "courier", "c", "auto", "Courier company code (e.g., sf, yt, zto, or auto for auto-detect)")
 	rootCmd.AddCommand(trackCmd)
 }
 
