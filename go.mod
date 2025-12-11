@@ -8,6 +8,7 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/creativeprojects/go-selfupdate v1.5.1
 	github.com/emersion/go-webdav v0.7.0
+	github.com/fatih/color v1.18.0
 	github.com/go-rod/rod v0.116.2
 	github.com/go-rod/stealth v0.4.9
 	github.com/gotd/td v0.136.0
@@ -20,7 +21,6 @@ require (
 	code.gitea.io/sdk/gitea v0.22.0 // indirect
 	github.com/42wim/httpsig v1.2.3 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
-	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc // indirect
@@ -32,7 +32,6 @@ require (
 	github.com/davidmz/go-pageant v1.0.2 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
-	github.com/fatih/color v1.18.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-faster/errors v0.7.1 // indirect
 	github.com/go-faster/jx v1.2.0 // indirect
