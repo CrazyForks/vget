@@ -154,10 +154,13 @@ func SanitizeFilename(name string) string {
 	spaceRegex := regexp.MustCompile(`\s+`)
 	result = spaceRegex.ReplaceAllString(result, " ")
 
-	// Limit length (use rune count to avoid splitting multi-byte UTF-8 characters)
+	// Limit length to avoid "file name too long" errors
+	// Most filesystems limit filenames to 255 bytes. For UTF-8 with CJK characters
+	// (3-4 bytes each), 60 runes is safe (~180-240 bytes), leaving room for extension.
+	const maxRunes = 60
 	runes := []rune(result)
-	if len(runes) > 200 {
-		result = string(runes[:200])
+	if len(runes) > maxRunes {
+		result = string(runes[:maxRunes])
 	}
 
 	// If result is empty after sanitization, return empty
