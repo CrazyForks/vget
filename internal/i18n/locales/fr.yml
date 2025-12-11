@@ -4,8 +4,6 @@ config:
   step_of: "Étape %d sur %d"
   language: "Langue"
   language_desc: "Langue préférée pour les métadonnées"
-  proxy: "Proxy"
-  proxy_desc: "Laisser vide pour aucun proxy"
   output_dir: "Répertoire de sortie"
   output_dir_desc: "Où enregistrer les vidéos"
   format: "Format"
@@ -16,13 +14,11 @@ config:
   confirm_desc: "Vérifier et sauvegarder"
   yes_save: "Oui, sauvegarder"
   no_cancel: "Non, annuler"
-  proxy_none: "(aucun)"
   best_available: "Meilleure qualité"
   recommended: "(recommandé)"
 
 config_review:
   language: "Langue"
-  proxy: "Proxy"
   output_dir: "Répertoire"
   format: "Format"
   quality: "Qualité"
@@ -111,6 +107,10 @@ ui:
   twitter_auth: "Auth Twitter"
   configured: "Configuré"
   not_configured: "Non configuré"
+  custom_config: "Config personnalisée"
+  config_key: "Clé (ex. twitter.auth_token)"
+  config_value: "Valeur"
+  set: "Définir"
 
 # Messages du serveur
 server:

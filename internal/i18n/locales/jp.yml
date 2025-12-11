@@ -4,8 +4,6 @@ config:
   step_of: "ステップ %d / %d"
   language: "言語"
   language_desc: "メタデータの言語設定"
-  proxy: "プロキシ"
-  proxy_desc: "空欄でプロキシなし"
   output_dir: "出力ディレクトリ"
   output_dir_desc: "動画の保存先"
   format: "フォーマット"
@@ -16,13 +14,11 @@ config:
   confirm_desc: "設定を確認して保存"
   yes_save: "はい、保存する"
   no_cancel: "いいえ、キャンセル"
-  proxy_none: "（なし）"
   best_available: "最高画質"
   recommended: "（推奨）"
 
 config_review:
   language: "言語"
-  proxy: "プロキシ"
   output_dir: "出力先"
   format: "フォーマット"
   quality: "画質"
@@ -111,6 +107,10 @@ ui:
   twitter_auth: "Twitter認証"
   configured: "設定済み"
   not_configured: "未設定"
+  custom_config: "カスタム設定"
+  config_key: "キー (例: twitter.auth_token)"
+  config_value: "値"
+  set: "設定"
 
 # サーバーメッセージ
 server:

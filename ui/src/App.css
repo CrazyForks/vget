@@ -668,3 +668,74 @@ body {
   color: var(--text-dim);
   font-size: 0.75rem;
 }
+
+/* Custom Config */
+.custom-config {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.custom-config-header {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.custom-config-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.custom-config-input {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: monospace;
+}
+
+.custom-config-input:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+}
+
+.custom-config-input::placeholder {
+  color: var(--text-dim);
+  font-family: inherit;
+}
+
+.custom-config-input:disabled {
+  opacity: 0.5;
+}
+
+.custom-config-input:first-child {
+  width: 180px;
+}
+
+.custom-config-value {
+  flex: 1;
+}
+
+.custom-config-btn {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--accent-blue);
+  border-radius: 4px;
+  background: var(--accent-blue);
+  color: #fff;
+  font-size: 0.875rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.custom-config-btn:hover:not(:disabled) {
+  background: var(--accent-blue-hover);
+  border-color: var(--accent-blue-hover);
+}
+
+.custom-config-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

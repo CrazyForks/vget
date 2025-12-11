@@ -4,8 +4,6 @@ config:
   step_of: "第 %d 步，共 %d 步"
   language: "语言"
   language_desc: "元数据的首选语言"
-  proxy: "代理"
-  proxy_desc: "留空表示不使用代理"
   output_dir: "输出目录"
   output_dir_desc: "视频保存位置"
   format: "格式"
@@ -16,13 +14,11 @@ config:
   confirm_desc: "检查并保存配置"
   yes_save: "是，保存"
   no_cancel: "否，取消"
-  proxy_none: "（无）"
   best_available: "最佳可用"
   recommended: "（推荐）"
 
 config_review:
   language: "语言"
-  proxy: "代理"
   output_dir: "输出目录"
   format: "格式"
   quality: "画质"
@@ -123,6 +119,10 @@ ui:
   twitter_auth: "Twitter 认证"
   configured: "已配置"
   not_configured: "未配置"
+  custom_config: "自定义配置"
+  config_key: "键 (如 twitter.auth_token)"
+  config_value: "值"
+  set: "设置"
 
 # 服务器消息
 server:

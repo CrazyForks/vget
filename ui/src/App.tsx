@@ -65,6 +65,10 @@ interface UITranslations {
   twitter_auth: string;
   configured: string;
   not_configured: string;
+  custom_config: string;
+  config_key: string;
+  config_value: string;
+  set: string;
 }
 
 interface ServerTranslations {
@@ -103,6 +107,10 @@ const defaultTranslations: UITranslations = {
   twitter_auth: "Twitter Auth",
   configured: "Configured",
   not_configured: "Not configured",
+  custom_config: "Custom Config",
+  config_key: "Key (e.g. twitter.auth_token)",
+  config_value: "Value",
+  set: "Set",
 };
 
 const defaultServerTranslations: ServerTranslations = {
@@ -195,6 +203,10 @@ function App() {
   const [pendingLang, setPendingLang] = useState("");
   const [pendingFormat, setPendingFormat] = useState("");
   const [pendingQuality, setPendingQuality] = useState("");
+  // Custom key-value config input
+  const [customKey, setCustomKey] = useState("");
+  const [customValue, setCustomValue] = useState("");
+  const [savingCustom, setSavingCustom] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute(
@@ -308,7 +320,22 @@ function App() {
     setPendingLang(configLang || "en");
     setPendingFormat(configFormat || "mp4");
     setPendingQuality(configQuality || "best");
+    setCustomKey("");
+    setCustomValue("");
     setShowSettings(false);
+  };
+
+  const handleSaveCustomConfig = async () => {
+    if (!customKey.trim()) return;
+    setSavingCustom(true);
+    try {
+      await setConfigValue(customKey.trim(), customValue);
+      setCustomKey("");
+      setCustomValue("");
+      refresh();
+    } finally {
+      setSavingCustom(false);
+    }
   };
 
   const isConnected = health?.status === "ok";
@@ -411,6 +438,37 @@ function App() {
               <span className={`setting-status ${hasTwitterAuth ? "configured" : ""}`}>
                 {hasTwitterAuth ? t.configured : t.not_configured}
               </span>
+            </div>
+          </div>
+          <div className="custom-config">
+            <div className="custom-config-header">{t.custom_config || "Custom Config"}</div>
+            <div className="custom-config-row">
+              <input
+                type="text"
+                className="custom-config-input"
+                placeholder={t.config_key || "Key (e.g. twitter.auth_token)"}
+                value={customKey}
+                onChange={(e) => setCustomKey(e.target.value)}
+                disabled={!isConnected || savingCustom}
+              />
+              <input
+                type="text"
+                className="custom-config-input custom-config-value"
+                placeholder={t.config_value || "Value"}
+                value={customValue}
+                onChange={(e) => setCustomValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveCustomConfig();
+                }}
+                disabled={!isConnected || savingCustom}
+              />
+              <button
+                className="custom-config-btn"
+                onClick={handleSaveCustomConfig}
+                disabled={!isConnected || savingCustom || !customKey.trim()}
+              >
+                {savingCustom ? "..." : t.set || "Set"}
+              </button>
             </div>
           </div>
         </div>

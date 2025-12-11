@@ -25,12 +25,12 @@ vget's core value is not "protocol-level innovation", but rather:
 
 ### Why Not Just Use yt-dlp?
 
-| Aspect | yt-dlp | vget |
-|--------|--------|------|
-| Installation | Python + pip | Single binary |
-| UI | CLI only | CLI + Bubble Tea TUI |
-| Complexity | 500+ flags | Minimal, opinionated |
-| Focus | 1000+ sites | Quality over quantity |
+| Aspect       | yt-dlp       | vget                  |
+| ------------ | ------------ | --------------------- |
+| Installation | Python + pip | Single binary         |
+| UI           | CLI only     | CLI + Bubble Tea TUI  |
+| Complexity   | 500+ flags   | Minimal, opinionated  |
+| Focus        | 1000+ sites  | Quality over quantity |
 
 vget aims to be the "modern wget for videos" - simple, fast, beautiful.
 
@@ -56,8 +56,7 @@ vget aims to be the "modern wget for videos" - simple, fast, beautiful.
 ### 2.2 v0.2 Goals
 
 - [x] Multi-threaded segmented downloads (range requests) ✅ **Implemented**
-- [x] Output filename customization (`-o`) ✅ **Implemented**
-- Proxy support (`--proxy`)
+- [x] Output filename customization (`-o`) ✅
 
 ### 2.3 v0.3 Goals
 
@@ -105,17 +104,17 @@ URL → Extractor → (MP4 / HLS / DASH / Playlist)
 
 ### 4.1 Downloader Engine (Core)
 
-| Feature | Description | Status |
-|---------|-------------|--------|
+| Feature               | Description                                           | Status         |
+| --------------------- | ----------------------------------------------------- | -------------- |
 | Multi-Stream Download | HTTP Range requests with parallel streams (default 8) | ✅ Implemented |
-| Concurrent Download | goroutine + worker pool pattern | ✅ Implemented |
-| Chunk-based Transfer | 16MB chunks with 128KB buffers per stream | ✅ Implemented |
-| Progress Display | Real-time speed, ETA, elapsed time, avg speed | ✅ Implemented |
-| Auto Retry | Exponential backoff retry (5 retries per chunk) | ✅ Implemented |
-| File Merge | Merge multiple segments into MP4 | Planned |
-| Verification | Support md5/sha256 (optional) | Planned |
-| Speed Limit | Throttle mode (optional) | Planned |
-| Download Queue | Multiple simultaneous tasks | Planned |
+| Concurrent Download   | goroutine + worker pool pattern                       | ✅ Implemented |
+| Chunk-based Transfer  | 16MB chunks with 128KB buffers per stream             | ✅ Implemented |
+| Progress Display      | Real-time speed, ETA, elapsed time, avg speed         | ✅ Implemented |
+| Auto Retry            | Exponential backoff retry (5 retries per chunk)       | ✅ Implemented |
+| File Merge            | Merge multiple segments into MP4                      | Planned        |
+| Verification          | Support md5/sha256 (optional)                         | Planned        |
+| Speed Limit           | Throttle mode (optional)                              | Planned        |
+| Download Queue        | Multiple simultaneous tasks                           | Planned        |
 
 #### Multi-Stream Download Architecture (Implemented)
 
@@ -165,12 +164,12 @@ URL → Extractor → (MP4 / HLS / DASH / Playlist)
 
 **Performance Comparison:**
 
-| Metric | Before (Single Stream) | After (Multi-Stream) |
-|--------|----------------------|---------------------|
-| Streams | 1 | 8 (configurable) |
-| Buffer | 32KB | 128KB per stream |
-| Typical Speed | ~10-20 MB/s | ~50-80 MB/s |
-| WebDAV Support | Basic | Full with Range requests |
+| Metric         | Before (Single Stream) | After (Multi-Stream)     |
+| -------------- | ---------------------- | ------------------------ |
+| Streams        | 1                      | 8 (configurable)         |
+| Buffer         | 32KB                   | 128KB per stream         |
+| Typical Speed  | ~10-20 MB/s            | ~50-80 MB/s              |
+| WebDAV Support | Basic                  | Full with Range requests |
 
 ### 4.2 Extractor Layer (URL Parsing)
 
@@ -203,13 +202,13 @@ type Format struct {
 
 #### Supported Extractors
 
-| Extractor | Status | Notes |
-|-----------|--------|-------|
-| Twitter/X | MVP | Native Go implementation |
-| Direct MP4 | MVP | Content-Type detection |
-| HLS | MVP | m3u8 parsing |
-| DASH | v0.2 | mpd XML parsing |
-| yt-dlp bridge | v0.3 | Optional fallback |
+| Extractor     | Status | Notes                    |
+| ------------- | ------ | ------------------------ |
+| Twitter/X     | MVP    | Native Go implementation |
+| Direct MP4    | MVP    | Content-Type detection   |
+| HLS           | MVP    | m3u8 parsing             |
+| DASH          | v0.2   | mpd XML parsing          |
+| yt-dlp bridge | v0.3   | Optional fallback        |
 
 #### Twitter/X Extractor Details
 
@@ -242,9 +241,6 @@ vget -t 32 <url>
 # Output filename
 vget -o out.mp4 <url>
 
-# Proxy
-vget --proxy socks5://127.0.0.1:1080 <url>
-
 # Cookie
 vget --cookies cookies.txt <url>
 
@@ -258,7 +254,6 @@ vget --info <url>
 vget init                           # Interactive config wizard (TUI)
 vget config show                    # Show current config
 vget config set language en         # Set config value (non-interactive)
-vget config set proxy http://...    # Set proxy
 vget config get language            # Get config value
 ```
 
@@ -276,13 +271,13 @@ vget config get language            # Get config value
 
 #### Keyboard Shortcuts
 
-| Key | Function |
-|-----|----------|
+| Key     | Function     |
+| ------- | ------------ |
 | `space` | Pause/Resume |
-| `p` | Pause |
-| `r` | Retry |
-| `q` | Quit |
-| `↑↓` | Switch tasks |
+| `p`     | Pause        |
+| `r`     | Retry        |
+| `q`     | Quit         |
+| `↑↓`    | Switch tasks |
 
 #### TUI Aesthetic
 
@@ -513,7 +508,6 @@ cat part*.ts | ffmpeg -i - -c copy out.mp4
 - Multi-task queue
 - History records
 - Graceful pause/resume
-- Auto proxy detection
 
 ### v2
 
@@ -530,13 +524,13 @@ cat part*.ts | ffmpeg -i - -c copy out.mp4
 
 ## 8. Success Metrics
 
-| Metric | Target |
-|--------|--------|
-| GitHub Stars | 1,000 (first month) / 5,000 (6 months) |
-| CLI Installs | 5K+ |
-| TUI Open Rate | > 40% |
-| Issue Feedback | > 20 (community engagement) |
-| Pull Requests | At least 5 external contributors |
+| Metric         | Target                                 |
+| -------------- | -------------------------------------- |
+| GitHub Stars   | 1,000 (first month) / 5,000 (6 months) |
+| CLI Installs   | 5K+                                    |
+| TUI Open Rate  | > 40%                                  |
+| Issue Feedback | > 20 (community engagement)            |
+| Pull Requests  | At least 5 external contributors       |
 
 ---
 

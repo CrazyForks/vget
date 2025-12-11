@@ -8,7 +8,6 @@
 
 - [x] `vget init` command
   - Language preference
-  - Proxy settings
   - Default output directory
   - Default format/quality
 - [x] Self update

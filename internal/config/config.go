@@ -47,9 +47,6 @@ type Config struct {
 	// Language for metadata (e.g., "en", "zh", "ja")
 	Language string `yaml:"language,omitempty"`
 
-	// Proxy URL (e.g., "http://127.0.0.1:7890", "socks5://127.0.0.1:1080")
-	Proxy string `yaml:"proxy,omitempty"`
-
 	// Default output directory
 	OutputDir string `yaml:"output_dir,omitempty"`
 
@@ -176,7 +173,6 @@ func isRunningInDocker() bool {
 func DefaultConfig() *Config {
 	return &Config{
 		Language:         "zh",
-		Proxy:            "",
 		OutputDir:        DefaultDownloadDir(),
 		Format:           "mp4",
 		Quality:          "best",

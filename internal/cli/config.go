@@ -28,7 +28,6 @@ var configShowCmd = &cobra.Command{
 
 		fmt.Println("Current configuration:")
 		fmt.Printf("  Language:  %s\n", cfg.Language)
-		fmt.Printf("  Proxy:     %s\n", orDefault(cfg.Proxy, "(none)"))
 		fmt.Printf("  OutputDir: %s\n", cfg.OutputDir)
 		fmt.Printf("  Format:    %s\n", cfg.Format)
 		fmt.Printf("  Quality:   %s\n", cfg.Quality)
@@ -65,7 +64,6 @@ var configSetCmd = &cobra.Command{
 
 Supported keys:
   language           Language code (en, zh, jp, kr, es, fr, de)
-  proxy              Proxy URL (e.g., http://127.0.0.1:7890)
   output_dir         Default download directory
   format             Preferred format (mp4, webm, best)
   quality            Default quality (1080p, 720p, best)
@@ -77,7 +75,6 @@ Supported keys:
 
 Examples:
   vget config set language en
-  vget config set proxy http://127.0.0.1:7890
   vget config set output_dir ~/Videos
   vget config set twitter.auth_token YOUR_TOKEN`,
 	Args: cobra.ExactArgs(2),
@@ -109,7 +106,6 @@ var configGetCmd = &cobra.Command{
 
 Examples:
   vget config get language
-  vget config get proxy
   vget config get twitter.auth_token`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -134,7 +130,6 @@ var configUnsetCmd = &cobra.Command{
 
 Supported keys:
   language           Reset to empty (uses default)
-  proxy              Clear proxy setting
   output_dir         Reset to empty (uses default)
   format             Reset to empty (uses default)
   quality            Reset to empty (uses default)
@@ -145,7 +140,6 @@ Supported keys:
   server.api_key     Clear API key
 
 Examples:
-  vget config unset proxy
   vget config unset twitter.auth_token`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -172,8 +166,6 @@ func setConfigValue(cfg *config.Config, key, value string) error {
 	switch key {
 	case "language":
 		cfg.Language = value
-	case "proxy":
-		cfg.Proxy = value
 	case "output_dir":
 		cfg.OutputDir = value
 	case "format":
@@ -209,8 +201,6 @@ func getConfigValue(cfg *config.Config, key string) (string, error) {
 	switch key {
 	case "language":
 		return cfg.Language, nil
-	case "proxy":
-		return cfg.Proxy, nil
 	case "output_dir":
 		return cfg.OutputDir, nil
 	case "format":
@@ -237,8 +227,6 @@ func unsetConfigValue(cfg *config.Config, key string) error {
 	switch key {
 	case "language":
 		cfg.Language = ""
-	case "proxy":
-		cfg.Proxy = ""
 	case "output_dir":
 		cfg.OutputDir = ""
 	case "format":

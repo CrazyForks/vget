@@ -30,8 +30,6 @@ type ConfigTranslations struct {
 	StepOf        string `yaml:"step_of"`
 	Language      string `yaml:"language"`
 	LanguageDesc  string `yaml:"language_desc"`
-	Proxy         string `yaml:"proxy"`
-	ProxyDesc     string `yaml:"proxy_desc"`
 	OutputDir     string `yaml:"output_dir"`
 	OutputDirDesc string `yaml:"output_dir_desc"`
 	Format        string `yaml:"format"`
@@ -42,14 +40,12 @@ type ConfigTranslations struct {
 	ConfirmDesc   string `yaml:"confirm_desc"`
 	YesSave       string `yaml:"yes_save"`
 	NoCancel      string `yaml:"no_cancel"`
-	ProxyNone     string `yaml:"proxy_none"`
 	BestAvailable string `yaml:"best_available"`
 	Recommended   string `yaml:"recommended"`
 }
 
 type ConfigReviewTranslations struct {
 	Language  string `yaml:"language"`
-	Proxy     string `yaml:"proxy"`
 	OutputDir string `yaml:"output_dir"`
 	Format    string `yaml:"format"`
 	Quality   string `yaml:"quality"`

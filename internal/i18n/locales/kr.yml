@@ -4,8 +4,6 @@ config:
   step_of: "%d단계 / %d단계"
   language: "언어"
   language_desc: "메타데이터 언어 설정"
-  proxy: "프록시"
-  proxy_desc: "프록시 없음은 비워두세요"
   output_dir: "출력 디렉토리"
   output_dir_desc: "동영상 저장 위치"
   format: "형식"
@@ -16,13 +14,11 @@ config:
   confirm_desc: "설정을 검토하고 저장"
   yes_save: "예, 저장"
   no_cancel: "아니오, 취소"
-  proxy_none: "(없음)"
   best_available: "최고 화질"
   recommended: "(권장)"
 
 config_review:
   language: "언어"
-  proxy: "프록시"
   output_dir: "출력 경로"
   format: "형식"
   quality: "화질"
@@ -111,6 +107,10 @@ ui:
   twitter_auth: "Twitter 인증"
   configured: "설정됨"
   not_configured: "설정 안 됨"
+  custom_config: "사용자 정의 설정"
+  config_key: "키 (예: twitter.auth_token)"
+  config_value: "값"
+  set: "설정"
 
 # 서버 메시지
 server:

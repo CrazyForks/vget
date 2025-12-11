@@ -93,14 +93,15 @@ User config lives in `~/.config/vget/config.yml`. Two ways to configure:
 2. **Non-interactive:** `vget config set <key> <value>` - For scripting/Docker
 
 Supported keys for `vget config set`:
+
 - `language` - Language code (en, zh, jp, kr, es, fr, de)
-- `proxy` - Proxy URL
 - `output_dir` - Default download directory
 - `format` - Preferred format (mp4, webm, best)
 - `quality` - Default quality (1080p, 720p, best)
 - `twitter.auth_token` - Twitter auth for NSFW content
 
 **IMPORTANT:** Config is read fresh on every command execution (not cached at startup). This is intentional and MUST be preserved:
+
 - Enables config changes without restart
 - Critical for Docker UX (no container restart needed)
 - Never change this behavior
