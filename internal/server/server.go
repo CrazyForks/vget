@@ -17,6 +17,7 @@ import (
 	"github.com/guiyumin/vget/internal/downloader"
 	"github.com/guiyumin/vget/internal/extractor"
 	"github.com/guiyumin/vget/internal/i18n"
+	"github.com/guiyumin/vget/internal/tracker"
 	"github.com/guiyumin/vget/internal/version"
 )
 
@@ -95,6 +96,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/config/webdav", s.handleWebDAVConfig)
 	mux.HandleFunc("/config/webdav/", s.handleWebDAVConfigAction)
 	mux.HandleFunc("/i18n", s.handleI18n)
+	mux.HandleFunc("/track", s.handleTrack)
 
 	// Serve embedded UI if available
 	if distFS := GetDistFS(); distFS != nil {
@@ -437,6 +439,7 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 				"server_max_concurrent": cfg.Server.MaxConcurrent,
 				"server_api_key":        cfg.Server.APIKey,
 				"webdav_servers":        webdavServers,
+				"express":               cfg.Express,
 			},
 			Message: "config retrieved",
 		})
@@ -585,6 +588,18 @@ func (s *Server) handleI18n(w http.ResponseWriter, r *http.Request) {
 
 // setConfigValue sets a config value by key (mirrors cli/config.go logic)
 func (s *Server) setConfigValue(cfg *config.Config, key, value string) error {
+	// Handle express.<provider>.<key> pattern (e.g., express.kuaidi100.key)
+	if strings.HasPrefix(key, "express.") {
+		parts := strings.SplitN(key, ".", 3)
+		if len(parts) != 3 {
+			return fmt.Errorf("invalid express config key format: %s (use express.<provider>.<key>)", key)
+		}
+		provider := parts[1]
+		configKey := parts[2]
+		cfg.SetExpressConfig(provider, configKey, value)
+		return nil
+	}
+
 	switch key {
 	case "language":
 		cfg.Language = value
@@ -1149,4 +1164,97 @@ func streamFile(w http.ResponseWriter, url, filename string, headers map[string]
 	}
 
 	io.Copy(w, resp.Body)
+}
+
+// TrackRequest is the request body for POST /track
+type TrackRequest struct {
+	TrackingNumber string `json:"tracking_number"`
+	Courier        string `json:"courier"`
+}
+
+// handleTrack handles package tracking requests
+func (s *Server) handleTrack(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.writeJSON(w, http.StatusMethodNotAllowed, Response{
+			Code:    405,
+			Data:    nil,
+			Message: "method not allowed",
+		})
+		return
+	}
+
+	var req TrackRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeJSON(w, http.StatusBadRequest, Response{
+			Code:    400,
+			Data:    nil,
+			Message: "invalid request body",
+		})
+		return
+	}
+
+	if req.TrackingNumber == "" {
+		s.writeJSON(w, http.StatusBadRequest, Response{
+			Code:    400,
+			Data:    nil,
+			Message: "tracking_number is required",
+		})
+		return
+	}
+
+	if req.Courier == "" {
+		s.writeJSON(w, http.StatusBadRequest, Response{
+			Code:    400,
+			Data:    nil,
+			Message: "courier is required",
+		})
+		return
+	}
+
+	// Load config to get kuaidi100 credentials
+	cfg := config.LoadOrDefault()
+	expressCfg := cfg.GetExpressConfig("kuaidi100")
+	if expressCfg == nil || expressCfg["key"] == "" || expressCfg["customer"] == "" {
+		s.writeJSON(w, http.StatusBadRequest, Response{
+			Code:    400,
+			Data:    nil,
+			Message: "kuaidi100 credentials not configured. Set express.kuaidi100.key and express.kuaidi100.customer in settings.",
+		})
+		return
+	}
+
+	// Create tracker and query
+	t := tracker.NewKuaidi100Tracker(expressCfg["key"], expressCfg["customer"])
+	courierCode := tracker.GetCourierCode(req.Courier)
+
+	result, err := t.Track(courierCode, req.TrackingNumber)
+	if err != nil {
+		s.writeJSON(w, http.StatusInternalServerError, Response{
+			Code:    500,
+			Data:    nil,
+			Message: fmt.Sprintf("tracking failed: %v", err),
+		})
+		return
+	}
+
+	// Get courier info for display
+	courierInfo := tracker.GetCourierInfo(req.Courier)
+	courierName := courierCode
+	if courierInfo != nil {
+		courierName = courierInfo.Name
+	}
+
+	s.writeJSON(w, http.StatusOK, Response{
+		Code: 200,
+		Data: map[string]interface{}{
+			"tracking_number": result.Nu,
+			"courier_code":    result.Com,
+			"courier_name":    courierName,
+			"state":           result.State,
+			"state_desc":      result.StateDescription(),
+			"is_delivered":    result.IsDelivered(),
+			"data":            result.Data,
+		},
+		Message: "tracking info retrieved",
+	})
 }

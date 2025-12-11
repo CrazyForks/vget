@@ -24,6 +24,24 @@ interface ApiResponse<T> {
   message: string;
 }
 
+interface TrackingRecord {
+  time: string;
+  ftime: string;
+  context: string;
+  status: string;
+}
+
+interface TrackingResult {
+  message: string;
+  state: string;
+  status: string;
+  condition: string;
+  ischeck: string;
+  com: string;
+  nu: string;
+  data: TrackingRecord[];
+}
+
 interface HealthData {
   status: string;
   version: string;
@@ -45,6 +63,7 @@ interface ConfigData {
   server_max_concurrent: number;
   server_api_key: string;
   webdav_servers: Record<string, WebDAVServer>;
+  express?: Record<string, Record<string, string>>;
 }
 
 interface JobsData {
@@ -220,6 +239,18 @@ async function deleteJob(id: string): Promise<ApiResponse<{ id: string }>> {
   return res.json();
 }
 
+async function trackPackage(
+  trackingNumber: string,
+  courier: string
+): Promise<ApiResponse<TrackingResult>> {
+  const res = await fetch("/track", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tracking_number: trackingNumber, courier }),
+  });
+  return res.json();
+}
+
 function App() {
   const [health, setHealth] = useState<HealthData | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -253,12 +284,22 @@ function App() {
   const [pendingTwitterAuth, setPendingTwitterAuth] = useState("");
   const [pendingMaxConcurrent, setPendingMaxConcurrent] = useState("10");
   const [pendingApiKey, setPendingApiKey] = useState("");
+  // Kuaidi100 config
+  const [pendingKuaidi100Key, setPendingKuaidi100Key] = useState("");
+  const [pendingKuaidi100Customer, setPendingKuaidi100Customer] = useState("");
   // WebDAV add form
   const [newWebDAVName, setNewWebDAVName] = useState("");
   const [newWebDAVUrl, setNewWebDAVUrl] = useState("");
   const [newWebDAVUsername, setNewWebDAVUsername] = useState("");
   const [newWebDAVPassword, setNewWebDAVPassword] = useState("");
   const [addingWebDAV, setAddingWebDAV] = useState(false);
+  // Package tracking
+  const [trackingNumber, setTrackingNumber] = useState("");
+  const [trackingCourier, setTrackingCourier] = useState("auto");
+  const [trackingResult, setTrackingResult] = useState<TrackingResult | null>(null);
+  const [trackingError, setTrackingError] = useState("");
+  const [isTracking, setIsTracking] = useState(false);
+  const [showTracking, setShowTracking] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute(
@@ -293,6 +334,10 @@ function App() {
         if (!pendingQuality) setPendingQuality(configRes.data.quality || "best");
         if (!pendingMaxConcurrent) setPendingMaxConcurrent(String(configRes.data.server_max_concurrent || 10));
         if (!pendingApiKey && configRes.data.server_api_key) setPendingApiKey(configRes.data.server_api_key);
+        // Initialize kuaidi100 config
+        const kuaidi100Cfg = configRes.data.express?.kuaidi100;
+        if (!pendingKuaidi100Key && kuaidi100Cfg?.key) setPendingKuaidi100Key(kuaidi100Cfg.key);
+        if (!pendingKuaidi100Customer && kuaidi100Cfg?.customer) setPendingKuaidi100Customer(kuaidi100Cfg.customer);
       }
       if (i18nRes.code === 200) {
         setT(i18nRes.data.ui);
@@ -371,6 +416,13 @@ function App() {
       if (pendingTwitterAuth) {
         await setConfigValue("twitter.auth_token", pendingTwitterAuth);
       }
+      // Save kuaidi100 config if provided
+      if (pendingKuaidi100Key) {
+        await setConfigValue("express.kuaidi100.key", pendingKuaidi100Key);
+      }
+      if (pendingKuaidi100Customer) {
+        await setConfigValue("express.kuaidi100.customer", pendingKuaidi100Customer);
+      }
       setShowSettings(false);
       refresh();
     } finally {
@@ -386,6 +438,8 @@ function App() {
     setPendingTwitterAuth("");
     setPendingMaxConcurrent(String(maxConcurrent || 10));
     setPendingApiKey(apiKey || "");
+    setPendingKuaidi100Key("");
+    setPendingKuaidi100Customer("");
     // Reset WebDAV form
     setNewWebDAVName("");
     setNewWebDAVUrl("");
@@ -420,6 +474,28 @@ function App() {
     const res = await deleteWebDAVServer(name);
     if (res.code === 200) {
       refresh();
+    }
+  };
+
+  const handleTrack = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!trackingNumber.trim() || isTracking) return;
+
+    setIsTracking(true);
+    setTrackingError("");
+    setTrackingResult(null);
+
+    try {
+      const res = await trackPackage(trackingNumber.trim(), trackingCourier);
+      if (res.code === 200) {
+        setTrackingResult(res.data);
+      } else {
+        setTrackingError(res.message || "Failed to track package");
+      }
+    } catch {
+      setTrackingError("Network error");
+    } finally {
+      setIsTracking(false);
     }
   };
 
@@ -563,6 +639,31 @@ function App() {
                 disabled={!isConnected || savingConfig}
               />
             </div>
+
+            {/* Kuaidi100 Section */}
+            <div className="setting-section-label">Kuaidi100 (Package Tracking)</div>
+            <div className="setting-row">
+              <span className="setting-label">API Key</span>
+              <input
+                type="password"
+                className="setting-input-text"
+                placeholder="(optional)"
+                value={pendingKuaidi100Key}
+                onChange={(e) => setPendingKuaidi100Key(e.target.value)}
+                disabled={!isConnected || savingConfig}
+              />
+            </div>
+            <div className="setting-row">
+              <span className="setting-label">Customer ID</span>
+              <input
+                type="text"
+                className="setting-input-text"
+                placeholder="(optional)"
+                value={pendingKuaidi100Customer}
+                onChange={(e) => setPendingKuaidi100Customer(e.target.value)}
+                disabled={!isConnected || savingConfig}
+              />
+            </div>
           </div>
 
           {/* WebDAV Servers Section */}
@@ -683,6 +784,83 @@ function App() {
           {submitting ? t.adding : t.download}
         </button>
       </form>
+
+      {/* Package Tracking Section */}
+      <section className="tracking-section">
+        <div className="tracking-header" onClick={() => setShowTracking(!showTracking)}>
+          <h2>📦 Package Tracking</h2>
+          <span className="tracking-toggle">{showTracking ? "▼" : "▶"}</span>
+        </div>
+        {showTracking && (
+          <div className="tracking-content">
+            <form className="tracking-form" onSubmit={handleTrack}>
+              <input
+                type="text"
+                value={trackingNumber}
+                onChange={(e) => setTrackingNumber(e.target.value)}
+                placeholder="Enter tracking number..."
+                disabled={!isConnected || isTracking}
+                className="tracking-input"
+              />
+              <select
+                value={trackingCourier}
+                onChange={(e) => setTrackingCourier(e.target.value)}
+                disabled={!isConnected || isTracking}
+                className="tracking-select"
+              >
+                <option value="auto">Auto Detect</option>
+                <option value="shunfeng">顺丰 SF Express</option>
+                <option value="yuantong">圆通 YTO</option>
+                <option value="zhongtong">中通 ZTO</option>
+                <option value="yunda">韵达 Yunda</option>
+                <option value="shentong">申通 STO</option>
+                <option value="jd">京东 JD</option>
+                <option value="ems">EMS</option>
+                <option value="youzhengguonei">邮政 China Post</option>
+                <option value="debangkuaidi">德邦 Deppon</option>
+                <option value="huitongkuaidi">百世 Best Express</option>
+                <option value="zhongyouex">众邮 ZYE</option>
+              </select>
+              <button
+                type="submit"
+                disabled={!isConnected || !trackingNumber.trim() || isTracking}
+                className="tracking-btn"
+              >
+                {isTracking ? "Tracking..." : "Track"}
+              </button>
+            </form>
+
+            {trackingError && (
+              <div className="tracking-error">{trackingError}</div>
+            )}
+
+            {trackingResult && (
+              <div className="tracking-result">
+                <div className="tracking-summary">
+                  <span className="tracking-nu">{trackingResult.nu}</span>
+                  <span className={`tracking-state tracking-state-${trackingResult.state}`}>
+                    {trackingResult.state === "3" ? "✓ Delivered" :
+                     trackingResult.state === "0" ? "In Transit" :
+                     trackingResult.state === "1" ? "Picked Up" :
+                     trackingResult.state === "2" ? "Problem" :
+                     trackingResult.state === "4" ? "Returned" :
+                     trackingResult.state === "5" ? "Delivering" :
+                     trackingResult.state === "6" ? "Returning" : "Unknown"}
+                  </span>
+                </div>
+                <div className="tracking-timeline">
+                  {trackingResult.data?.map((record, idx) => (
+                    <div key={idx} className="tracking-record">
+                      <div className="tracking-time">{record.ftime || record.time}</div>
+                      <div className="tracking-context">{record.context}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
 
       <section className="jobs-section">
         <div className="jobs-header">

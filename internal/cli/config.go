@@ -44,6 +44,17 @@ var configShowCmd = &cobra.Command{
 			fmt.Println("\nTwitter:")
 			fmt.Printf("  auth_token: %s\n", cfg.Twitter.AuthToken)
 		}
+
+		// Show express tracking providers config
+		if len(cfg.Express) > 0 {
+			fmt.Println("\nExpress Tracking:")
+			for provider, providerCfg := range cfg.Express {
+				fmt.Printf("  %s:\n", provider)
+				for key, value := range providerCfg {
+					fmt.Printf("    %s: %s\n", key, value)
+				}
+			}
+		}
 	},
 }
 
@@ -72,10 +83,20 @@ Supported keys:
   server.max_concurrent  Max concurrent downloads
   server.api_key     Server API key
 
+Express tracking (dynamic keys):
+  express.<provider>.<key>  Set express provider config
+
+  Kuaidi100 example:
+    express.kuaidi100.key       API authorization key
+    express.kuaidi100.customer  Customer ID
+    express.kuaidi100.secret    Secret for delivery time API (optional)
+
 Examples:
   vget config set language en
   vget config set output_dir ~/Videos
-  vget config set twitter.auth_token YOUR_TOKEN`,
+  vget config set twitter.auth_token YOUR_TOKEN
+  vget config set express.kuaidi100.key YOUR_KEY
+  vget config set express.kuaidi100.customer YOUR_CUSTOMER_ID`,
 	Args: cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		key := args[0]
@@ -137,8 +158,12 @@ Supported keys:
   server.max_concurrent  Reset to 0 (uses default)
   server.api_key     Clear API key
 
+Express tracking (dynamic keys):
+  express.<provider>.<key>  Clear express provider config value
+
 Examples:
-  vget config unset twitter.auth_token`,
+  vget config unset twitter.auth_token
+  vget config unset express.kuaidi100.key`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		key := args[0]
@@ -161,6 +186,18 @@ Examples:
 
 // setConfigValue sets a config value by key
 func setConfigValue(cfg *config.Config, key, value string) error {
+	// Handle express.<provider>.<key> pattern (e.g., express.kuaidi100.key)
+	if strings.HasPrefix(key, "express.") {
+		parts := strings.SplitN(key, ".", 3)
+		if len(parts) != 3 {
+			return fmt.Errorf("invalid express config key format: %s\nUse: express.<provider>.<key> (e.g., express.kuaidi100.key)", key)
+		}
+		provider := parts[1]
+		configKey := parts[2]
+		cfg.SetExpressConfig(provider, configKey, value)
+		return nil
+	}
+
 	switch key {
 	case "language":
 		cfg.Language = value
@@ -194,6 +231,21 @@ func setConfigValue(cfg *config.Config, key, value string) error {
 
 // getConfigValue gets a config value by key
 func getConfigValue(cfg *config.Config, key string) (string, error) {
+	// Handle express.<provider>.<key> pattern (e.g., express.kuaidi100.key)
+	if strings.HasPrefix(key, "express.") {
+		parts := strings.SplitN(key, ".", 3)
+		if len(parts) != 3 {
+			return "", fmt.Errorf("invalid express config key format: %s\nUse: express.<provider>.<key> (e.g., express.kuaidi100.key)", key)
+		}
+		provider := parts[1]
+		configKey := parts[2]
+		providerCfg := cfg.GetExpressConfig(provider)
+		if providerCfg == nil {
+			return "", nil
+		}
+		return providerCfg[configKey], nil
+	}
+
 	switch key {
 	case "language":
 		return cfg.Language, nil
@@ -218,6 +270,18 @@ func getConfigValue(cfg *config.Config, key string) (string, error) {
 
 // unsetConfigValue clears a config value by key
 func unsetConfigValue(cfg *config.Config, key string) error {
+	// Handle express.<provider>.<key> pattern (e.g., express.kuaidi100.key)
+	if strings.HasPrefix(key, "express.") {
+		parts := strings.SplitN(key, ".", 3)
+		if len(parts) != 3 {
+			return fmt.Errorf("invalid express config key format: %s\nUse: express.<provider>.<key> (e.g., express.kuaidi100.key)", key)
+		}
+		provider := parts[1]
+		configKey := parts[2]
+		cfg.DeleteExpressConfig(provider, configKey)
+		return nil
+	}
+
 	switch key {
 	case "language":
 		cfg.Language = ""
@@ -385,13 +449,6 @@ var configWebdavShowCmd = &cobra.Command{
 			fmt.Printf("Password: %s\n", strings.Repeat("*", len(server.Password)))
 		}
 	},
-}
-
-func orDefault(s, def string) string {
-	if s == "" {
-		return def
-	}
-	return s
 }
 
 // --- Twitter auth management ---
