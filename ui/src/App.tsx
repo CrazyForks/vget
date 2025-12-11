@@ -3,225 +3,28 @@ import "./App.css";
 import logo from "./assets/logo.png";
 import { Kuaidi100 } from "./components/Kuaidi100";
 import { ConfigEditor, type ConfigValues } from "./components/ConfigEditor";
-
-type JobStatus =
-  | "queued"
-  | "downloading"
-  | "completed"
-  | "failed"
-  | "cancelled";
-
-interface Job {
-  id: string;
-  url: string;
-  status: JobStatus;
-  progress: number;
-  filename?: string;
-  error?: string;
-}
-
-interface ApiResponse<T> {
-  code: number;
-  data: T;
-  message: string;
-}
-
-interface HealthData {
-  status: string;
-  version: string;
-}
-
-interface WebDAVServer {
-  url: string;
-  username: string;
-  password: string;
-}
-
-interface ConfigData {
-  output_dir: string;
-  language: string;
-  format: string;
-  quality: string;
-  twitter_auth_token: string;
-  server_port: number;
-  server_max_concurrent: number;
-  server_api_key: string;
-  webdav_servers: Record<string, WebDAVServer>;
-  express?: Record<string, Record<string, string>>;
-}
-
-interface JobsData {
-  jobs: Job[];
-}
-
-interface UITranslations {
-  download_to: string;
-  edit: string;
-  save: string;
-  cancel: string;
-  paste_url: string;
-  download: string;
-  adding: string;
-  jobs: string;
-  total: string;
-  no_downloads: string;
-  paste_hint: string;
-  queued: string;
-  downloading: string;
-  completed: string;
-  failed: string;
-  cancelled: string;
-  settings: string;
-  language: string;
-  format: string;
-  quality: string;
-  twitter_auth: string;
-  server_port: string;
-  max_concurrent: string;
-  api_key: string;
-  webdav_servers: string;
-  add: string;
-  delete: string;
-  name: string;
-  url: string;
-  username: string;
-  password: string;
-  no_webdav_servers: string;
-}
-
-interface ServerTranslations {
-  no_config_warning: string;
-  run_init_hint: string;
-}
-
-interface I18nData {
-  language: string;
-  ui: UITranslations;
-  server: ServerTranslations;
-  config_exists: boolean;
-}
-
-const defaultTranslations: UITranslations = {
-  download_to: "Download to:",
-  edit: "Edit",
-  save: "Save",
-  cancel: "Cancel",
-  paste_url: "Paste URL to download...",
-  download: "Download",
-  adding: "Adding...",
-  jobs: "Jobs",
-  total: "total",
-  no_downloads: "No downloads yet",
-  paste_hint: "Paste a URL above to get started",
-  queued: "queued",
-  downloading: "downloading",
-  completed: "completed",
-  failed: "failed",
-  cancelled: "cancelled",
-  settings: "Settings",
-  language: "Language",
-  format: "Format",
-  quality: "Quality",
-  twitter_auth: "Twitter Auth",
-  server_port: "Server Port",
-  max_concurrent: "Max Concurrent",
-  api_key: "API Key",
-  webdav_servers: "WebDAV Servers",
-  add: "Add",
-  delete: "Delete",
-  name: "Name",
-  url: "URL",
-  username: "Username",
-  password: "Password",
-  no_webdav_servers: "No WebDAV servers configured",
-};
-
-const defaultServerTranslations: ServerTranslations = {
-  no_config_warning: "No config file found. Using default settings.",
-  run_init_hint: "Run 'vget init' to configure vget interactively.",
-};
-
-async function fetchHealth(): Promise<ApiResponse<HealthData>> {
-  const res = await fetch("/health");
-  return res.json();
-}
-
-async function fetchJobs(): Promise<ApiResponse<JobsData>> {
-  const res = await fetch("/jobs");
-  return res.json();
-}
-
-async function fetchConfig(): Promise<ApiResponse<ConfigData>> {
-  const res = await fetch("/config");
-  return res.json();
-}
-
-async function fetchI18n(): Promise<ApiResponse<I18nData>> {
-  const res = await fetch("/i18n");
-  return res.json();
-}
-
-async function updateConfig(
-  outputDir: string
-): Promise<ApiResponse<ConfigData>> {
-  const res = await fetch("/config", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ output_dir: outputDir }),
-  });
-  return res.json();
-}
-
-async function setConfigValue(
-  key: string,
-  value: string
-): Promise<ApiResponse<{ key: string; value: string }>> {
-  const res = await fetch("/config", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ key, value }),
-  });
-  return res.json();
-}
-
-async function postDownload(
-  url: string
-): Promise<ApiResponse<{ id: string; status: string }>> {
-  const res = await fetch("/download", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url }),
-  });
-  return res.json();
-}
-
-async function addWebDAVServer(
-  name: string,
-  url: string,
-  username: string,
-  password: string
-): Promise<ApiResponse<{ name: string }>> {
-  const res = await fetch("/config/webdav", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, url, username, password }),
-  });
-  return res.json();
-}
-
-async function deleteWebDAVServer(
-  name: string
-): Promise<ApiResponse<{ name: string }>> {
-  const res = await fetch(`/config/webdav/${encodeURIComponent(name)}`, {
-    method: "DELETE",
-  });
-  return res.json();
-}
-
-async function deleteJob(id: string): Promise<ApiResponse<{ id: string }>> {
-  const res = await fetch(`/jobs/${id}`, { method: "DELETE" });
-  return res.json();
-}
+import {
+  type UITranslations,
+  type ServerTranslations,
+  defaultTranslations,
+  defaultServerTranslations,
+} from "./utils/translations";
+import {
+  type Job,
+  type JobStatus,
+  type HealthData,
+  type WebDAVServer,
+  fetchHealth,
+  fetchJobs,
+  fetchConfig,
+  fetchI18n,
+  updateConfig,
+  setConfigValue,
+  postDownload,
+  addWebDAVServer,
+  deleteWebDAVServer,
+  deleteJob,
+} from "./utils/apis";
 
 function App() {
   const [health, setHealth] = useState<HealthData | null>(null);
@@ -237,9 +40,11 @@ function App() {
     return saved ? saved === "dark" : true;
   });
   const [t, setT] = useState<UITranslations>(defaultTranslations);
-  const [serverT, setServerT] = useState<ServerTranslations>(defaultServerTranslations);
+  const [serverT, setServerT] = useState<ServerTranslations>(
+    defaultServerTranslations
+  );
   const [configExists, setConfigExists] = useState(true);
-  const [showSettings, setShowSettings] = useState(false);
+  const [showConfigEditor, setShowConfigEditor] = useState(false);
   const [configLang, setConfigLang] = useState("");
   const [configFormat, setConfigFormat] = useState("");
   const [configQuality, setConfigQuality] = useState("");
@@ -247,7 +52,9 @@ function App() {
   const [serverPort, setServerPort] = useState(8080);
   const [maxConcurrent, setMaxConcurrent] = useState(10);
   const [apiKey, setApiKey] = useState("");
-  const [webdavServers, setWebdavServers] = useState<Record<string, WebDAVServer>>({});
+  const [webdavServers, setWebdavServers] = useState<
+    Record<string, WebDAVServer>
+  >({});
   // Kuaidi100 config
   const [kuaidi100Key, setKuaidi100Key] = useState("");
   const [kuaidi100Customer, setKuaidi100Customer] = useState("");
@@ -356,13 +163,21 @@ function App() {
       await setConfigValue("express.kuaidi100.key", values.kuaidi100Key);
     }
     if (values.kuaidi100Customer) {
-      await setConfigValue("express.kuaidi100.customer", values.kuaidi100Customer);
+      await setConfigValue(
+        "express.kuaidi100.customer",
+        values.kuaidi100Customer
+      );
     }
-    setShowSettings(false);
+    setShowConfigEditor(false);
     refresh();
   };
 
-  const handleAddWebDAV = async (name: string, url: string, username: string, password: string) => {
+  const handleAddWebDAV = async (
+    name: string,
+    url: string,
+    username: string,
+    password: string
+  ) => {
     const res = await addWebDAVServer(name, url, username, password);
     if (res.code === 200) {
       refresh();
@@ -403,7 +218,7 @@ function App() {
         <div className="header-right">
           <button
             className="settings-toggle"
-            onClick={() => setShowSettings(!showSettings)}
+            onClick={() => setShowConfigEditor(!showConfigEditor)}
             title={t.settings}
           >
             ⚙️
@@ -428,14 +243,14 @@ function App() {
           </div>
           <button
             className="warning-settings-btn"
-            onClick={() => setShowSettings(true)}
+            onClick={() => setShowConfigEditor(true)}
           >
             ⚙️ {t.settings}
           </button>
         </div>
       )}
 
-      {showSettings && (
+      {showConfigEditor && (
         <ConfigEditor
           isConnected={isConnected}
           t={t}
@@ -449,7 +264,7 @@ function App() {
           serverPort={serverPort}
           webdavServers={webdavServers}
           onSave={handleSaveConfig}
-          onCancel={() => setShowSettings(false)}
+          onCancel={() => setShowConfigEditor(false)}
           onAddWebDAV={handleAddWebDAV}
           onDeleteWebDAV={handleDeleteWebDAV}
         />
@@ -511,7 +326,9 @@ function App() {
       <section className="jobs-section">
         <div className="jobs-header">
           <h2>{t.jobs}</h2>
-          <span className="count">{jobs.length} {t.total}</span>
+          <span className="count">
+            {jobs.length} {t.total}
+          </span>
         </div>
 
         {loading ? (
