@@ -488,8 +488,17 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		// Update server's cached config
 		s.cfg = cfg
 
-		// Special handling for output_dir - update runtime values
+		// Special handling for output_dir - validate and create directory, then update runtime values
 		if req.Key == "output_dir" {
+			// Validate the directory exists or can be created
+			if err := os.MkdirAll(req.Value, 0755); err != nil {
+				s.writeJSON(w, http.StatusBadRequest, Response{
+					Code:    400,
+					Data:    nil,
+					Message: fmt.Sprintf("invalid output directory: %v", err),
+				})
+				return
+			}
 			s.outputDir = req.Value
 			s.jobQueue.outputDir = req.Value
 		}

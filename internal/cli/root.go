@@ -150,13 +150,13 @@ func runDownload(url string) error {
 		fmt.Printf("\n  %s %s\n\n", "✓", t.Download.Completed)
 		return nil
 	case *extractor.VideoMedia:
-		return downloadVideo(m, dl, t, cfg.Language)
+		return downloadVideo(m, dl, t, cfg.Language, cfg.OutputDir)
 	case *extractor.AudioMedia:
-		return downloadAudio(m, dl)
+		return downloadAudio(m, dl, cfg.OutputDir)
 	case *extractor.ImageMedia:
-		return downloadImages(m, dl)
+		return downloadImages(m, dl, cfg.OutputDir)
 	case *extractor.MultiVideoMedia:
-		return downloadMultiVideo(m, dl, t, cfg.Language)
+		return downloadMultiVideo(m, dl, t, cfg.Language, cfg.OutputDir)
 	default:
 		return fmt.Errorf("unsupported media type")
 	}
@@ -263,7 +263,7 @@ func formatSize(b int64) string {
 	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
 }
 
-func downloadMultiVideo(m *extractor.MultiVideoMedia, dl *downloader.Downloader, t *i18n.Translations, lang string) error {
+func downloadMultiVideo(m *extractor.MultiVideoMedia, dl *downloader.Downloader, t *i18n.Translations, lang string, outputDir string) error {
 	// Info only mode
 	if info {
 		fmt.Printf("  Videos (%d):\n", len(m.Videos))
@@ -284,14 +284,14 @@ func downloadMultiVideo(m *extractor.MultiVideoMedia, dl *downloader.Downloader,
 
 	for i, video := range m.Videos {
 		fmt.Printf("\n  [%d/%d] %s\n", i+1, len(m.Videos), video.Title)
-		if err := downloadVideo(video, dl, t, lang); err != nil {
+		if err := downloadVideo(video, dl, t, lang, outputDir); err != nil {
 			return fmt.Errorf("failed to download video %d: %w", i+1, err)
 		}
 	}
 	return nil
 }
 
-func downloadVideo(m *extractor.VideoMedia, dl *downloader.Downloader, t *i18n.Translations, lang string) error {
+func downloadVideo(m *extractor.VideoMedia, dl *downloader.Downloader, t *i18n.Translations, lang string, outputDir string) error {
 	// Info only mode
 	if info {
 		for i, f := range m.Formats {
@@ -326,6 +326,10 @@ func downloadVideo(m *extractor.VideoMedia, dl *downloader.Downloader, t *i18n.T
 		} else {
 			outputFile = fmt.Sprintf("%s.%s", m.ID, ext)
 		}
+		// Prepend outputDir if configured
+		if outputDir != "" {
+			outputFile = filepath.Join(outputDir, outputFile)
+		}
 	}
 
 	// Use HLS downloader for m3u8 streams
@@ -335,12 +339,17 @@ func downloadVideo(m *extractor.VideoMedia, dl *downloader.Downloader, t *i18n.T
 		if title == "" {
 			title = m.ID
 		}
-		if err := os.MkdirAll(title, 0755); err != nil {
+		// Use outputDir as base if configured
+		baseDir := title
+		if outputDir != "" {
+			baseDir = filepath.Join(outputDir, title)
+		}
+		if err := os.MkdirAll(baseDir, 0755); err != nil {
 			return fmt.Errorf("failed to create directory: %w", err)
 		}
 		// Put output file inside the directory
-		outputFile = filepath.Join(title, filepath.Base(outputFile))
-		fmt.Printf("  Output directory: %s/\n", title)
+		outputFile = filepath.Join(baseDir, filepath.Base(outputFile))
+		fmt.Printf("  Output directory: %s/\n", baseDir)
 		return downloader.RunHLSDownloadWithHeadersTUI(format.URL, outputFile, m.ID, lang, format.Headers)
 	}
 
@@ -402,7 +411,7 @@ func downloadVideoAndAudio(format *extractor.VideoFormat, outputFile, videoID st
 	return nil
 }
 
-func downloadAudio(m *extractor.AudioMedia, dl *downloader.Downloader) error {
+func downloadAudio(m *extractor.AudioMedia, dl *downloader.Downloader, outputDir string) error {
 	// Info only mode
 	if info {
 		fmt.Printf("  Audio: %s (%s)\n", m.Title, m.Ext)
@@ -418,12 +427,16 @@ func downloadAudio(m *extractor.AudioMedia, dl *downloader.Downloader) error {
 		} else {
 			outputFile = fmt.Sprintf("%s.%s", m.ID, m.Ext)
 		}
+		// Prepend outputDir if configured
+		if outputDir != "" {
+			outputFile = filepath.Join(outputDir, outputFile)
+		}
 	}
 
 	return dl.Download(m.URL, outputFile, m.ID)
 }
 
-func downloadImages(m *extractor.ImageMedia, dl *downloader.Downloader) error {
+func downloadImages(m *extractor.ImageMedia, dl *downloader.Downloader, outputDir string) error {
 	// Info only mode
 	if info {
 		fmt.Printf("  Images (%d):\n", len(m.Images))
@@ -454,6 +467,10 @@ func downloadImages(m *extractor.ImageMedia, dl *downloader.Downloader) error {
 				outputFile = fmt.Sprintf("%s_%d.%s", baseFilename, i+1, img.Ext)
 			} else {
 				outputFile = fmt.Sprintf("%s.%s", baseFilename, img.Ext)
+			}
+			// Prepend outputDir if configured
+			if outputDir != "" {
+				outputFile = filepath.Join(outputDir, outputFile)
 			}
 		}
 
