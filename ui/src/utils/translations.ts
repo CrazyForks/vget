@@ -31,6 +31,8 @@ export interface UITranslations {
   username: string;
   password: string;
   no_webdav_servers: string;
+  clear_history: string;
+  clear_all: string;
 }
 
 export interface ServerTranslations {
@@ -71,6 +73,8 @@ export const defaultTranslations: UITranslations = {
   username: "Username",
   password: "Password",
   no_webdav_servers: "No WebDAV servers configured",
+  clear_history: "Clear",
+  clear_all: "Clear All",
 };
 
 export const defaultServerTranslations: ServerTranslations = {

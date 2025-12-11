@@ -332,36 +332,48 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
+	switch r.Method {
+	case http.MethodGet:
+		jobs := s.jobQueue.GetAllJobs()
+
+		jobList := make([]map[string]interface{}, len(jobs))
+		for i, job := range jobs {
+			jobList[i] = map[string]interface{}{
+				"id":       job.ID,
+				"url":      job.URL,
+				"status":   job.Status,
+				"progress": job.Progress,
+				"filename": job.Filename,
+				"error":    job.Error,
+			}
+		}
+
+		s.writeJSON(w, http.StatusOK, Response{
+			Code: 200,
+			Data: map[string]interface{}{
+				"jobs": jobList,
+			},
+			Message: fmt.Sprintf("%d jobs found", len(jobs)),
+		})
+
+	case http.MethodDelete:
+		// Clear all completed, failed, and cancelled jobs
+		count := s.jobQueue.ClearHistory()
+		s.writeJSON(w, http.StatusOK, Response{
+			Code: 200,
+			Data: map[string]interface{}{
+				"cleared": count,
+			},
+			Message: fmt.Sprintf("%d jobs cleared", count),
+		})
+
+	default:
 		s.writeJSON(w, http.StatusMethodNotAllowed, Response{
 			Code:    405,
 			Data:    nil,
 			Message: "method not allowed",
 		})
-		return
 	}
-
-	jobs := s.jobQueue.GetAllJobs()
-
-	jobList := make([]map[string]interface{}, len(jobs))
-	for i, job := range jobs {
-		jobList[i] = map[string]interface{}{
-			"id":       job.ID,
-			"url":      job.URL,
-			"status":   job.Status,
-			"progress": job.Progress,
-			"filename": job.Filename,
-			"error":    job.Error,
-		}
-	}
-
-	s.writeJSON(w, http.StatusOK, Response{
-		Code: 200,
-		Data: map[string]interface{}{
-			"jobs": jobList,
-		},
-		Message: fmt.Sprintf("%d jobs found", len(jobs)),
-	})
 }
 
 func (s *Server) handleJobAction(w http.ResponseWriter, r *http.Request) {
@@ -378,17 +390,24 @@ func (s *Server) handleJobAction(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodDelete:
+		// Try to cancel active job first, then try to remove finished job
 		if s.jobQueue.CancelJob(id) {
 			s.writeJSON(w, http.StatusOK, Response{
 				Code:    200,
 				Data:    map[string]string{"id": id},
 				Message: "job cancelled",
 			})
+		} else if s.jobQueue.RemoveJob(id) {
+			s.writeJSON(w, http.StatusOK, Response{
+				Code:    200,
+				Data:    map[string]string{"id": id},
+				Message: "job removed",
+			})
 		} else {
 			s.writeJSON(w, http.StatusNotFound, Response{
 				Code:    404,
 				Data:    nil,
-				Message: "job not found or cannot be cancelled",
+				Message: "job not found or cannot be cancelled/removed",
 			})
 		}
 	default:
@@ -861,22 +880,40 @@ func (s *Server) downloadWithExtractor(ctx context.Context, url, filename string
 		if len(m.Images) == 0 {
 			return fmt.Errorf("no images available")
 		}
-		// Download first image for now
-		img := m.Images[0]
-		downloadURL = img.URL
 
-		if filename != "" {
-			outputPath = filepath.Join(s.outputDir, filename)
-		} else {
-			title := extractor.SanitizeFilename(m.Title)
-			if title != "" {
-				outputPath = filepath.Join(s.outputDir, fmt.Sprintf("%s.%s", title, img.Ext))
+		// Download all images
+		title := extractor.SanitizeFilename(m.Title)
+		var filenames []string
+
+		for i, img := range m.Images {
+			var imgPath string
+			if len(m.Images) == 1 {
+				// Single image - no index suffix
+				if title != "" {
+					imgPath = filepath.Join(s.outputDir, fmt.Sprintf("%s.%s", title, img.Ext))
+				} else {
+					imgPath = filepath.Join(s.outputDir, fmt.Sprintf("%s.%s", m.ID, img.Ext))
+				}
 			} else {
-				outputPath = filepath.Join(s.outputDir, fmt.Sprintf("%s.%s", m.ID, img.Ext))
+				// Multiple images - add index suffix
+				if title != "" {
+					imgPath = filepath.Join(s.outputDir, fmt.Sprintf("%s_%d.%s", title, i+1, img.Ext))
+				} else {
+					imgPath = filepath.Join(s.outputDir, fmt.Sprintf("%s_%d.%s", m.ID, i+1, img.Ext))
+				}
+			}
+
+			filenames = append(filenames, imgPath)
+
+			// Download this image
+			if err := downloadFile(ctx, img.URL, imgPath, nil, nil); err != nil {
+				return fmt.Errorf("failed to download image %d: %w", i+1, err)
 			}
 		}
 
-		s.updateJobFilename(url, outputPath)
+		// Update job filename to show all files
+		s.updateJobFilename(url, strings.Join(filenames, ", "))
+		return nil // Already downloaded all images
 
 	default:
 		return fmt.Errorf("unsupported media type")

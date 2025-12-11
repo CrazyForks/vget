@@ -4,11 +4,13 @@ import type { UITranslations } from "../utils/translations";
 interface DownloadJobCardProps {
   job: Job;
   onCancel: () => void;
+  onClear: () => void;
   t: UITranslations;
 }
 
-export function DownloadJobCard({ job, onCancel, t }: DownloadJobCardProps) {
+export function DownloadJobCard({ job, onCancel, onClear, t }: DownloadJobCardProps) {
   const canCancel = job.status === "queued" || job.status === "downloading";
+  const canClear = job.status === "completed" || job.status === "failed" || job.status === "cancelled";
 
   const statusText: Record<JobStatus, string> = {
     queued: t.queued,
@@ -29,6 +31,11 @@ export function DownloadJobCard({ job, onCancel, t }: DownloadJobCardProps) {
           {canCancel && (
             <button className="cancel-btn" onClick={onCancel}>
               {t.cancel}
+            </button>
+          )}
+          {canClear && (
+            <button className="clear-btn" onClick={onClear}>
+              {t.clear_history}
             </button>
           )}
         </div>

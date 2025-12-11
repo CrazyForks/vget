@@ -116,6 +116,8 @@ ui:
   username: "Benutzername"
   password: "Passwort"
   no_webdav_servers: "Keine WebDAV-Server konfiguriert"
+  clear_history: "Löschen"
+  clear_all: "Alle löschen"
 
 # Server-Nachrichten
 server:

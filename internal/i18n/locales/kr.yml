@@ -116,6 +116,8 @@ ui:
   username: "사용자 이름"
   password: "비밀번호"
   no_webdav_servers: "WebDAV 서버가 구성되지 않았습니다"
+  clear_history: "삭제"
+  clear_all: "모두 삭제"
 
 # 서버 메시지
 server:

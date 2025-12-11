@@ -116,6 +116,8 @@ ui:
   username: "Utilisateur"
   password: "Mot de passe"
   no_webdav_servers: "Aucun serveur WebDAV configuré"
+  clear_history: "Effacer"
+  clear_all: "Tout effacer"
 
 # Messages du serveur
 server:

@@ -140,3 +140,10 @@ export async function deleteJob(
   const res = await fetch(`/jobs/${id}`, { method: "DELETE" });
   return res.json();
 }
+
+export async function clearHistory(): Promise<
+  ApiResponse<{ cleared: number }>
+> {
+  const res = await fetch("/jobs", { method: "DELETE" });
+  return res.json();
+}

@@ -332,14 +332,44 @@ body {
 
 .jobs-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 0.75rem;
   margin-bottom: 1rem;
 }
 
 .jobs-header .count {
   color: var(--text-secondary);
   font-size: 0.875rem;
+}
+
+.jobs-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.clear-btn,
+.clear-all-btn {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.clear-btn:hover:not(:disabled),
+.clear-all-btn:hover:not(:disabled) {
+  border-color: var(--accent-red);
+  color: var(--accent-red);
+}
+
+.clear-btn:disabled,
+.clear-all-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .jobs-list {

@@ -25,6 +25,7 @@ import {
   addWebDAVServer,
   deleteWebDAVServer,
   deleteJob,
+  clearHistory,
 } from "./utils/apis";
 
 export default function App() {
@@ -128,6 +129,11 @@ export default function App() {
 
   const handleCancel = async (id: string) => {
     await deleteJob(id);
+    refresh();
+  };
+
+  const handleClearHistory = async () => {
+    await clearHistory();
     refresh();
   };
 
@@ -330,6 +336,24 @@ export default function App() {
           <span className="count">
             {jobs.length} {t.total}
           </span>
+          <div className="jobs-actions">
+            <button
+              className="clear-all-btn"
+              onClick={handleClearHistory}
+              disabled={
+                !isConnected ||
+                !jobs.some(
+                  (j) =>
+                    j.status === "completed" ||
+                    j.status === "failed" ||
+                    j.status === "cancelled"
+                )
+              }
+              title={t.clear_all}
+            >
+              {t.clear_all}
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -346,6 +370,7 @@ export default function App() {
                 key={job.id}
                 job={job}
                 onCancel={() => handleCancel(job.id)}
+                onClear={() => handleCancel(job.id)}
                 t={t}
               />
             ))}

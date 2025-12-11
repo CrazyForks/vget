@@ -116,6 +116,8 @@ ui:
   username: "ユーザー名"
   password: "パスワード"
   no_webdav_servers: "WebDAVサーバーは設定されていません"
+  clear_history: "クリア"
+  clear_all: "すべてクリア"
 
 # サーバーメッセージ
 server:

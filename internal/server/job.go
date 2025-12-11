@@ -153,6 +153,40 @@ func (jq *JobQueue) cleanupOldJobs() {
 	}
 }
 
+// ClearHistory removes all completed, failed, and cancelled jobs
+func (jq *JobQueue) ClearHistory() int {
+	jq.mu.Lock()
+	defer jq.mu.Unlock()
+
+	count := 0
+	for id, job := range jq.jobs {
+		if job.Status == JobStatusCompleted || job.Status == JobStatusFailed || job.Status == JobStatusCancelled {
+			delete(jq.jobs, id)
+			count++
+		}
+	}
+	return count
+}
+
+// RemoveJob removes a single completed, failed, or cancelled job by ID
+func (jq *JobQueue) RemoveJob(id string) bool {
+	jq.mu.Lock()
+	defer jq.mu.Unlock()
+
+	job, ok := jq.jobs[id]
+	if !ok {
+		return false
+	}
+
+	// Can only remove completed, failed, or cancelled jobs
+	if job.Status != JobStatusCompleted && job.Status != JobStatusFailed && job.Status != JobStatusCancelled {
+		return false
+	}
+
+	delete(jq.jobs, id)
+	return true
+}
+
 // AddJob creates and queues a new download job
 func (jq *JobQueue) AddJob(url, filename string) (*Job, error) {
 	id, err := generateJobID()
