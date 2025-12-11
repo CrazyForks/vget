@@ -245,7 +245,37 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to parse %s: %w", path, err)
 	}
 
+	// Expand tilde in OutputDir
+	cfg.OutputDir = expandPath(cfg.OutputDir)
+
 	return cfg, nil
+}
+
+// expandPath expands the tilde (~) in the path to the user's home directory.
+// It handles both forward and backward slashes to ensure cross-platform compatibility
+// for configuration files.
+func expandPath(path string) string {
+	if path == "" {
+		return ""
+	}
+
+	if strings.HasPrefix(path, "~") {
+		// Only expand if it's explicitly "~", "~/", or "~\"
+		if len(path) == 1 || path[1] == '/' || path[1] == '\\' {
+			home, err := os.UserHomeDir()
+			if err == nil {
+				subPath := path[1:]
+				// Handle the separator manually to ensure clean join across platforms
+				// This allows "~\Downloads" to work correctly on macOS/Linux as well
+				if len(subPath) > 0 && (subPath[0] == '/' || subPath[0] == '\\') {
+					subPath = subPath[1:]
+				}
+				return filepath.Join(home, subPath)
+			}
+		}
+	}
+
+	return path
 }
 
 // Save writes the config to ~/.config/vget/config.yml
