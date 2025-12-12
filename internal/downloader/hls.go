@@ -9,11 +9,14 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/guiyumin/vget/internal/config"
 )
 
 // HLSConfig holds configuration for HLS downloads
@@ -88,6 +91,16 @@ func RunHLSDownloadWithHeadersTUI(m3u8URL, output, displayID, lang string, heade
 	if downloadErr != nil {
 		return downloadErr
 	}
+
+	// Convert .ts to .mp4 in Docker environment
+	mp4Path, err := convertTsToMp4(output)
+	if err != nil {
+		// Log warning but don't fail - the .ts file is still usable
+		fmt.Printf("Warning: %v\n", err)
+	} else if mp4Path != output {
+		fmt.Printf("Converted to: %s\n", mp4Path)
+	}
+
 	return nil
 }
 
@@ -392,29 +405,30 @@ func decryptAES128(data, key, iv []byte, segmentIndex int) ([]byte, error) {
 }
 
 // DownloadHLSWithProgress downloads an HLS stream with a progress callback (for server use)
-func DownloadHLSWithProgress(ctx context.Context, m3u8URL, output string, headers map[string]string, progressFn func(downloaded, total int64)) error {
-	config := DefaultHLSConfig()
+// Returns the final output path (may be .mp4 if converted in Docker) and error
+func DownloadHLSWithProgress(ctx context.Context, m3u8URL, output string, headers map[string]string, progressFn func(downloaded, total int64)) (string, error) {
+	hlsConfig := DefaultHLSConfig()
 
 	// Parse the m3u8 playlist
 	playlist, err := ParseM3U8WithHeaders(m3u8URL, headers)
 	if err != nil {
-		return fmt.Errorf("failed to parse m3u8: %w", err)
+		return "", fmt.Errorf("failed to parse m3u8: %w", err)
 	}
 
 	// If master playlist, get the best variant and parse it
 	if playlist.IsMaster {
 		variant := playlist.SelectBestVariant()
 		if variant == nil {
-			return fmt.Errorf("no variants found in master playlist")
+			return "", fmt.Errorf("no variants found in master playlist")
 		}
 		playlist, err = ParseM3U8WithHeaders(variant.URL, headers)
 		if err != nil {
-			return fmt.Errorf("failed to parse variant playlist: %w", err)
+			return "", fmt.Errorf("failed to parse variant playlist: %w", err)
 		}
 	}
 
 	if len(playlist.Segments) == 0 {
-		return fmt.Errorf("no segments found in playlist")
+		return "", fmt.Errorf("no segments found in playlist")
 	}
 
 	// Get encryption key if needed
@@ -423,7 +437,7 @@ func DownloadHLSWithProgress(ctx context.Context, m3u8URL, output string, header
 	if playlist.IsEncrypted && playlist.KeyURL != "" {
 		decryptKey, err = fetchKeyWithHeaders(playlist.KeyURL, headers)
 		if err != nil {
-			return fmt.Errorf("failed to fetch encryption key: %w", err)
+			return "", fmt.Errorf("failed to fetch encryption key: %w", err)
 		}
 		if playlist.KeyIV != "" {
 			decryptIV, _ = hex.DecodeString(playlist.KeyIV)
@@ -433,9 +447,8 @@ func DownloadHLSWithProgress(ctx context.Context, m3u8URL, output string, header
 	// Create output file
 	file, err := os.Create(output)
 	if err != nil {
-		return fmt.Errorf("failed to create output file: %w", err)
+		return "", fmt.Errorf("failed to create output file: %w", err)
 	}
-	defer file.Close()
 
 	// Set up progress tracking using segment count
 	totalSegments := int64(len(playlist.Segments))
@@ -471,10 +484,14 @@ func DownloadHLSWithProgress(ctx context.Context, m3u8URL, output string, header
 	defer close(progressDone)
 
 	// Download segments
-	err = downloadSegmentsOrdered(ctx, playlist.Segments, file, decryptKey, decryptIV, hlsState, config, headers)
+	err = downloadSegmentsOrdered(ctx, playlist.Segments, file, decryptKey, decryptIV, hlsState, hlsConfig, headers)
 	if err != nil {
-		return err
+		file.Close()
+		return "", err
 	}
+
+	// Close file before conversion (ffmpeg needs exclusive access)
+	file.Close()
 
 	// Final progress update - download complete
 	if progressFn != nil {
@@ -482,5 +499,50 @@ func DownloadHLSWithProgress(ctx context.Context, m3u8URL, output string, header
 		progressFn(finalBytes, finalBytes)
 	}
 
-	return nil
+	// Convert .ts to .mp4 in Docker environment
+	finalPath, convErr := convertTsToMp4(output)
+	if convErr != nil {
+		// Log warning but don't fail - the .ts file is still usable
+		fmt.Printf("Warning: %v\n", convErr)
+		return output, nil
+	}
+
+	return finalPath, nil
+}
+
+// convertTsToMp4 converts a .ts file to .mp4 using ffmpeg (copy, no re-encoding)
+// Only runs in Docker environment where ffmpeg is available
+// Returns the new .mp4 path if conversion succeeded, otherwise returns original path
+func convertTsToMp4(tsPath string) (string, error) {
+	// Only convert in Docker
+	if !config.IsRunningInDocker() {
+		return tsPath, nil
+	}
+
+	// Only convert .ts files
+	if !strings.HasSuffix(strings.ToLower(tsPath), ".ts") {
+		return tsPath, nil
+	}
+
+	// Build mp4 output path
+	mp4Path := strings.TrimSuffix(tsPath, ".ts") + ".mp4"
+	if strings.HasSuffix(tsPath, ".TS") {
+		mp4Path = strings.TrimSuffix(tsPath, ".TS") + ".mp4"
+	}
+
+	// Run ffmpeg with stream copy (fast, no re-encoding)
+	cmd := exec.Command("ffmpeg", "-i", tsPath, "-c", "copy", "-y", mp4Path)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// Conversion failed, keep the .ts file
+		return tsPath, fmt.Errorf("ffmpeg conversion failed: %w\nOutput: %s", err, string(output))
+	}
+
+	// Conversion succeeded, delete the .ts file
+	if err := os.Remove(tsPath); err != nil {
+		// Log but don't fail - the mp4 was created successfully
+		fmt.Printf("Warning: could not remove original .ts file: %v\n", err)
+	}
+
+	return mp4Path, nil
 }

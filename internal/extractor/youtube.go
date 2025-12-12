@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/guiyumin/vget/internal/config"
 )
 
 // YouTubeDockerRequiredError indicates YouTube extraction needs Docker
@@ -50,7 +52,7 @@ func (e *ytdlpExtractor) Match(u *url.URL) bool {
 }
 
 func (e *ytdlpExtractor) Extract(urlStr string) (Media, error) {
-	if !isRunningInDocker() {
+	if !config.IsRunningInDocker() {
 		return nil, &YouTubeDockerRequiredError{URL: urlStr}
 	}
 
@@ -155,29 +157,6 @@ func downloadWithYoutubeDL(ctx context.Context, url, outputDir string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
-}
-
-// isRunningInDocker detects if we're running inside a Docker container
-func isRunningInDocker() bool {
-	// Method 1: Check for .dockerenv file
-	if _, err := os.Stat("/.dockerenv"); err == nil {
-		return true
-	}
-
-	// Method 2: Check cgroup (Linux)
-	if data, err := os.ReadFile("/proc/1/cgroup"); err == nil {
-		content := string(data)
-		if strings.Contains(content, "docker") || strings.Contains(content, "containerd") {
-			return true
-		}
-	}
-
-	// Method 3: Check for kubernetes
-	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
-		return true
-	}
-
-	return false
 }
 
 func init() {

@@ -924,7 +924,15 @@ func (s *Server) downloadWithExtractor(ctx context.Context, url, filename string
 	// Check if this is an HLS stream (m3u8)
 	if strings.HasSuffix(strings.ToLower(downloadURL), ".m3u8") ||
 		strings.Contains(strings.ToLower(downloadURL), ".m3u8?") {
-		return downloader.DownloadHLSWithProgress(ctx, downloadURL, outputPath, headers, progressFn)
+		finalPath, err := downloader.DownloadHLSWithProgress(ctx, downloadURL, outputPath, headers, progressFn)
+		if err != nil {
+			return err
+		}
+		// Update job filename if conversion changed the path (e.g., .ts -> .mp4)
+		if finalPath != outputPath {
+			s.updateJobFilename(url, finalPath)
+		}
+		return nil
 	}
 
 	// Perform regular download

@@ -170,7 +170,7 @@ func (c *Config) DeleteWebDAVServer(name string) {
 // Linux: ~/downloads
 func DefaultDownloadDir() string {
 	// Docker: use the default container path (users mount their volume here)
-	if isRunningInDocker() {
+	if IsRunningInDocker() {
 		return "/home/vget/downloads"
 	}
 
@@ -188,8 +188,8 @@ func DefaultDownloadDir() string {
 	}
 }
 
-// isRunningInDocker detects if we're running inside a Docker container
-func isRunningInDocker() bool {
+// IsRunningInDocker detects if we're running inside a Docker container
+func IsRunningInDocker() bool {
 	// Check for .dockerenv file
 	if _, err := os.Stat("/.dockerenv"); err == nil {
 		return true
