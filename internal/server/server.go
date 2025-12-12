@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
@@ -13,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/guiyumin/vget/internal/core/config"
 	"github.com/guiyumin/vget/internal/core/downloader"
 	"github.com/guiyumin/vget/internal/core/extractor"
@@ -30,7 +30,7 @@ type Response struct {
 
 // DownloadRequest is the request body for POST /download
 type DownloadRequest struct {
-	URL        string `json:"url"`
+	URL        string `json:"url" binding:"required"`
 	Filename   string `json:"filename,omitempty"`
 	ReturnFile bool   `json:"return_file,omitempty"`
 }
@@ -43,6 +43,7 @@ type Server struct {
 	jobQueue  *JobQueue
 	cfg       *config.Config
 	server    *http.Server
+	engine    *gin.Engine
 }
 
 // NewServer creates a new HTTP server
@@ -83,40 +84,44 @@ func (s *Server) Start() error {
 	// Start job queue workers
 	s.jobQueue.Start()
 
-	// Setup routes
-	mux := http.NewServeMux()
+	// Set Gin mode
+	gin.SetMode(gin.ReleaseMode)
+
+	// Create Gin engine
+	s.engine = gin.New()
+
+	// Add middleware
+	s.engine.Use(gin.Recovery())
+	s.engine.Use(s.loggingMiddleware())
+	if s.apiKey != "" {
+		s.engine.Use(s.authMiddleware())
+	}
 
 	// API routes
-	mux.HandleFunc("/health", s.handleHealth)
-	mux.HandleFunc("/download", s.handleDownload)
-	mux.HandleFunc("/status/", s.handleStatus)
-	mux.HandleFunc("/jobs", s.handleJobs)
-	mux.HandleFunc("/jobs/", s.handleJobAction)
-	mux.HandleFunc("/config", s.handleConfig)
-	mux.HandleFunc("/config/webdav", s.handleWebDAVConfig)
-	mux.HandleFunc("/config/webdav/", s.handleWebDAVConfigAction)
-	mux.HandleFunc("/i18n", s.handleI18n)
-	mux.HandleFunc("/kuaidi100", s.handleKuaidi100)
+	s.engine.GET("/health", s.handleHealth)
+	s.engine.POST("/download", s.handleDownload)
+	s.engine.GET("/status/:id", s.handleStatus)
+	s.engine.GET("/jobs", s.handleGetJobs)
+	s.engine.DELETE("/jobs", s.handleClearJobs)
+	s.engine.DELETE("/jobs/:id", s.handleDeleteJob)
+	s.engine.GET("/config", s.handleGetConfig)
+	s.engine.POST("/config", s.handleSetConfig)
+	s.engine.PUT("/config", s.handleUpdateConfig)
+	s.engine.GET("/config/webdav", s.handleGetWebDAV)
+	s.engine.POST("/config/webdav", s.handleAddWebDAV)
+	s.engine.DELETE("/config/webdav/:name", s.handleDeleteWebDAV)
+	s.engine.GET("/i18n", s.handleI18n)
+	s.engine.POST("/kuaidi100", s.handleKuaidi100)
 
 	// Serve embedded UI if available
 	if distFS := GetDistFS(); distFS != nil {
-		fileServer := http.FileServer(http.FS(distFS))
-		mux.HandleFunc("/", s.handleUI(fileServer, distFS))
+		s.setupStaticFiles(distFS)
 		log.Println("Serving embedded WebUI at /")
 	}
 
-	// Wrap with auth middleware if API key is set
-	var handler http.Handler = mux
-	if s.apiKey != "" {
-		handler = s.authMiddleware(mux)
-	}
-
-	// Add logging middleware
-	handler = s.loggingMiddleware(handler)
-
 	s.server = &http.Server{
 		Addr:         fmt.Sprintf(":%d", s.port),
-		Handler:      handler,
+		Handler:      s.engine,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 0, // No timeout for downloads
 		IdleTimeout:  120 * time.Second,
@@ -139,91 +144,90 @@ func (s *Server) Stop(ctx context.Context) error {
 
 // Middleware
 
-func (s *Server) authMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
+func (s *Server) authMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		path := c.Request.URL.Path
 
 		// Health endpoint doesn't require auth
 		if path == "/health" {
-			next.ServeHTTP(w, r)
+			c.Next()
 			return
 		}
 
 		// UI routes don't require auth (static files and SPA routes)
-		// API routes start with /download, /status, /jobs
 		isAPIRoute := path == "/download" ||
 			strings.HasPrefix(path, "/status/") ||
 			path == "/jobs" ||
 			strings.HasPrefix(path, "/jobs/")
 
 		if !isAPIRoute {
-			next.ServeHTTP(w, r)
+			c.Next()
 			return
 		}
 
-		apiKey := r.Header.Get("X-API-Key")
+		apiKey := c.GetHeader("X-API-Key")
 		if apiKey != s.apiKey {
-			s.writeJSON(w, http.StatusUnauthorized, Response{
+			c.JSON(http.StatusUnauthorized, Response{
 				Code:    401,
 				Data:    nil,
 				Message: "invalid or missing API key",
 			})
+			c.Abort()
 			return
 		}
-		next.ServeHTTP(w, r)
-	})
+		c.Next()
+	}
 }
 
-func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func (s *Server) loggingMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
 		start := time.Now()
-		next.ServeHTTP(w, r)
-		log.Printf("%s %s %s", r.Method, r.URL.Path, time.Since(start))
+		c.Next()
+		log.Printf("%s %s %s", c.Request.Method, c.Request.URL.Path, time.Since(start))
+	}
+}
+
+// setupStaticFiles serves the embedded SPA with fallback to index.html
+func (s *Server) setupStaticFiles(distFS fs.FS) {
+	// Serve static assets
+	s.engine.GET("/assets/*filepath", func(c *gin.Context) {
+		c.FileFromFS(c.Request.URL.Path, http.FS(distFS))
+	})
+
+	// Serve other static files (favicon, etc)
+	s.engine.GET("/vite.svg", func(c *gin.Context) {
+		c.FileFromFS("vite.svg", http.FS(distFS))
+	})
+
+	// Fallback to index.html for SPA routing
+	s.engine.NoRoute(func(c *gin.Context) {
+		// Only serve index.html for non-API routes
+		if strings.HasPrefix(c.Request.URL.Path, "/api") {
+			c.JSON(http.StatusNotFound, Response{
+				Code:    404,
+				Data:    nil,
+				Message: "not found",
+			})
+			return
+		}
+
+		indexFile, err := fs.ReadFile(distFS, "index.html")
+		if err != nil {
+			c.String(http.StatusNotFound, "index.html not found")
+			return
+		}
+
+		c.Header("Content-Type", "text/html; charset=utf-8")
+		c.String(http.StatusOK, string(indexFile))
 	})
 }
 
 // Handlers
 
-// handleUI serves the embedded SPA with fallback to index.html for client-side routing
-func (s *Server) handleUI(fileServer http.Handler, distFS fs.FS) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-
-		// Try to serve the file directly
-		if path != "/" {
-			// Check if file exists
-			cleanPath := strings.TrimPrefix(path, "/")
-			if _, err := fs.Stat(distFS, cleanPath); err == nil {
-				fileServer.ServeHTTP(w, r)
-				return
-			}
-		}
-
-		// Fallback to index.html for SPA routing
-		indexFile, err := fs.ReadFile(distFS, "index.html")
-		if err != nil {
-			http.Error(w, "index.html not found", http.StatusNotFound)
-			return
-		}
-
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write(indexFile)
-	}
-}
-
-func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		s.writeJSON(w, http.StatusMethodNotAllowed, Response{
-			Code:    405,
-			Data:    nil,
-			Message: "method not allowed",
-		})
-		return
-	}
-
-	s.writeJSON(w, http.StatusOK, Response{
+func (s *Server) handleHealth(c *gin.Context) {
+	c.JSON(http.StatusOK, Response{
 		Code: 200,
-		Data: map[string]string{
+		Data: gin.H{
 			"status":  "ok",
 			"version": version.Version,
 		},
@@ -231,45 +235,27 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		s.writeJSON(w, http.StatusMethodNotAllowed, Response{
-			Code:    405,
-			Data:    nil,
-			Message: "method not allowed",
-		})
-		return
-	}
-
+func (s *Server) handleDownload(c *gin.Context) {
 	var req DownloadRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		s.writeJSON(w, http.StatusBadRequest, Response{
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, Response{
 			Code:    400,
 			Data:    nil,
-			Message: "invalid request body",
-		})
-		return
-	}
-
-	if req.URL == "" {
-		s.writeJSON(w, http.StatusBadRequest, Response{
-			Code:    400,
-			Data:    nil,
-			Message: "url is required",
+			Message: "invalid request body: url is required",
 		})
 		return
 	}
 
 	// If return_file is true, download and stream directly
 	if req.ReturnFile {
-		s.downloadAndStream(w, req.URL, req.Filename)
+		s.downloadAndStream(c, req.URL, req.Filename)
 		return
 	}
 
 	// Otherwise, queue the download
 	job, err := s.jobQueue.AddJob(req.URL, req.Filename)
 	if err != nil {
-		s.writeJSON(w, http.StatusInternalServerError, Response{
+		c.JSON(http.StatusInternalServerError, Response{
 			Code:    500,
 			Data:    nil,
 			Message: err.Error(),
@@ -277,9 +263,9 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.writeJSON(w, http.StatusOK, Response{
+	c.JSON(http.StatusOK, Response{
 		Code: 200,
-		Data: map[string]interface{}{
+		Data: gin.H{
 			"id":     job.ID,
 			"status": job.Status,
 		},
@@ -287,30 +273,12 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		s.writeJSON(w, http.StatusMethodNotAllowed, Response{
-			Code:    405,
-			Data:    nil,
-			Message: "method not allowed",
-		})
-		return
-	}
-
-	// Extract job ID from path: /status/{id}
-	id := strings.TrimPrefix(r.URL.Path, "/status/")
-	if id == "" {
-		s.writeJSON(w, http.StatusBadRequest, Response{
-			Code:    400,
-			Data:    nil,
-			Message: "job id is required",
-		})
-		return
-	}
+func (s *Server) handleStatus(c *gin.Context) {
+	id := c.Param("id")
 
 	job := s.jobQueue.GetJob(id)
 	if job == nil {
-		s.writeJSON(w, http.StatusNotFound, Response{
+		c.JSON(http.StatusNotFound, Response{
 			Code:    404,
 			Data:    nil,
 			Message: "job not found",
@@ -318,9 +286,9 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.writeJSON(w, http.StatusOK, Response{
+	c.JSON(http.StatusOK, Response{
 		Code: 200,
-		Data: map[string]interface{}{
+		Data: gin.H{
 			"id":       job.ID,
 			"status":   job.Status,
 			"progress": job.Progress,
@@ -331,94 +299,72 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		jobs := s.jobQueue.GetAllJobs()
+func (s *Server) handleGetJobs(c *gin.Context) {
+	jobs := s.jobQueue.GetAllJobs()
 
-		jobList := make([]map[string]interface{}, len(jobs))
-		for i, job := range jobs {
-			jobList[i] = map[string]interface{}{
-				"id":         job.ID,
-				"url":        job.URL,
-				"status":     job.Status,
-				"progress":   job.Progress,
-				"downloaded": job.Downloaded,
-				"total":      job.Total,
-				"filename":   job.Filename,
-				"error":      job.Error,
-			}
+	jobList := make([]gin.H, len(jobs))
+	for i, job := range jobs {
+		jobList[i] = gin.H{
+			"id":         job.ID,
+			"url":        job.URL,
+			"status":     job.Status,
+			"progress":   job.Progress,
+			"downloaded": job.Downloaded,
+			"total":      job.Total,
+			"filename":   job.Filename,
+			"error":      job.Error,
 		}
+	}
 
-		s.writeJSON(w, http.StatusOK, Response{
-			Code: 200,
-			Data: map[string]interface{}{
-				"jobs": jobList,
-			},
-			Message: fmt.Sprintf("%d jobs found", len(jobs)),
+	c.JSON(http.StatusOK, Response{
+		Code: 200,
+		Data: gin.H{
+			"jobs": jobList,
+		},
+		Message: fmt.Sprintf("%d jobs found", len(jobs)),
+	})
+}
+
+func (s *Server) handleClearJobs(c *gin.Context) {
+	count := s.jobQueue.ClearHistory()
+	c.JSON(http.StatusOK, Response{
+		Code: 200,
+		Data: gin.H{
+			"cleared": count,
+		},
+		Message: fmt.Sprintf("%d jobs cleared", count),
+	})
+}
+
+func (s *Server) handleDeleteJob(c *gin.Context) {
+	id := c.Param("id")
+
+	// Try to cancel active job first, then try to remove finished job
+	if s.jobQueue.CancelJob(id) {
+		c.JSON(http.StatusOK, Response{
+			Code:    200,
+			Data:    gin.H{"id": id},
+			Message: "job cancelled",
 		})
-
-	case http.MethodDelete:
-		// Clear all completed, failed, and cancelled jobs
-		count := s.jobQueue.ClearHistory()
-		s.writeJSON(w, http.StatusOK, Response{
-			Code: 200,
-			Data: map[string]interface{}{
-				"cleared": count,
-			},
-			Message: fmt.Sprintf("%d jobs cleared", count),
+	} else if s.jobQueue.RemoveJob(id) {
+		c.JSON(http.StatusOK, Response{
+			Code:    200,
+			Data:    gin.H{"id": id},
+			Message: "job removed",
 		})
-
-	default:
-		s.writeJSON(w, http.StatusMethodNotAllowed, Response{
-			Code:    405,
+	} else {
+		c.JSON(http.StatusNotFound, Response{
+			Code:    404,
 			Data:    nil,
-			Message: "method not allowed",
+			Message: "job not found or cannot be cancelled/removed",
 		})
 	}
 }
 
-func (s *Server) handleJobAction(w http.ResponseWriter, r *http.Request) {
-	// Extract job ID from path: /jobs/{id}
-	id := strings.TrimPrefix(r.URL.Path, "/jobs/")
-	if id == "" {
-		s.writeJSON(w, http.StatusBadRequest, Response{
-			Code:    400,
-			Data:    nil,
-			Message: "job id is required",
-		})
-		return
-	}
-
-	switch r.Method {
-	case http.MethodDelete:
-		// Try to cancel active job first, then try to remove finished job
-		if s.jobQueue.CancelJob(id) {
-			s.writeJSON(w, http.StatusOK, Response{
-				Code:    200,
-				Data:    map[string]string{"id": id},
-				Message: "job cancelled",
-			})
-		} else if s.jobQueue.RemoveJob(id) {
-			s.writeJSON(w, http.StatusOK, Response{
-				Code:    200,
-				Data:    map[string]string{"id": id},
-				Message: "job removed",
-			})
-		} else {
-			s.writeJSON(w, http.StatusNotFound, Response{
-				Code:    404,
-				Data:    nil,
-				Message: "job not found or cannot be cancelled/removed",
-			})
-		}
-	default:
-		s.writeJSON(w, http.StatusMethodNotAllowed, Response{
-			Code:    405,
-			Data:    nil,
-			Message: "method not allowed",
-		})
-	}
+// ConfigSetRequest is the request body for POST /config
+type ConfigSetRequest struct {
+	Key   string `json:"key" binding:"required"`
+	Value string `json:"value"`
 }
 
 // ConfigRequest is the request body for PUT /config
@@ -426,175 +372,136 @@ type ConfigRequest struct {
 	OutputDir string `json:"output_dir,omitempty"`
 }
 
-// ConfigSetRequest is the request body for POST /config (set individual key)
-type ConfigSetRequest struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-}
+func (s *Server) handleGetConfig(c *gin.Context) {
+	cfg := config.LoadOrDefault()
 
-func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		// Return current config (reload fresh)
-		cfg := config.LoadOrDefault()
-
-		// Convert WebDAV servers to a simpler format for JSON
-		webdavServers := make(map[string]map[string]string)
-		for name, server := range cfg.WebDAVServers {
-			webdavServers[name] = map[string]string{
-				"url":      server.URL,
-				"username": server.Username,
-				"password": server.Password,
-			}
+	// Convert WebDAV servers to a simpler format for JSON
+	webdavServers := make(map[string]map[string]string)
+	for name, server := range cfg.WebDAVServers {
+		webdavServers[name] = map[string]string{
+			"url":      server.URL,
+			"username": server.Username,
+			"password": server.Password,
 		}
-
-		s.writeJSON(w, http.StatusOK, Response{
-			Code: 200,
-			Data: map[string]interface{}{
-				"output_dir":            s.outputDir,
-				"language":              cfg.Language,
-				"format":                cfg.Format,
-				"quality":               cfg.Quality,
-				"twitter_auth_token":    cfg.Twitter.AuthToken,
-				"server_port":           cfg.Server.Port,
-				"server_max_concurrent": cfg.Server.MaxConcurrent,
-				"server_api_key":        cfg.Server.APIKey,
-				"webdav_servers":        webdavServers,
-				"express":               cfg.Express,
-			},
-			Message: "config retrieved",
-		})
-
-	case http.MethodPost:
-		// Set individual config key (for Docker/UI usage)
-		var req ConfigSetRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			s.writeJSON(w, http.StatusBadRequest, Response{
-				Code:    400,
-				Data:    nil,
-				Message: "invalid request body",
-			})
-			return
-		}
-
-		if req.Key == "" {
-			s.writeJSON(w, http.StatusBadRequest, Response{
-				Code:    400,
-				Data:    nil,
-				Message: "key is required",
-			})
-			return
-		}
-
-		// Load current config, update, save
-		cfg := config.LoadOrDefault()
-		if err := s.setConfigValue(cfg, req.Key, req.Value); err != nil {
-			s.writeJSON(w, http.StatusBadRequest, Response{
-				Code:    400,
-				Data:    nil,
-				Message: err.Error(),
-			})
-			return
-		}
-
-		if err := config.Save(cfg); err != nil {
-			s.writeJSON(w, http.StatusInternalServerError, Response{
-				Code:    500,
-				Data:    nil,
-				Message: fmt.Sprintf("failed to save config: %v", err),
-			})
-			return
-		}
-
-		// Update server's cached config
-		s.cfg = cfg
-
-		// Special handling for output_dir - validate and create directory, then update runtime values
-		if req.Key == "output_dir" {
-			// Validate the directory exists or can be created
-			if err := os.MkdirAll(req.Value, 0755); err != nil {
-				s.writeJSON(w, http.StatusBadRequest, Response{
-					Code:    400,
-					Data:    nil,
-					Message: fmt.Sprintf("invalid output directory: %v", err),
-				})
-				return
-			}
-			s.outputDir = req.Value
-			s.jobQueue.outputDir = req.Value
-		}
-
-		s.writeJSON(w, http.StatusOK, Response{
-			Code: 200,
-			Data: map[string]interface{}{
-				"key":   req.Key,
-				"value": req.Value,
-			},
-			Message: fmt.Sprintf("config %s updated", req.Key),
-		})
-
-	case http.MethodPut:
-		var req ConfigRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			s.writeJSON(w, http.StatusBadRequest, Response{
-				Code:    400,
-				Data:    nil,
-				Message: "invalid request body",
-			})
-			return
-		}
-
-		if req.OutputDir != "" {
-			// Validate the directory exists or can be created
-			if err := os.MkdirAll(req.OutputDir, 0755); err != nil {
-				s.writeJSON(w, http.StatusBadRequest, Response{
-					Code:    400,
-					Data:    nil,
-					Message: fmt.Sprintf("invalid output directory: %v", err),
-				})
-				return
-			}
-
-			// Update server's output directory
-			s.outputDir = req.OutputDir
-			s.jobQueue.outputDir = req.OutputDir
-
-			// Save to config file
-			cfg := config.LoadOrDefault()
-			cfg.OutputDir = req.OutputDir
-			if err := config.Save(cfg); err != nil {
-				log.Printf("Warning: failed to save config: %v", err)
-			}
-		}
-
-		s.writeJSON(w, http.StatusOK, Response{
-			Code: 200,
-			Data: map[string]interface{}{
-				"output_dir": s.outputDir,
-			},
-			Message: "config updated",
-		})
-
-	default:
-		s.writeJSON(w, http.StatusMethodNotAllowed, Response{
-			Code:    405,
-			Data:    nil,
-			Message: "method not allowed",
-		})
 	}
+
+	c.JSON(http.StatusOK, Response{
+		Code: 200,
+		Data: gin.H{
+			"output_dir":            s.outputDir,
+			"language":              cfg.Language,
+			"format":                cfg.Format,
+			"quality":               cfg.Quality,
+			"twitter_auth_token":    cfg.Twitter.AuthToken,
+			"server_port":           cfg.Server.Port,
+			"server_max_concurrent": cfg.Server.MaxConcurrent,
+			"server_api_key":        cfg.Server.APIKey,
+			"webdav_servers":        webdavServers,
+			"express":               cfg.Express,
+		},
+		Message: "config retrieved",
+	})
 }
 
-func (s *Server) handleI18n(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		s.writeJSON(w, http.StatusMethodNotAllowed, Response{
-			Code:    405,
+func (s *Server) handleSetConfig(c *gin.Context) {
+	var req ConfigSetRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, Response{
+			Code:    400,
 			Data:    nil,
-			Message: "method not allowed",
+			Message: "invalid request body: key is required",
 		})
 		return
 	}
 
-	// Get translations for the configured language
+	// Load current config, update, save
+	cfg := config.LoadOrDefault()
+	if err := s.setConfigValue(cfg, req.Key, req.Value); err != nil {
+		c.JSON(http.StatusBadRequest, Response{
+			Code:    400,
+			Data:    nil,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	if err := config.Save(cfg); err != nil {
+		c.JSON(http.StatusInternalServerError, Response{
+			Code:    500,
+			Data:    nil,
+			Message: fmt.Sprintf("failed to save config: %v", err),
+		})
+		return
+	}
+
+	// Update server's cached config
+	s.cfg = cfg
+
+	// Special handling for output_dir
+	if req.Key == "output_dir" {
+		if err := os.MkdirAll(req.Value, 0755); err != nil {
+			c.JSON(http.StatusBadRequest, Response{
+				Code:    400,
+				Data:    nil,
+				Message: fmt.Sprintf("invalid output directory: %v", err),
+			})
+			return
+		}
+		s.outputDir = req.Value
+		s.jobQueue.outputDir = req.Value
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Code: 200,
+		Data: gin.H{
+			"key":   req.Key,
+			"value": req.Value,
+		},
+		Message: fmt.Sprintf("config %s updated", req.Key),
+	})
+}
+
+func (s *Server) handleUpdateConfig(c *gin.Context) {
+	var req ConfigRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, Response{
+			Code:    400,
+			Data:    nil,
+			Message: "invalid request body",
+		})
+		return
+	}
+
+	if req.OutputDir != "" {
+		if err := os.MkdirAll(req.OutputDir, 0755); err != nil {
+			c.JSON(http.StatusBadRequest, Response{
+				Code:    400,
+				Data:    nil,
+				Message: fmt.Sprintf("invalid output directory: %v", err),
+			})
+			return
+		}
+
+		s.outputDir = req.OutputDir
+		s.jobQueue.outputDir = req.OutputDir
+
+		cfg := config.LoadOrDefault()
+		cfg.OutputDir = req.OutputDir
+		if err := config.Save(cfg); err != nil {
+			log.Printf("Warning: failed to save config: %v", err)
+		}
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Code: 200,
+		Data: gin.H{
+			"output_dir": s.outputDir,
+		},
+		Message: "config updated",
+	})
+}
+
+func (s *Server) handleI18n(c *gin.Context) {
 	lang := s.cfg.Language
 	if lang == "" {
 		lang = "zh"
@@ -602,9 +509,9 @@ func (s *Server) handleI18n(w http.ResponseWriter, r *http.Request) {
 
 	t := i18n.GetTranslations(lang)
 
-	s.writeJSON(w, http.StatusOK, Response{
+	c.JSON(http.StatusOK, Response{
 		Code: 200,
-		Data: map[string]interface{}{
+		Data: gin.H{
 			"language":      lang,
 			"ui":            t.UI,
 			"server":        t.Server,
@@ -614,11 +521,174 @@ func (s *Server) handleI18n(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// WebDAV handlers
+
+// WebDAVConfigRequest is the request body for WebDAV server operations
+type WebDAVConfigRequest struct {
+	Name     string `json:"name" binding:"required"`
+	URL      string `json:"url" binding:"required"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+func (s *Server) handleGetWebDAV(c *gin.Context) {
+	cfg := config.LoadOrDefault()
+
+	servers := make(map[string]map[string]string)
+	for name, server := range cfg.WebDAVServers {
+		servers[name] = map[string]string{
+			"url":      server.URL,
+			"username": server.Username,
+			"password": server.Password,
+		}
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Code:    200,
+		Data:    servers,
+		Message: "webdav servers retrieved",
+	})
+}
+
+func (s *Server) handleAddWebDAV(c *gin.Context) {
+	var req WebDAVConfigRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, Response{
+			Code:    400,
+			Data:    nil,
+			Message: "name and url are required",
+		})
+		return
+	}
+
+	cfg := config.LoadOrDefault()
+	cfg.SetWebDAVServer(req.Name, config.WebDAVServer{
+		URL:      req.URL,
+		Username: req.Username,
+		Password: req.Password,
+	})
+
+	if err := config.Save(cfg); err != nil {
+		c.JSON(http.StatusInternalServerError, Response{
+			Code:    500,
+			Data:    nil,
+			Message: fmt.Sprintf("failed to save config: %v", err),
+		})
+		return
+	}
+
+	s.cfg = cfg
+	c.JSON(http.StatusOK, Response{
+		Code:    200,
+		Data:    gin.H{"name": req.Name},
+		Message: "webdav server added",
+	})
+}
+
+func (s *Server) handleDeleteWebDAV(c *gin.Context) {
+	name := c.Param("name")
+
+	cfg := config.LoadOrDefault()
+	if cfg.GetWebDAVServer(name) == nil {
+		c.JSON(http.StatusNotFound, Response{
+			Code:    404,
+			Data:    nil,
+			Message: "webdav server not found",
+		})
+		return
+	}
+
+	cfg.DeleteWebDAVServer(name)
+
+	if err := config.Save(cfg); err != nil {
+		c.JSON(http.StatusInternalServerError, Response{
+			Code:    500,
+			Data:    nil,
+			Message: fmt.Sprintf("failed to save config: %v", err),
+		})
+		return
+	}
+
+	s.cfg = cfg
+	c.JSON(http.StatusOK, Response{
+		Code:    200,
+		Data:    gin.H{"name": name},
+		Message: "webdav server deleted",
+	})
+}
+
+// Kuaidi100 handler
+
+// TrackRequest is the request body for POST /kuaidi100
+type TrackRequest struct {
+	TrackingNumber string `json:"tracking_number" binding:"required"`
+	Courier        string `json:"courier" binding:"required"`
+}
+
+func (s *Server) handleKuaidi100(c *gin.Context) {
+	var req TrackRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, Response{
+			Code:    400,
+			Data:    nil,
+			Message: "tracking_number and courier are required",
+		})
+		return
+	}
+
+	// Load config to get kuaidi100 credentials
+	cfg := config.LoadOrDefault()
+	expressCfg := cfg.GetExpressConfig("kuaidi100")
+	if expressCfg == nil || expressCfg["key"] == "" || expressCfg["customer"] == "" {
+		c.JSON(http.StatusBadRequest, Response{
+			Code:    400,
+			Data:    nil,
+			Message: "快递100凭证未配置。请在设置中配置 API Key 和 Customer ID。",
+		})
+		return
+	}
+
+	// Create tracker and query
+	t := tracker.NewKuaidi100Tracker(expressCfg["key"], expressCfg["customer"])
+	courierCode := tracker.GetCourierCode(req.Courier)
+
+	result, err := t.Track(courierCode, req.TrackingNumber)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, Response{
+			Code:    500,
+			Data:    nil,
+			Message: fmt.Sprintf("tracking failed: %v", err),
+		})
+		return
+	}
+
+	// Get courier info for display
+	courierInfo := tracker.GetCourierInfo(req.Courier)
+	courierName := courierCode
+	if courierInfo != nil {
+		courierName = courierInfo.Name
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Code: 200,
+		Data: gin.H{
+			"tracking_number": result.Nu,
+			"courier_code":    result.Com,
+			"courier_name":    courierName,
+			"state":           result.State,
+			"state_desc":      result.StateDescription(),
+			"is_delivered":    result.IsDelivered(),
+			"data":            result.Data,
+		},
+		Message: "tracking info retrieved",
+	})
+}
+
 // Helper functions
 
-// setConfigValue sets a config value by key (mirrors cli/config.go logic)
+// setConfigValue sets a config value by key
 func (s *Server) setConfigValue(cfg *config.Config, key, value string) error {
-	// Handle express.<provider>.<key> pattern (e.g., express.kuaidi100.key)
+	// Handle express.<provider>.<key> pattern
 	if strings.HasPrefix(key, "express.") {
 		parts := strings.SplitN(key, ".", 3)
 		if len(parts) != 3 {
@@ -655,153 +725,11 @@ func (s *Server) setConfigValue(cfg *config.Config, key, value string) error {
 	return nil
 }
 
-func (s *Server) writeJSON(w http.ResponseWriter, statusCode int, resp Response) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(resp)
-}
-
-// WebDAVConfigRequest is the request body for WebDAV server operations
-type WebDAVConfigRequest struct {
-	Name     string `json:"name"`
-	URL      string `json:"url"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-// handleWebDAVConfig handles listing and adding WebDAV servers
-func (s *Server) handleWebDAVConfig(w http.ResponseWriter, r *http.Request) {
-	cfg := config.LoadOrDefault()
-
-	switch r.Method {
-	case http.MethodGet:
-		// List all WebDAV servers
-		servers := make(map[string]map[string]string)
-		for name, server := range cfg.WebDAVServers {
-			servers[name] = map[string]string{
-				"url":      server.URL,
-				"username": server.Username,
-				"password": server.Password,
-			}
-		}
-		s.writeJSON(w, http.StatusOK, Response{
-			Code:    200,
-			Data:    servers,
-			Message: "webdav servers retrieved",
-		})
-
-	case http.MethodPost:
-		// Add a new WebDAV server
-		var req WebDAVConfigRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			s.writeJSON(w, http.StatusBadRequest, Response{
-				Code:    400,
-				Data:    nil,
-				Message: "invalid request body",
-			})
-			return
-		}
-
-		if req.Name == "" || req.URL == "" {
-			s.writeJSON(w, http.StatusBadRequest, Response{
-				Code:    400,
-				Data:    nil,
-				Message: "name and url are required",
-			})
-			return
-		}
-
-		cfg.SetWebDAVServer(req.Name, config.WebDAVServer{
-			URL:      req.URL,
-			Username: req.Username,
-			Password: req.Password,
-		})
-
-		if err := config.Save(cfg); err != nil {
-			s.writeJSON(w, http.StatusInternalServerError, Response{
-				Code:    500,
-				Data:    nil,
-				Message: fmt.Sprintf("failed to save config: %v", err),
-			})
-			return
-		}
-
-		s.cfg = cfg
-		s.writeJSON(w, http.StatusOK, Response{
-			Code:    200,
-			Data:    map[string]string{"name": req.Name},
-			Message: "webdav server added",
-		})
-
-	default:
-		s.writeJSON(w, http.StatusMethodNotAllowed, Response{
-			Code:    405,
-			Data:    nil,
-			Message: "method not allowed",
-		})
-	}
-}
-
-// handleWebDAVConfigAction handles updating and deleting individual WebDAV servers
-func (s *Server) handleWebDAVConfigAction(w http.ResponseWriter, r *http.Request) {
-	// Extract server name from path: /config/webdav/{name}
-	name := strings.TrimPrefix(r.URL.Path, "/config/webdav/")
-	if name == "" {
-		s.writeJSON(w, http.StatusBadRequest, Response{
-			Code:    400,
-			Data:    nil,
-			Message: "server name is required",
-		})
-		return
-	}
-
-	cfg := config.LoadOrDefault()
-
-	switch r.Method {
-	case http.MethodDelete:
-		// Delete WebDAV server
-		if cfg.GetWebDAVServer(name) == nil {
-			s.writeJSON(w, http.StatusNotFound, Response{
-				Code:    404,
-				Data:    nil,
-				Message: "webdav server not found",
-			})
-			return
-		}
-
-		cfg.DeleteWebDAVServer(name)
-
-		if err := config.Save(cfg); err != nil {
-			s.writeJSON(w, http.StatusInternalServerError, Response{
-				Code:    500,
-				Data:    nil,
-				Message: fmt.Sprintf("failed to save config: %v", err),
-			})
-			return
-		}
-
-		s.cfg = cfg
-		s.writeJSON(w, http.StatusOK, Response{
-			Code:    200,
-			Data:    map[string]string{"name": name},
-			Message: "webdav server deleted",
-		})
-
-	default:
-		s.writeJSON(w, http.StatusMethodNotAllowed, Response{
-			Code:    405,
-			Data:    nil,
-			Message: "method not allowed",
-		})
-	}
-}
-
 // downloadWithExtractor is the download function used by the job queue
 func (s *Server) downloadWithExtractor(ctx context.Context, url, filename string, progressFn func(downloaded, total int64)) error {
 	// Find matching extractor
 	ext := extractor.Match(url)
 	if ext == nil {
-		// Try sites.yml for configured sites
 		sitesConfig, _ := config.LoadSites()
 		if sitesConfig != nil {
 			if site := sitesConfig.MatchSite(url); site != nil {
@@ -833,7 +761,6 @@ func (s *Server) downloadWithExtractor(ctx context.Context, url, filename string
 
 	switch m := media.(type) {
 	case *extractor.YouTubeDirectDownload:
-		// YouTube: use yt-dlp directly for download with progress tracking
 		return extractor.DownloadWithYtdlpProgress(ctx, m.URL, s.outputDir, progressFn)
 
 	case *extractor.VideoMedia:
@@ -859,7 +786,6 @@ func (s *Server) downloadWithExtractor(ctx context.Context, url, filename string
 			}
 		}
 
-		// Update job filename
 		s.updateJobFilename(url, outputPath)
 
 	case *extractor.AudioMedia:
@@ -883,21 +809,18 @@ func (s *Server) downloadWithExtractor(ctx context.Context, url, filename string
 			return fmt.Errorf("no images available")
 		}
 
-		// Download all images
 		title := extractor.SanitizeFilename(m.Title)
 		var filenames []string
 
 		for i, img := range m.Images {
 			var imgPath string
 			if len(m.Images) == 1 {
-				// Single image - no index suffix
 				if title != "" {
 					imgPath = filepath.Join(s.outputDir, fmt.Sprintf("%s.%s", title, img.Ext))
 				} else {
 					imgPath = filepath.Join(s.outputDir, fmt.Sprintf("%s.%s", m.ID, img.Ext))
 				}
 			} else {
-				// Multiple images - add index suffix
 				if title != "" {
 					imgPath = filepath.Join(s.outputDir, fmt.Sprintf("%s_%d.%s", title, i+1, img.Ext))
 				} else {
@@ -907,40 +830,35 @@ func (s *Server) downloadWithExtractor(ctx context.Context, url, filename string
 
 			filenames = append(filenames, imgPath)
 
-			// Download this image
 			if err := downloadFile(ctx, img.URL, imgPath, nil, nil); err != nil {
 				return fmt.Errorf("failed to download image %d: %w", i+1, err)
 			}
 		}
 
-		// Update job filename to show all files
 		s.updateJobFilename(url, strings.Join(filenames, ", "))
-		return nil // Already downloaded all images
+		return nil
 
 	default:
 		return fmt.Errorf("unsupported media type")
 	}
 
-	// Check if this is an HLS stream (m3u8)
+	// Check if this is an HLS stream
 	if strings.HasSuffix(strings.ToLower(downloadURL), ".m3u8") ||
 		strings.Contains(strings.ToLower(downloadURL), ".m3u8?") {
 		finalPath, err := downloader.DownloadHLSWithProgress(ctx, downloadURL, outputPath, headers, progressFn)
 		if err != nil {
 			return err
 		}
-		// Update job filename if conversion changed the path (e.g., .ts -> .mp4)
 		if finalPath != outputPath {
 			s.updateJobFilename(url, finalPath)
 		}
 		return nil
 	}
 
-	// Perform regular download
 	return downloadFile(ctx, downloadURL, outputPath, headers, progressFn)
 }
 
 func (s *Server) updateJobFilename(url, filename string) {
-	// Find job by URL and update filename
 	jobs := s.jobQueue.GetAllJobs()
 	for _, job := range jobs {
 		if job.URL == url {
@@ -955,8 +873,7 @@ func (s *Server) updateJobFilename(url, filename string) {
 }
 
 // downloadAndStream extracts and streams the file directly to the response
-func (s *Server) downloadAndStream(w http.ResponseWriter, url, filename string) {
-	// Find matching extractor
+func (s *Server) downloadAndStream(c *gin.Context, url, filename string) {
 	ext := extractor.Match(url)
 	if ext == nil {
 		sitesConfig, _ := config.LoadSites()
@@ -970,17 +887,15 @@ func (s *Server) downloadAndStream(w http.ResponseWriter, url, filename string) 
 		}
 	}
 
-	// Configure Twitter extractor
 	if twitterExt, ok := ext.(*extractor.TwitterExtractor); ok {
 		if s.cfg.Twitter.AuthToken != "" {
 			twitterExt.SetAuth(s.cfg.Twitter.AuthToken)
 		}
 	}
 
-	// Extract media info
 	media, err := ext.Extract(url)
 	if err != nil {
-		s.writeJSON(w, http.StatusInternalServerError, Response{
+		c.JSON(http.StatusInternalServerError, Response{
 			Code:    500,
 			Data:    nil,
 			Message: fmt.Sprintf("extraction failed: %v", err),
@@ -994,8 +909,7 @@ func (s *Server) downloadAndStream(w http.ResponseWriter, url, filename string) 
 
 	switch m := media.(type) {
 	case *extractor.YouTubeDirectDownload:
-		// YouTube requires yt-dlp; streaming not supported
-		s.writeJSON(w, http.StatusBadRequest, Response{
+		c.JSON(http.StatusBadRequest, Response{
 			Code:    400,
 			Data:    nil,
 			Message: "YouTube streaming not supported. Use queued download instead.",
@@ -1004,7 +918,7 @@ func (s *Server) downloadAndStream(w http.ResponseWriter, url, filename string) 
 
 	case *extractor.VideoMedia:
 		if len(m.Formats) == 0 {
-			s.writeJSON(w, http.StatusInternalServerError, Response{
+			c.JSON(http.StatusInternalServerError, Response{
 				Code:    500,
 				Data:    nil,
 				Message: "no video formats available",
@@ -1045,7 +959,7 @@ func (s *Server) downloadAndStream(w http.ResponseWriter, url, filename string) 
 
 	case *extractor.ImageMedia:
 		if len(m.Images) == 0 {
-			s.writeJSON(w, http.StatusInternalServerError, Response{
+			c.JSON(http.StatusInternalServerError, Response{
 				Code:    500,
 				Data:    nil,
 				Message: "no images available",
@@ -1066,7 +980,7 @@ func (s *Server) downloadAndStream(w http.ResponseWriter, url, filename string) 
 		}
 
 	default:
-		s.writeJSON(w, http.StatusInternalServerError, Response{
+		c.JSON(http.StatusInternalServerError, Response{
 			Code:    500,
 			Data:    nil,
 			Message: "unsupported media type",
@@ -1074,8 +988,7 @@ func (s *Server) downloadAndStream(w http.ResponseWriter, url, filename string) 
 		return
 	}
 
-	// Stream the file
-	streamFile(w, downloadURL, outputFilename, headers)
+	streamFile(c.Writer, downloadURL, outputFilename, headers)
 }
 
 func selectBestFormat(formats []extractor.VideoFormat) *extractor.VideoFormat {
@@ -1083,7 +996,6 @@ func selectBestFormat(formats []extractor.VideoFormat) *extractor.VideoFormat {
 		return nil
 	}
 
-	// Prefer formats with audio
 	var bestWithAudio *extractor.VideoFormat
 	for i := range formats {
 		f := &formats[i]
@@ -1097,7 +1009,6 @@ func selectBestFormat(formats []extractor.VideoFormat) *extractor.VideoFormat {
 		return bestWithAudio
 	}
 
-	// Fall back to highest bitrate
 	best := &formats[0]
 	for i := range formats {
 		if formats[i].Bitrate > best.Bitrate {
@@ -1120,7 +1031,6 @@ func downloadFile(ctx context.Context, url, outputPath string, headers map[strin
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Set headers
 	if len(headers) > 0 {
 		for key, value := range headers {
 			req.Header.Set(key, value)
@@ -1141,19 +1051,16 @@ func downloadFile(ctx context.Context, url, outputPath string, headers map[strin
 
 	total := resp.ContentLength
 
-	// Create output file
 	file, err := os.Create(outputPath)
 	if err != nil {
 		return fmt.Errorf("failed to create output file: %w", err)
 	}
 	defer file.Close()
 
-	// Download with progress tracking
 	buf := make([]byte, 32*1024)
 	var downloaded int64
 
 	for {
-		// Check for context cancellation
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -1216,7 +1123,6 @@ func streamFile(w http.ResponseWriter, url, filename string, headers map[string]
 		return
 	}
 
-	// Set response headers
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
 	if resp.ContentLength > 0 {
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", resp.ContentLength))
@@ -1226,97 +1132,4 @@ func streamFile(w http.ResponseWriter, url, filename string, headers map[string]
 	}
 
 	io.Copy(w, resp.Body)
-}
-
-// TrackRequest is the request body for POST /track
-type TrackRequest struct {
-	TrackingNumber string `json:"tracking_number"`
-	Courier        string `json:"courier"`
-}
-
-// handleKuaidi100 handles kuaidi100 package tracking requests
-func (s *Server) handleKuaidi100(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		s.writeJSON(w, http.StatusMethodNotAllowed, Response{
-			Code:    405,
-			Data:    nil,
-			Message: "method not allowed",
-		})
-		return
-	}
-
-	var req TrackRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		s.writeJSON(w, http.StatusBadRequest, Response{
-			Code:    400,
-			Data:    nil,
-			Message: "invalid request body",
-		})
-		return
-	}
-
-	if req.TrackingNumber == "" {
-		s.writeJSON(w, http.StatusBadRequest, Response{
-			Code:    400,
-			Data:    nil,
-			Message: "tracking_number is required",
-		})
-		return
-	}
-
-	if req.Courier == "" {
-		s.writeJSON(w, http.StatusBadRequest, Response{
-			Code:    400,
-			Data:    nil,
-			Message: "courier is required",
-		})
-		return
-	}
-
-	// Load config to get kuaidi100 credentials
-	cfg := config.LoadOrDefault()
-	expressCfg := cfg.GetExpressConfig("kuaidi100")
-	if expressCfg == nil || expressCfg["key"] == "" || expressCfg["customer"] == "" {
-		s.writeJSON(w, http.StatusBadRequest, Response{
-			Code:    400,
-			Data:    nil,
-			Message: "快递100凭证未配置。请在设置中配置 API Key 和 Customer ID。",
-		})
-		return
-	}
-
-	// Create tracker and query
-	t := tracker.NewKuaidi100Tracker(expressCfg["key"], expressCfg["customer"])
-	courierCode := tracker.GetCourierCode(req.Courier)
-
-	result, err := t.Track(courierCode, req.TrackingNumber)
-	if err != nil {
-		s.writeJSON(w, http.StatusInternalServerError, Response{
-			Code:    500,
-			Data:    nil,
-			Message: fmt.Sprintf("tracking failed: %v", err),
-		})
-		return
-	}
-
-	// Get courier info for display
-	courierInfo := tracker.GetCourierInfo(req.Courier)
-	courierName := courierCode
-	if courierInfo != nil {
-		courierName = courierInfo.Name
-	}
-
-	s.writeJSON(w, http.StatusOK, Response{
-		Code: 200,
-		Data: map[string]interface{}{
-			"tracking_number": result.Nu,
-			"courier_code":    result.Com,
-			"courier_name":    courierName,
-			"state":           result.State,
-			"state_desc":      result.StateDescription(),
-			"is_delivered":    result.IsDelivered(),
-			"data":            result.Data,
-		},
-		Message: "tracking info retrieved",
-	})
 }
