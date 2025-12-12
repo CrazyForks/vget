@@ -104,10 +104,7 @@ func RunHLSDownloadWithHeadersTUI(m3u8URL, output, displayID, lang string, heade
 	return nil
 }
 
-// downloadHLS downloads an HLS stream
-func downloadHLS(ctx context.Context, m3u8URL, output string, state *downloadState, config HLSConfig) error {
-	return downloadHLSWithHeaders(ctx, m3u8URL, output, state, config, nil)
-}
+ 
 
 // downloadHLSWithHeaders downloads an HLS stream with custom headers
 func downloadHLSWithHeaders(ctx context.Context, m3u8URL, output string, state *downloadState, config HLSConfig, headers map[string]string) error {
