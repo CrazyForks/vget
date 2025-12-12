@@ -329,12 +329,29 @@ func (e *BrowserExtractor) findInPageSource(page *rod.Page, targetExt string) st
 func (e *BrowserExtractor) createLauncher(headless bool) *launcher.Launcher {
 	userDataDir := e.getUserDataDir()
 
+	// Check for ROD_BROWSER env var (set in Docker)
+	browserPath := os.Getenv("ROD_BROWSER")
+
 	l := launcher.New().
 		Headless(headless).
 		UserDataDir(userDataDir).
 		Set("no-sandbox").
 		Set("disable-gpu").
-		Set("disable-dev-shm-usage")
+		Set("disable-dev-shm-usage").
+		Set("disable-software-rasterizer").
+		Set("disable-extensions").
+		Set("disable-background-networking").
+		Set("disable-sync").
+		Set("disable-translate").
+		Set("no-first-run").
+		Set("safebrowsing-disable-auto-update").
+		Set("window-size", "1920,1080").
+		Set("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+
+	// Explicitly set browser path if provided (required for Docker)
+	if browserPath != "" {
+		l = l.Bin(browserPath)
+	}
 
 	return l
 }

@@ -1,5 +1,5 @@
 # Build stage for UI
-FROM node:22-alpine AS ui-builder
+FROM node:22-slim AS ui-builder
 WORKDIR /app/ui
 COPY ui/package*.json ./
 RUN npm ci
@@ -7,11 +7,8 @@ COPY ui/ ./
 RUN npm run build
 
 # Build stage for Go binary
-FROM golang:1.25.4-alpine AS go-builder
+FROM golang:1.25-bookworm AS go-builder
 WORKDIR /app
-
-# Install build dependencies
-RUN apk add --no-cache git
 
 # Copy go mod files first for caching
 COPY go.mod go.sum ./
@@ -27,7 +24,7 @@ COPY --from=ui-builder /app/ui/dist ./internal/server/dist
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /vget ./cmd/vget
 
 # Final runtime stage
-FROM alpine:3.21
+FROM debian:bookworm-slim
 
 # Install runtime dependencies
 # - ca-certificates: for HTTPS requests
@@ -36,17 +33,18 @@ FROM alpine:3.21
 # - python3/pip: for yt-dlp and youtube-dl
 # - ffmpeg: for merging video/audio streams
 # - nodejs: for yt-dlp JS challenge solving (N parameter)
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     chromium \
-    font-noto-cjk \
-    font-noto-emoji \
-    tzdata \
-    su-exec \
+    fonts-noto-cjk \
+    fonts-noto-color-emoji \
     python3 \
-    py3-pip \
+    python3-pip \
+    python3-venv \
     ffmpeg \
-    nodejs
+    nodejs \
+    gosu \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install yt-dlp and youtube-dl
 RUN pip3 install --no-cache-dir --break-system-packages \
@@ -54,8 +52,8 @@ RUN pip3 install --no-cache-dir --break-system-packages \
     youtube-dl
 
 # Create non-root user
-RUN addgroup -g 1000 vget && \
-    adduser -u 1000 -G vget -h /home/vget -D vget && \
+RUN groupadd -g 1000 vget && \
+    useradd -u 1000 -g vget -m -d /home/vget vget && \
     mkdir -p /home/vget/downloads /home/vget/.config/vget && \
     chown -R vget:vget /home/vget
 
@@ -63,7 +61,7 @@ RUN addgroup -g 1000 vget && \
 COPY --from=go-builder /vget /usr/local/bin/vget
 
 # Tell rod to use system chromium instead of downloading
-ENV ROD_BROWSER=/usr/bin/chromium-browser
+ENV ROD_BROWSER=/usr/bin/chromium
 
 # Copy entrypoint script
 COPY docker/entrypoint.sh /usr/local/bin/
