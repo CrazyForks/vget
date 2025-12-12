@@ -116,7 +116,22 @@ func (e *XiaohongshuExtractor) resolveShortURL(shortURL string) (string, error) 
 	page.MustNavigate(shortURL)
 	page.MustWaitDOMStable()
 
-	return page.MustInfo().URL, nil
+	finalURL := page.MustInfo().URL
+
+	// Check if we got redirected to login page
+	// If so, extract the actual target URL from redirectPath parameter
+	if strings.Contains(finalURL, "/login") {
+		parsedURL, err := url.Parse(finalURL)
+		if err == nil {
+			redirectPath := parsedURL.Query().Get("redirectPath")
+			if redirectPath != "" {
+				// redirectPath is already URL-decoded by Query().Get()
+				return redirectPath, nil
+			}
+		}
+	}
+
+	return finalURL, nil
 }
 
 func (e *XiaohongshuExtractor) extractWithBrowser(targetURL, noteID string) (Media, error) {
