@@ -215,13 +215,16 @@ export default function App() {
   });
 
   return (
-    <div className="max-w-3xl mx-auto w-full h-full flex gap-3 flex-col p-8 bg-zinc-100 dark:bg-zinc-950 min-h-screen text-zinc-900 dark:text-white transition-colors">
-      <header className="flex justify-between items-center mb-8 pb-6 border-b border-zinc-300 dark:border-zinc-700">
+    <div className="max-w-3xl mx-auto w-full h-full flex gap-3 flex-col bg-zinc-100 dark:bg-zinc-950 min-h-screen text-zinc-900 dark:text-white transition-colors">
+      <header className="flex justify-between items-center mt-4 py-2 border-b border-zinc-300 dark:border-zinc-700">
         <div className="flex items-center gap-3">
           <img
             src={logo}
             alt="vget"
-            className={clsx("w-10 h-10 object-contain transition-all", !isConnected && "grayscale opacity-50")}
+            className={clsx(
+              "w-10 h-10 object-contain transition-all",
+              !isConnected && "grayscale opacity-50"
+            )}
           />
           <h1 className="text-2xl font-bold bg-linear-to-br from-amber-400 to-orange-500 bg-clip-text text-transparent">
             VGet Server
@@ -295,11 +298,11 @@ export default function App() {
         <input
           type="text"
           className={clsx(
-              "flex-1 px-3 py-2 border rounded font-mono text-sm transition-colors focus:outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-600",
-              editingDir
-                ? "border-blue-500 bg-zinc-100 dark:bg-zinc-950 text-zinc-900 dark:text-white"
-                : "border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200 cursor-default"
-            )}
+            "flex-1 px-3 py-2 border rounded font-mono text-sm transition-colors focus:outline-none placeholder:text-zinc-400 dark:placeholder:text-zinc-600",
+            editingDir
+              ? "border-blue-500 bg-zinc-100 dark:bg-zinc-950 text-zinc-900 dark:text-white"
+              : "border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200 cursor-default"
+          )}
           value={editingDir ? newOutputDir : outputDir}
           onChange={(e) => setNewOutputDir(e.target.value)}
           onKeyDown={(e) => {
