@@ -233,7 +233,7 @@ func downloadSegmentsOrdered(ctx context.Context, segments []Segment, file *os.F
 				default:
 				}
 
-				data, err := downloadSegment(client, seg.URL, decryptKey, decryptIV, seg.Index, config.BufferSize, headers)
+				data, err := downloadSegment(client, seg.URL, decryptKey, decryptIV, seg.Index, headers)
 				resultsChan <- segmentResult{
 					index: seg.Index,
 					data:  data,
@@ -290,7 +290,7 @@ func downloadSegmentsOrdered(ctx context.Context, segments []Segment, file *os.F
 }
 
 // downloadSegment downloads a single segment
-func downloadSegment(client *http.Client, url string, decryptKey, decryptIV []byte, index, bufferSize int, headers map[string]string) ([]byte, error) {
+func downloadSegment(client *http.Client, url string, decryptKey, decryptIV []byte, index int, headers map[string]string) ([]byte, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -326,11 +326,6 @@ func downloadSegment(client *http.Client, url string, decryptKey, decryptIV []by
 	}
 
 	return data, nil
-}
-
-// fetchKey fetches the encryption key from the URL
-func fetchKey(url string) ([]byte, error) {
-	return fetchKeyWithHeaders(url, nil)
 }
 
 // fetchKeyWithHeaders fetches the encryption key from the URL with custom headers

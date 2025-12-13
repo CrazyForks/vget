@@ -188,7 +188,7 @@ func MultiStreamDownload(ctx context.Context, url, output string, config MultiSt
 	}
 
 	// Calculate chunks
-	chunks := calculateChunks(totalSize, config.Streams, config.ChunkSize)
+	chunks := calculateChunks(totalSize, config.ChunkSize)
 
 	// Create multi-stream state
 	msState := &multiStreamState{
@@ -252,7 +252,7 @@ func MultiStreamDownload(ctx context.Context, url, output string, config MultiSt
 // calculateChunks divides the file into download chunks
 // Uses dynamic chunking - fixed chunk size regardless of file size
 // This keeps all workers busy throughout the download
-func calculateChunks(totalSize int64, streams int, chunkSize int64) []chunk {
+func calculateChunks(totalSize int64, chunkSize int64) []chunk {
 	var chunks []chunk
 
 	// If file is small, just use one chunk
@@ -472,7 +472,7 @@ func MultiStreamDownloadWithAuth(ctx context.Context, url, authHeader, output st
 	}
 
 	// Calculate chunks
-	chunks := calculateChunks(totalSize, config.Streams, config.ChunkSize)
+	chunks := calculateChunks(totalSize, config.ChunkSize)
 
 	// Create multi-stream state
 	msState := &multiStreamState{
