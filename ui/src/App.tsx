@@ -27,6 +27,8 @@ import {
   deleteJob,
   clearHistory,
 } from "./utils/apis";
+import { FaGear } from "react-icons/fa6";
+import { CiLight, CiDark } from "react-icons/ci";
 
 export default function App() {
   const [health, setHealth] = useState<HealthData | null>(null);
@@ -228,14 +230,14 @@ export default function App() {
             onClick={() => setShowConfigEditor(!showConfigEditor)}
             title={t.settings}
           >
-            ⚙️
+            <FaGear />
           </button>
           <button
             className="theme-toggle"
             onClick={() => setDarkMode(!darkMode)}
             title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
           >
-            {darkMode ? "☀️" : "🌙"}
+            {darkMode ? <CiLight /> : <CiDark />}
           </button>
           <span className="version">{health?.version || "..."}</span>
         </div>
@@ -252,7 +254,7 @@ export default function App() {
             className="warning-settings-btn"
             onClick={() => setShowConfigEditor(true)}
           >
-            ⚙️ {t.settings}
+            <FaGear /> {t.settings}
           </button>
         </div>
       )}
