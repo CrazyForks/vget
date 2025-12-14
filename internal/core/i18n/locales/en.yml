@@ -102,6 +102,8 @@ ui:
   cancel: "Cancel"
   paste_url: "Paste URL to download..."
   download: "Download"
+  bulk_download: "Bulk Download"
+  coming_soon: "Coming Soon"
   adding: "Adding..."
   jobs: "Jobs"
   total: "total"

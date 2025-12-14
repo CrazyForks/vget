@@ -90,6 +90,8 @@ ui:
   cancel: "キャンセル"
   paste_url: "URLを貼り付け..."
   download: "ダウンロード"
+  bulk_download: "一括ダウンロード"
+  coming_soon: "近日公開"
   adding: "追加中..."
   jobs: "ジョブ"
   total: "件"

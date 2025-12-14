@@ -102,6 +102,8 @@ ui:
   cancel: "取消"
   paste_url: "粘贴下载链接..."
   download: "下载"
+  bulk_download: "批量下载"
+  coming_soon: "即将推出"
   adding: "添加中..."
   jobs: "任务"
   total: "个"

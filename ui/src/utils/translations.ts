@@ -5,6 +5,8 @@ export interface UITranslations {
   cancel: string;
   paste_url: string;
   download: string;
+  bulk_download: string;
+  coming_soon: string;
   adding: string;
   jobs: string;
   total: string;
@@ -47,6 +49,8 @@ export const defaultTranslations: UITranslations = {
   cancel: "Cancel",
   paste_url: "Paste URL to download...",
   download: "Download",
+  bulk_download: "Bulk Download",
+  coming_soon: "Coming Soon",
   adding: "Adding...",
   jobs: "Jobs",
   total: "total",

@@ -90,6 +90,8 @@ ui:
   cancel: "Cancelar"
   paste_url: "Pegar URL para descargar..."
   download: "Descargar"
+  bulk_download: "Descarga masiva"
+  coming_soon: "Próximamente"
   adding: "Añadiendo..."
   jobs: "Trabajos"
   total: "total"

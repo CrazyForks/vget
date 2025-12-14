@@ -1,12 +1,8 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import clsx from "clsx";
- 
-import {
-  FaDownload,
-  FaGear,
-  FaTruck,
-  
-} from "react-icons/fa6";
+
+import { FaDownload, FaGear, FaTruck, FaLayerGroup } from "react-icons/fa6";
+import { useApp } from "../context/AppContext";
 
 interface SidebarProps {
   lang: string;
@@ -21,24 +17,31 @@ interface NavItem {
 
 export function Sidebar({ lang }: SidebarProps) {
   const location = useLocation();
+  const { t } = useApp();
 
   const navItems: NavItem[] = [
     {
       to: "/",
       icon: <FaDownload />,
-      label: "Download",
+      label: t.download,
+      show: true,
+    },
+    {
+      to: "/bulk",
+      icon: <FaLayerGroup />,
+      label: t.bulk_download,
       show: true,
     },
     {
       to: "/config",
       icon: <FaGear />,
-      label: "Config",
+      label: t.settings,
       show: true,
     },
     {
       to: "/kuaidi100",
       icon: <FaTruck />,
-      label: "Kuaidi100",
+      label: "快递查询",
       show: lang === "zh",
     },
   ];
@@ -72,13 +75,12 @@ export function Sidebar({ lang }: SidebarProps) {
                 )}
               >
                 <span className="text-lg">{item.icon}</span>
-               <span>{item.label}</span>
+                <span>{item.label}</span>
               </Link>
             );
           })}
         </nav>
       </div>
-
     </aside>
   );
 }

@@ -90,6 +90,8 @@ ui:
   cancel: "취소"
   paste_url: "URL을 붙여넣기..."
   download: "다운로드"
+  bulk_download: "대량 다운로드"
+  coming_soon: "곧 출시 예정"
   adding: "추가 중..."
   jobs: "작업"
   total: "개"
