@@ -141,8 +141,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setKuaidi100Customer(kuaidi100Cfg?.customer || "");
       }
       if (i18nRes.code === 200) {
-        setT(i18nRes.data.ui);
-        setServerT(i18nRes.data.server);
+        // Merge with defaults to ensure new keys are available
+        setT({ ...defaultTranslations, ...i18nRes.data.ui });
+        setServerT({ ...defaultServerTranslations, ...i18nRes.data.server });
         setConfigExists(i18nRes.data.config_exists);
       }
     } catch {

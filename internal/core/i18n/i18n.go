@@ -136,6 +136,8 @@ type UITranslations struct {
 	Cancel           string `yaml:"cancel" json:"cancel"`
 	PasteURL         string `yaml:"paste_url" json:"paste_url"`
 	Download         string `yaml:"download" json:"download"`
+	BulkDownload     string `yaml:"bulk_download" json:"bulk_download"`
+	ComingSoon       string `yaml:"coming_soon" json:"coming_soon"`
 	Adding           string `yaml:"adding" json:"adding"`
 	Jobs             string `yaml:"jobs" json:"jobs"`
 	Total            string `yaml:"total" json:"total"`
