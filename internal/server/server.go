@@ -98,20 +98,21 @@ func (s *Server) Start() error {
 	}
 
 	// API routes
-	s.engine.GET("/health", s.handleHealth)
-	s.engine.POST("/download", s.handleDownload)
-	s.engine.GET("/status/:id", s.handleStatus)
-	s.engine.GET("/jobs", s.handleGetJobs)
-	s.engine.DELETE("/jobs", s.handleClearJobs)
-	s.engine.DELETE("/jobs/:id", s.handleDeleteJob)
-	s.engine.GET("/config", s.handleGetConfig)
-	s.engine.POST("/config", s.handleSetConfig)
-	s.engine.PUT("/config", s.handleUpdateConfig)
-	s.engine.GET("/config/webdav", s.handleGetWebDAV)
-	s.engine.POST("/config/webdav", s.handleAddWebDAV)
-	s.engine.DELETE("/config/webdav/:name", s.handleDeleteWebDAV)
-	s.engine.GET("/i18n", s.handleI18n)
-	s.engine.POST("/kuaidi100", s.handleKuaidi100)
+	api := s.engine.Group("/api")
+	api.GET("/health", s.handleHealth)
+	api.POST("/download", s.handleDownload)
+	api.GET("/status/:id", s.handleStatus)
+	api.GET("/jobs", s.handleGetJobs)
+	api.DELETE("/jobs", s.handleClearJobs)
+	api.DELETE("/jobs/:id", s.handleDeleteJob)
+	api.GET("/config", s.handleGetConfig)
+	api.POST("/config", s.handleSetConfig)
+	api.PUT("/config", s.handleUpdateConfig)
+	api.GET("/config/webdav", s.handleGetWebDAV)
+	api.POST("/config/webdav", s.handleAddWebDAV)
+	api.DELETE("/config/webdav/:name", s.handleDeleteWebDAV)
+	api.GET("/i18n", s.handleI18n)
+	api.POST("/kuaidi100", s.handleKuaidi100)
 
 	// Serve embedded UI if available
 	if distFS := GetDistFS(); distFS != nil {
@@ -149,18 +150,19 @@ func (s *Server) authMiddleware() gin.HandlerFunc {
 		path := c.Request.URL.Path
 
 		// Health endpoint doesn't require auth
-		if path == "/health" {
+		if path == "/api/health" {
 			c.Next()
 			return
 		}
 
-		// UI routes don't require auth (static files and SPA routes)
-		isAPIRoute := path == "/download" ||
-			strings.HasPrefix(path, "/status/") ||
-			path == "/jobs" ||
-			strings.HasPrefix(path, "/jobs/")
+		// Only API routes require auth (those under /api prefix)
+		// Exclude /api/download and /api/jobs which need auth
+		isProtectedAPIRoute := path == "/api/download" ||
+			strings.HasPrefix(path, "/api/status/") ||
+			path == "/api/jobs" ||
+			strings.HasPrefix(path, "/api/jobs/")
 
-		if !isAPIRoute {
+		if !isProtectedAPIRoute {
 			c.Next()
 			return
 		}

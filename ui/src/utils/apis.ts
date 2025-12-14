@@ -60,29 +60,29 @@ export interface I18nData {
 }
 
 export async function fetchHealth(): Promise<ApiResponse<HealthData>> {
-  const res = await fetch("/health");
+  const res = await fetch("/api/health");
   return res.json();
 }
 
 export async function fetchJobs(): Promise<ApiResponse<JobsData>> {
-  const res = await fetch("/jobs");
+  const res = await fetch("/api/jobs");
   return res.json();
 }
 
 export async function fetchConfig(): Promise<ApiResponse<ConfigData>> {
-  const res = await fetch("/config");
+  const res = await fetch("/api/config");
   return res.json();
 }
 
 export async function fetchI18n(): Promise<ApiResponse<I18nData>> {
-  const res = await fetch("/i18n");
+  const res = await fetch("/api/i18n");
   return res.json();
 }
 
 export async function updateConfig(
   outputDir: string
 ): Promise<ApiResponse<ConfigData>> {
-  const res = await fetch("/config", {
+  const res = await fetch("/api/config", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ output_dir: outputDir }),
@@ -94,7 +94,7 @@ export async function setConfigValue(
   key: string,
   value: string
 ): Promise<ApiResponse<{ key: string; value: string }>> {
-  const res = await fetch("/config", {
+  const res = await fetch("/api/config", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ key, value }),
@@ -105,7 +105,7 @@ export async function setConfigValue(
 export async function postDownload(
   url: string
 ): Promise<ApiResponse<{ id: string; status: string }>> {
-  const res = await fetch("/download", {
+  const res = await fetch("/api/download", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url }),
@@ -119,7 +119,7 @@ export async function addWebDAVServer(
   username: string,
   password: string
 ): Promise<ApiResponse<{ name: string }>> {
-  const res = await fetch("/config/webdav", {
+  const res = await fetch("/api/config/webdav", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, url, username, password }),
@@ -130,7 +130,7 @@ export async function addWebDAVServer(
 export async function deleteWebDAVServer(
   name: string
 ): Promise<ApiResponse<{ name: string }>> {
-  const res = await fetch(`/config/webdav/${encodeURIComponent(name)}`, {
+  const res = await fetch(`/api/config/webdav/${encodeURIComponent(name)}`, {
     method: "DELETE",
   });
   return res.json();
@@ -139,13 +139,13 @@ export async function deleteWebDAVServer(
 export async function deleteJob(
   id: string
 ): Promise<ApiResponse<{ id: string }>> {
-  const res = await fetch(`/jobs/${id}`, { method: "DELETE" });
+  const res = await fetch(`/api/jobs/${id}`, { method: "DELETE" });
   return res.json();
 }
 
 export async function clearHistory(): Promise<
   ApiResponse<{ cleared: number }>
 > {
-  const res = await fetch("/jobs", { method: "DELETE" });
+  const res = await fetch("/api/jobs", { method: "DELETE" });
   return res.json();
 }
