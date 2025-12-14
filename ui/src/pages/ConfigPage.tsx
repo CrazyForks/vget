@@ -1,6 +1,5 @@
 import { useApp } from "../context/AppContext";
 import { ConfigEditor, type ConfigValues } from "../components/ConfigEditor";
-import { FaGear } from "react-icons/fa6";
 
 export function ConfigPage() {
   const {
