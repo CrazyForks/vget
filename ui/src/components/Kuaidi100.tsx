@@ -164,7 +164,7 @@ export function Kuaidi100({ isConnected }: Kuaidi100Props) {
                               : "未知"}
               </span>
             </div>
-            <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto">
+            <div className="flex flex-col gap-2 max-h-75 overflow-y-auto">
               {trackingResult.data?.map((record, idx) => (
                 <div
                   key={idx}
