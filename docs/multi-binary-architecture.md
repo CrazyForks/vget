@@ -8,7 +8,7 @@ vget is split into separate binaries with a shared core module:
 |--------|---------|--------------|
 | `vget` | CLI tool | GitHub Releases (all platforms) |
 | `vget-server` | HTTP server + Web UI | GitHub Releases + Docker Image |
-| `vget-desktop` | Desktop GUI (Fyne) | GitHub Releases (future) |
+| `vget-desktop` | Desktop GUI (PySide6) | Separate private repo |
 
 ## Current Structure
 
@@ -86,28 +86,15 @@ Configuration is read from `~/.config/vget/config.yml` (same as CLI).
 
 ## Release Artifacts
 
-| Platform | CLI | Server | Desktop |
-|----------|-----|--------|---------|
-| Linux amd64 | vget-linux-amd64 | vget-server-linux-amd64 | (future) |
-| Linux arm64 | vget-linux-arm64 | vget-server-linux-arm64 | (future) |
-| macOS amd64 | vget-darwin-amd64 | vget-server-darwin-amd64 | (future) |
-| macOS arm64 | vget-darwin-arm64 | vget-server-darwin-arm64 | (future) |
-| Windows | vget-windows-amd64.exe | vget-server-windows-amd64.exe | (future) |
-| Docker | - | guiyumin/vget | - |
+| Platform | CLI | Server |
+|----------|-----|--------|
+| Linux amd64 | vget-linux-amd64 | vget-server-linux-amd64 |
+| Linux arm64 | vget-linux-arm64 | vget-server-linux-arm64 |
+| macOS amd64 | vget-darwin-amd64 | vget-server-darwin-amd64 |
+| macOS arm64 | vget-darwin-arm64 | vget-server-darwin-arm64 |
+| Windows | vget-windows-amd64.exe | vget-server-windows-amd64.exe |
+| Docker | - | guiyumin/vget |
 
-## Future: Desktop App
+## Desktop App
 
-When implementing the desktop app:
-
-1. Create `cmd/vget-desktop/main.go` using Fyne
-2. Create `internal/desktop/` for Fyne UI components
-3. Desktop will import from `internal/core/` (shared)
-4. Desktop can use `internal/updater/` for self-update
-
-```
-cmd/
-  vget-desktop/main.go      # Fyne entry point
-
-internal/
-  desktop/                  # Desktop-specific (Fyne UI)
-```
+The desktop app (`vget-desktop`) is maintained in a separate private repository. It is built with PySide6, the official Python binding for Qt 6.
