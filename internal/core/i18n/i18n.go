@@ -168,6 +168,20 @@ type UITranslations struct {
 	NotConfigured    string `yaml:"not_configured" json:"not_configured"`
 	ClearHistory     string `yaml:"clear_history" json:"clear_history"`
 	ClearAll         string `yaml:"clear_all" json:"clear_all"`
+	// Torrent
+	Torrent              string `yaml:"torrent" json:"torrent"`
+	TorrentHint          string `yaml:"torrent_hint" json:"torrent_hint"`
+	TorrentSubmit        string `yaml:"torrent_submit" json:"torrent_submit"`
+	TorrentSubmitting    string `yaml:"torrent_submitting" json:"torrent_submitting"`
+	TorrentSuccess       string `yaml:"torrent_success" json:"torrent_success"`
+	TorrentNotConfigured string `yaml:"torrent_not_configured" json:"torrent_not_configured"`
+	TorrentSettings      string `yaml:"torrent_settings" json:"torrent_settings"`
+	TorrentClient        string `yaml:"torrent_client" json:"torrent_client"`
+	TorrentHost          string `yaml:"torrent_host" json:"torrent_host"`
+	TorrentTest          string `yaml:"torrent_test" json:"torrent_test"`
+	TorrentTesting       string `yaml:"torrent_testing" json:"torrent_testing"`
+	TorrentTestSuccess   string `yaml:"torrent_test_success" json:"torrent_test_success"`
+	TorrentEnabled       string `yaml:"torrent_enabled" json:"torrent_enabled"`
 }
 
 // ServerTranslations holds translations for server messages
