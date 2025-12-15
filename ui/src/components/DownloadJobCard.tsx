@@ -40,15 +40,16 @@ export function DownloadJobCard({
     job.status === "failed" ||
     job.status === "cancelled";
 
-  // Track download speed
+  // Track download speed with exponential moving average for smoothing
   const prevDownloaded = useRef<number>(0);
   const prevTime = useRef<number>(0);
+  const smoothedSpeed = useRef<number>(0);
   const [speed, setSpeed] = useState<number>(0);
 
   useEffect(() => {
     if (job.status === "downloading") {
       const now = Date.now();
-      // Initialize prevTime on first update
+      // Initialize on first update
       if (prevTime.current === 0) {
         prevTime.current = now;
         prevDownloaded.current = job.downloaded;
@@ -59,8 +60,12 @@ export function DownloadJobCard({
       const bytesDelta = job.downloaded - prevDownloaded.current;
 
       if (timeDelta > 0 && bytesDelta >= 0) {
-        const newSpeed = bytesDelta / timeDelta;
-        setSpeed(newSpeed);
+        const instantSpeed = bytesDelta / timeDelta;
+        // Exponential moving average: higher alpha = more weight on recent data
+        const alpha = 0.7;
+        smoothedSpeed.current =
+          alpha * instantSpeed + (1 - alpha) * smoothedSpeed.current;
+        setSpeed(smoothedSpeed.current);
       }
 
       prevDownloaded.current = job.downloaded;
@@ -69,6 +74,7 @@ export function DownloadJobCard({
       // Reset when not downloading
       prevDownloaded.current = 0;
       prevTime.current = 0;
+      smoothedSpeed.current = 0;
       setSpeed(0);
     }
   }, [job.downloaded, job.status]);
