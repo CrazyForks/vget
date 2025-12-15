@@ -72,7 +72,9 @@ export function WebDAVPage() {
           setFiles([]);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load directory");
+        setError(
+          err instanceof Error ? err.message : "Failed to load directory"
+        );
         setFiles([]);
       } finally {
         setLoading(false);
@@ -133,7 +135,8 @@ export function WebDAVPage() {
         showToast(
           "success",
           count === 1
-            ? t.download_queued || "Download started. Check progress on Download page."
+            ? t.download_queued ||
+                "Download started. Check progress on Download page."
             : `${count} ${t.downloads_queued || "downloads started. Check progress on Download page."}`
         );
       } else {
@@ -141,7 +144,8 @@ export function WebDAVPage() {
         showToast("error", res.message);
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to start download";
+      const msg =
+        err instanceof Error ? err.message : "Failed to start download";
       setError(msg);
       showToast("error", msg);
     } finally {
@@ -159,8 +163,7 @@ export function WebDAVPage() {
 
   const selectableFiles = files.filter((f) => !f.isDir);
   const allSelected =
-    selectableFiles.length > 0 &&
-    selectedFiles.size === selectableFiles.length;
+    selectableFiles.length > 0 && selectedFiles.size === selectableFiles.length;
 
   // Show loading while fetching remotes
   if (!remotesLoaded) {
@@ -229,7 +232,7 @@ export function WebDAVPage() {
           >
             {selectedRemote}:
           </button>
-          <FaChevronRight className="text-zinc-400 text-xs flex-shrink-0" />
+          <FaChevronRight className="text-zinc-400 text-xs shrink-0" />
           {pathParts.map((part, i) => (
             <span key={i} className="flex items-center gap-1">
               <button
@@ -241,7 +244,7 @@ export function WebDAVPage() {
                 {part}
               </button>
               {i < pathParts.length - 1 && (
-                <FaChevronRight className="text-zinc-400 text-xs flex-shrink-0" />
+                <FaChevronRight className="text-zinc-400 text-xs shrink-0" />
               )}
             </span>
           ))}
@@ -327,9 +330,9 @@ export function WebDAVPage() {
                   </div>
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     {file.isDir ? (
-                      <FaFolder className="text-amber-500 flex-shrink-0" />
+                      <FaFolder className="text-amber-500 shrink-0" />
                     ) : (
-                      <FaFile className="text-zinc-400 flex-shrink-0" />
+                      <FaFile className="text-zinc-400 shrink-0" />
                     )}
                     <span className="truncate">{file.name}</span>
                   </div>
@@ -346,8 +349,8 @@ export function WebDAVPage() {
         {selectedFiles.size > 0 && (
           <div className="px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-700 flex items-center justify-between">
             <span className="text-sm text-zinc-600 dark:text-zinc-400">
-              {selectedFiles.size} {t.selected_files} ({formatSize(selectedSize)}
-              )
+              {selectedFiles.size} {t.selected_files} (
+              {formatSize(selectedSize)})
             </span>
             <button
               onClick={handleDownload}
