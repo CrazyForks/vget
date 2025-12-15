@@ -35,6 +35,8 @@ export interface UITranslations {
   no_webdav_servers: string;
   clear_history: string;
   clear_all: string;
+  // WebDAV
+  webdav_browser: string;
   // Torrent
   torrent: string;
   torrent_hint: string;
@@ -93,6 +95,8 @@ export const defaultTranslations: UITranslations = {
   no_webdav_servers: "No WebDAV servers configured",
   clear_history: "Clear",
   clear_all: "Clear All",
+  // WebDAV
+  webdav_browser: "WebDAV",
   // Torrent
   torrent: "BT/Magnet",
   torrent_hint: "Paste magnet link or torrent URL...",

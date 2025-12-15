@@ -132,6 +132,8 @@ ui:
   no_webdav_servers: "未配置 WebDAV 服务器"
   clear_history: "清除"
   clear_all: "全部清除"
+  # WebDAV
+  webdav_browser: "WebDAV"
   # 磁力下载
   torrent: "磁力下载"
   torrent_hint: "粘贴磁力链接或种子URL..."

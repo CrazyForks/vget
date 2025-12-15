@@ -168,6 +168,8 @@ type UITranslations struct {
 	NotConfigured    string `yaml:"not_configured" json:"not_configured"`
 	ClearHistory     string `yaml:"clear_history" json:"clear_history"`
 	ClearAll         string `yaml:"clear_all" json:"clear_all"`
+	// WebDAV
+	WebDAVBrowser    string `yaml:"webdav_browser" json:"webdav_browser"`
 	// Torrent
 	Torrent              string `yaml:"torrent" json:"torrent"`
 	TorrentHint          string `yaml:"torrent_hint" json:"torrent_hint"`

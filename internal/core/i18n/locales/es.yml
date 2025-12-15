@@ -120,6 +120,8 @@ ui:
   no_webdav_servers: "No hay servidores WebDAV configurados"
   clear_history: "Limpiar"
   clear_all: "Limpiar todo"
+  # WebDAV
+  webdav_browser: "WebDAV"
   # Torrent
   torrent: "BT/Magnet"
   torrent_hint: "Pega un enlace magnet o URL de torrent..."

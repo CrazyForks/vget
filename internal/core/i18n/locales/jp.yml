@@ -120,6 +120,8 @@ ui:
   no_webdav_servers: "WebDAVサーバーは設定されていません"
   clear_history: "クリア"
   clear_all: "すべてクリア"
+  # WebDAV
+  webdav_browser: "WebDAV"
   # トレント
   torrent: "BT/マグネット"
   torrent_hint: "マグネットリンクまたはトレントURLを貼り付け..."
