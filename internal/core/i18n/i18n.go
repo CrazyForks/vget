@@ -190,6 +190,9 @@ type UITranslations struct {
 	TorrentTesting       string `yaml:"torrent_testing" json:"torrent_testing"`
 	TorrentTestSuccess   string `yaml:"torrent_test_success" json:"torrent_test_success"`
 	TorrentEnabled       string `yaml:"torrent_enabled" json:"torrent_enabled"`
+	// Toast
+	DownloadQueued  string `yaml:"download_queued" json:"download_queued"`
+	DownloadsQueued string `yaml:"downloads_queued" json:"downloads_queued"`
 }
 
 // ServerTranslations holds translations for server messages
