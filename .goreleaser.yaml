@@ -62,3 +62,17 @@ release:
   draft: false
   prerelease: auto
   name_template: "v{{.Version}}"
+
+brews:
+  - repository:
+      owner: guiyumin
+      name: homebrew-tap
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    homepage: "https://github.com/guiyumin/vget"
+    description: "Media downloader CLI for various platforms"
+    license: "Apache-2.0"
+    directory: Formula
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    commit_msg_template: "{{ .ProjectName }}: update to {{ .Tag }}"
