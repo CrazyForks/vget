@@ -734,9 +734,111 @@ bilibili:
 10. **bilibili_subtitle.go** - Subtitle download/conversion
 11. **bilibili_danmaku.go** - Danmaku support
 
+## 8K Video Download Technical Details
+
+### Quality Codes (qn)
+
+| qn  | Quality      | Requirements           |
+| --- | ------------ | ---------------------- |
+| 127 | 8K 超高清    | 大会员 + DASH + HEVC/AV1 |
+| 126 | 杜比视界     | 大会员 + DASH          |
+| 125 | HDR 真彩     | 大会员 + DASH          |
+| 120 | 4K 超清      | 大会员 + DASH          |
+| 116 | 1080P 60帧   | 大会员                 |
+| 112 | 1080P 高码率 | 大会员                 |
+| 80  | 1080P        | 登录                   |
+| 64  | 720P         | 登录                   |
+| 32  | 480P         | -                      |
+| 16  | 360P         | -                      |
+
+### 8K Requirements
+
+| Requirement | Details |
+|------------|---------|
+| **Account** | 大会员 (Premium membership) required |
+| **Format** | DASH only (no MP4/FLV for 8K) |
+| **Codec** | HEVC or AV1 only (AVC not supported for 8K) |
+| **fnval** | `1024` (8K flag) or `4048` (all DASH streams) |
+| **fourk** | `1` (enable 4K/8K negotiation) |
+
+### API Comparison for 8K
+
+| API | Endpoint | 8K Support | Auth Method | Best For |
+|-----|----------|-----------|-------------|----------|
+| **APP API** | `grpc.biliapi.net` (gRPC) | ✅ Full | access_token | 8K, FLAC, Dolby |
+| **TV API** | `api.snm0516.aisee.tv` | ✅ Yes | access_key + signature | Alternative |
+| **WEB API** | `api.bilibili.com` | ⚠️ Limited | Cookie + WBI signature | Standard use |
+| **INTL API** | `api.biliintl.com` | ❌ No | Cookie | International |
+
+### APP API (Recommended for 8K)
+
+The APP API uses gRPC with Protobuf, same as Bilibili mobile app:
+
+```go
+// Request structure
+PlayViewReq {
+    Aid:             int64,   // Video AV number
+    Cid:             int64,   // Content ID
+    Qn:              127,     // Always request 8K
+    Fnval:           4048,    // DASH with all options
+    Fourk:           true,    // Enable 4K/8K
+    PreferCodecType: CodeAV1, // or CodeHEVC
+}
+
+// Endpoints
+Regular:  grpc.biliapi.net/bilibili.app.playurl.v1.PlayURL/PlayView
+Bangumi:  app.bilibili.com/bilibili.pgc.gateway.player.v2.PlayURL/PlayView
+```
+
+### fnval Bitmask
+
+```go
+const (
+    FnvalMP4     = 1     // MP4 format
+    FnvalDASH    = 16    // DASH format
+    FnvalHDR     = 64    // HDR support
+    FnvalDolby   = 256   // Dolby audio
+    FnvalDolbyVision = 512  // Dolby Vision
+    Fnval8K      = 1024  // 8K resolution
+    FnvalAV1     = 2048  // AV1 codec
+)
+
+// Common combinations
+FnvalAll = 4048  // 16 | 64 | 256 | 512 | 1024 | 2048
+```
+
+### Codec Support
+
+| Codec | Code | 8K Support | Notes |
+|-------|------|------------|-------|
+| AV1   | 13   | ✅ Yes | Best compression, newer |
+| HEVC  | 12   | ✅ Yes | Default for bangumi |
+| AVC   | 7    | ❌ No | Legacy, max 4K |
+
+### Authentication for 8K
+
+```bash
+# Method 1: APP API with TV login token
+bbdown logintv                    # Get access_token
+bbdown <url> -app                 # Use APP API
+
+# Method 2: Cookie (WEB API, limited)
+bbdown login                      # QR code login
+bbdown <url> --cookie <cookie>    # Use WEB API
+```
+
+### Implementation Priority
+
+For vget Bilibili support:
+
+1. **Phase 1**: WEB API with Cookie (covers most content up to 1080P)
+2. **Phase 2**: TV API for 4K content
+3. **Phase 3**: APP API (gRPC) for 8K, FLAC, Dolby
+
 ## References
 
 - [BBDown Source](https://github.com/nilaoda/BBDown)
 - [Bilibili API Documentation](https://github.com/SocialSisterYi/bilibili-API-collect) (unofficial)
+- [Video Stream URL API](https://github.com/SocialSisterYi/bilibili-API-collect/blob/master/docs/video/videostream_url.md)
 - [BV/AV Conversion Algorithm](https://www.zhihu.com/question/381784377)
 - [WBI Signature Mechanism](https://github.com/SocialSisterYi/bilibili-API-collect/blob/master/docs/misc/sign/wbi.md)
