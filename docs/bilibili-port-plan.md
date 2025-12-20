@@ -640,6 +640,20 @@ func (c *BilibiliClient) GetDanmaku(cid int64, format string) ([]byte, error) {
 }
 ```
 
+## Quality Access by Account Type
+
+| 画质 | 未登录 | 已登录 | 大会员 |
+|------|--------|--------|--------|
+| 360P | ✅ | ✅ | ✅ |
+| 480P | ✅ | ✅ | ✅ |
+| 720P | ⚠️ | ✅ | ✅ |
+| 1080P | ❌ | ✅ | ✅ |
+| 1080P+ | ❌ | ❌ | ✅ |
+| 4K | ❌ | ❌ | ✅ |
+| 8K | ❌ | ❌ | ✅ |
+| HDR | ❌ | ❌ | ✅ |
+| 杜比视界 | ❌ | ❌ | ✅ |
+
 ## Quality Priority Mapping
 
 ```go
