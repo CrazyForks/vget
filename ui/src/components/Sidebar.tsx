@@ -1,7 +1,16 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import clsx from "clsx";
 
-import { FaDownload, FaGear, FaTruck, FaLayerGroup, FaMagnet, FaCloud, FaPodcast, FaB } from "react-icons/fa6";
+import {
+  FaDownload,
+  FaGear,
+  FaTruck,
+  FaLayerGroup,
+  FaMagnet,
+  FaCloud,
+  FaPodcast,
+  FaB,
+} from "react-icons/fa6";
 import { useApp } from "../context/AppContext";
 
 interface SidebarProps {
@@ -33,6 +42,12 @@ export function Sidebar({ lang }: SidebarProps) {
       show: true,
     },
     {
+      to: "/bilibili",
+      icon: <FaB />,
+      label: "哔哩哔哩",
+      show: lang === "zh",
+    },
+    {
       to: "/torrent",
       icon: <FaMagnet />,
       label: t.torrent,
@@ -50,12 +65,7 @@ export function Sidebar({ lang }: SidebarProps) {
       label: t.webdav_browser,
       show: true,
     },
-    {
-      to: "/config",
-      icon: <FaGear />,
-      label: t.settings,
-      show: true,
-    },
+
     {
       to: "/kuaidi100",
       icon: <FaTruck />,
@@ -63,10 +73,10 @@ export function Sidebar({ lang }: SidebarProps) {
       show: lang === "zh",
     },
     {
-      to: "/bilibili",
-      icon: <FaB />,
-      label: "哔哩哔哩",
-      show: lang === "zh",
+      to: "/config",
+      icon: <FaGear />,
+      label: t.settings,
+      show: true,
     },
   ];
 
