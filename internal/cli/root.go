@@ -105,6 +105,16 @@ func runDownload(url string) error {
 		}
 	}
 
+	// Check Bilibili login status and prompt for confirmation if not logged in
+	if bilibiliExt, ok := ext.(*extractor.BilibiliExtractor); ok {
+		_ = bilibiliExt // Mark as used
+		if cfg.Bilibili.Cookie == "" {
+			if !confirmBilibiliNoLogin() {
+				return nil // User cancelled
+			}
+		}
+	}
+
 	// Extract media info with spinner
 	media, err := runExtractWithSpinner(ext, url, cfg.Language)
 	if err != nil {
@@ -619,6 +629,22 @@ func selectVideoFormat(formats []extractor.VideoFormat, preferred string) *extra
 // isTelegramURL checks if the URL is a Telegram message URL
 func isTelegramURL(urlStr string) bool {
 	return strings.Contains(urlStr, "t.me/") || strings.Contains(urlStr, "telegram.me/")
+}
+
+// confirmBilibiliNoLogin prompts user to confirm download without login
+func confirmBilibiliNoLogin() bool {
+	fmt.Println()
+	fmt.Println("  \033[33m未登录 Bilibili，只能下载 360P/480P 低清视频\033[0m")
+	fmt.Println("  \033[90m提示: 运行 'vget login bilibili' 登录后可下载更高清晰度\033[0m")
+	fmt.Println()
+	fmt.Print("  是否继续下载? [Y/n]: ")
+
+	var response string
+	fmt.Scanln(&response)
+
+	response = strings.TrimSpace(strings.ToLower(response))
+	// Default to yes if empty, or explicit yes
+	return response == "" || response == "y" || response == "yes" || response == "是"
 }
 
 // runTelegramDownload handles Telegram media downloads with TUI progress
