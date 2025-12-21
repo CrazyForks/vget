@@ -13,7 +13,10 @@ require (
 	github.com/go-rod/rod v0.116.2
 	github.com/go-rod/stealth v0.4.9
 	github.com/gotd/td v0.136.0
+	github.com/mattn/go-runewidth v0.0.16
+	github.com/nsf/termbox-go v1.1.1
 	github.com/spf13/cobra v1.10.1
+	github.com/yeqown/go-qrcode/v2 v2.2.5
 	golang.org/x/term v0.37.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -67,7 +70,6 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
-	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421 // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
@@ -87,6 +89,7 @@ require (
 	github.com/ulikunitz/xz v0.5.14 // indirect
 	github.com/xanzy/go-gitlab v0.115.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
+	github.com/yeqown/reedsolomon v1.0.0 // indirect
 	github.com/ysmood/fetchup v0.2.3 // indirect
 	github.com/ysmood/goob v0.4.0 // indirect
 	github.com/ysmood/got v0.40.0 // indirect
