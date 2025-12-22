@@ -34,6 +34,10 @@ rm vget.zip
 
 ![다운로드 진행률](screenshots/pikpak_download.png)
 
+### Docker 서버 UI
+
+![](screenshots/vget_server_ui.png)
+
 ## 지원 소스
 
 지원 사이트 전체 목록은 [sites.md](sites.md)를 참조하세요.

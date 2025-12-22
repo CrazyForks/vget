@@ -34,6 +34,10 @@ Download `vget-windows-amd64.zip` from [Releases](https://github.com/guiyumin/vg
 
 ![Download Progress](screenshots/pikpak_download.png)
 
+### Docker Server UI
+
+![](screenshots/vget_server_ui.png)
+
 ## Supported Sources
 
 See [sites.md](sites.md) for the full list of supported sites.

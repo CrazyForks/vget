@@ -34,6 +34,10 @@ Téléchargez `vget-windows-amd64.zip` depuis [Releases](https://github.com/guiy
 
 ![Progression du téléchargement](screenshots/pikpak_download.png)
 
+### Interface serveur Docker
+
+![](screenshots/vget_server_ui.png)
+
 ## Sources prises en charge
 
 Consultez [sites.md](sites.md) pour la liste complète des sites pris en charge.

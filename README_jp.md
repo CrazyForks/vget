@@ -34,6 +34,10 @@ rm vget.zip
 
 ![ダウンロード進捗](screenshots/pikpak_download.png)
 
+### Docker サーバー UI
+
+![](screenshots/vget_server_ui.png)
+
 ## 対応ソース
 
 対応サイトの一覧は [sites.md](sites.md) をご覧ください。

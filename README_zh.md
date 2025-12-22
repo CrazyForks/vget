@@ -34,6 +34,10 @@ rm vget.zip
 
 ![下载进度](screenshots/pikpak_download.png)
 
+### Docker 服务器界面
+
+![](screenshots/vget_server_ui.png)
+
 ## 支持的来源
 
 查看 [sites.md](sites.md) 获取完整的支持网站列表。
