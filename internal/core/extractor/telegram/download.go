@@ -22,15 +22,32 @@ type DownloadResult struct {
 	Size     int64
 }
 
+// DownloadOptions configures the download behavior
+type DownloadOptions struct {
+	URL        string
+	OutputPath string
+	Takeout    bool // Use takeout session for lower rate limits
+	ProgressFn func(downloaded, total int64)
+}
+
 // Download downloads media from a Telegram URL directly.
 // This combines extraction and download because Telegram requires
 // the download to happen within the authenticated client context.
 func Download(urlStr string, outputPath string, progressFn func(downloaded, total int64)) (*DownloadResult, error) {
+	return DownloadWithOptions(DownloadOptions{
+		URL:        urlStr,
+		OutputPath: outputPath,
+		ProgressFn: progressFn,
+	})
+}
+
+// DownloadWithOptions downloads media with configurable options including takeout mode
+func DownloadWithOptions(opts DownloadOptions) (*DownloadResult, error) {
 	if !SessionExists() {
 		return nil, fmt.Errorf("not logged in to Telegram. Run 'vget telegram login' first")
 	}
 
-	msg, err := ParseURL(urlStr)
+	msg, err := ParseURL(opts.URL)
 	if err != nil {
 		return nil, err
 	}
@@ -56,6 +73,23 @@ func Download(urlStr string, outputPath string, progressFn func(downloaded, tota
 		}
 
 		api := client.API()
+
+		// Initialize takeout session if requested
+		var takeout *TakeoutSession
+		if opts.Takeout {
+			takeout = NewTakeoutSession(api)
+			if err := takeout.Start(ctx); err != nil {
+				// Log warning but continue without takeout
+				// Some accounts may not have takeout enabled
+				fmt.Printf("Warning: could not start takeout session: %v\n", err)
+			} else {
+				defer func() {
+					if err := takeout.Finish(ctx); err != nil {
+						fmt.Printf("Warning: failed to finish takeout session: %v\n", err)
+					}
+				}()
+			}
+		}
 
 		// Resolve channel
 		inputChannel, err := resolveChannel(ctx, api, msg)
@@ -87,11 +121,11 @@ func Download(urlStr string, outputPath string, progressFn func(downloaded, tota
 
 		switch media := tgMsg.Media.(type) {
 		case *tg.MessageMediaDocument:
-			result, err = downloadDocument(ctx, api, dl, media, tgMsg, outputPath, progressFn)
+			result, err = downloadDocument(ctx, api, dl, media, tgMsg, opts.OutputPath, opts.ProgressFn)
 			return err
 
 		case *tg.MessageMediaPhoto:
-			result, err = downloadPhoto(ctx, api, dl, media, tgMsg, outputPath, progressFn)
+			result, err = downloadPhoto(ctx, api, dl, media, tgMsg, opts.OutputPath, opts.ProgressFn)
 			return err
 
 		default:

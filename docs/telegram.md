@@ -183,18 +183,20 @@ MediaTypePhoto     // .jpg (lower priority)
 ## File Structure
 
 ```
-internal/extractor/
+internal/core/extractor/
 ├── telegram.go              # Thin wrapper, registers extractor, re-exports
 ├── telegram/
-│   ├── telegram.go          # Package constants (API credentials)
+│   ├── constants.go         # API credentials (DesktopAppID, DesktopAppHash)
 │   ├── parser.go            # URL parsing
 │   ├── session.go           # Session path/exists helpers
 │   ├── media.go             # Media extraction helpers
 │   ├── extractor.go         # Extractor implementation
-│   └── download.go          # Download functionality
+│   ├── download.go          # Download functionality + DownloadWithOptions
+│   └── takeout.go           # TakeoutSession for bulk downloads
 
 internal/cli/
 ├── telegram.go              # login/logout/status commands
+├── batch.go                 # Batch download with auto-takeout for Telegram
 ```
 
 ## vget vs tdl
@@ -202,7 +204,7 @@ internal/cli/
 | Aspect | tdl | vget |
 |--------|-----|------|
 | Scope | Telegram-only | Multi-platform |
-| Features | Many advanced (batch, resume, takeout) | Simple: paste URL, get media |
+| Features | Many advanced (batch, resume, takeout) | Simple + auto-takeout for batch |
 | Philosophy | Power tool | All-in-one simplicity |
 
 ## Reference Implementation
@@ -219,7 +221,183 @@ The `tdl` project (github.com/iyear/tdl) was analyzed for patterns:
 
 - Iterator + Resume pattern (Phase 2)
 - Data Center pooling (overkill for single downloads)
-- Takeout mode (for bulk exports)
+
+### Implemented from tdl
+
+- **Takeout mode** - auto-enabled for batch downloads (2+ Telegram URLs)
+
+## Protected/Restricted Content
+
+### Understanding `noforwards` Flag
+
+Channel owners can enable "Restrict saving content" which sets the `noforwards` flag on the channel or individual messages. This:
+- Disables "Forward" button in official apps
+- Disables "Save" button for media in official apps
+- Shows "Saving content is restricted" message
+
+### Why Downloads Still Work
+
+**Key insight**: `noforwards` is a **client-side UI restriction**, not an API-level restriction.
+
+The official Telegram apps *choose* to respect this flag by hiding UI buttons. But at the API level:
+- If you have access to a message, you can read its content
+- If you can read the content, you can download attached media
+- The API does not block file downloads based on `noforwards`
+
+This is how `tdl` and similar tools work - they use the Telegram Client API (MTProto) directly, bypassing the UI restrictions that official apps enforce.
+
+### How tdl Detects Protected Content
+
+From `tdl/core/forwarder/forwarder.go`:
+
+```go
+func protectedDialog(peer peers.Peer) bool {
+    switch p := peer.(type) {
+    case peers.Chat:
+        return p.Raw().GetNoforwards()
+    case peers.Channel:
+        return p.Raw().GetNoforwards()
+    }
+    return false
+}
+
+func protectedMessage(msg *tg.Message) bool {
+    return msg.GetNoforwards()
+}
+```
+
+### Operation Differences
+
+| Operation | Protected Content | How It Works |
+|-----------|-------------------|--------------|
+| **Download** | ✅ Works | Direct file access via API - `noforwards` doesn't apply |
+| **Forward** | ⚠️ Blocked by API | Must use "clone" mode (re-upload as new message) |
+
+### Takeout Mode for Bulk Downloads
+
+For downloading many files, use Telegram's official "Data Export" feature via API:
+
+```go
+// From tdl/core/middlewares/takeout/takeout.go
+req := &tg.AccountInitTakeoutSessionRequest{
+    MessageChannels:   true,
+    Files:             true,
+    FileMaxSize:       4000 * 1024 * 1024,  // 4GB limit
+}
+```
+
+Takeout sessions have **lower flood wait limits**, making bulk downloads faster and less likely to trigger rate limiting.
+
+### vget Implementation Notes
+
+For vget's Telegram support:
+1. Desktop session import works for protected content - same API access as tdl
+2. No special handling needed - just download the file if user has message access
+3. Takeout mode is **auto-enabled** for batch downloads (2+ Telegram URLs)
+
+## Takeout Mode (Implemented)
+
+### What is Takeout?
+
+Takeout is Telegram's official "Data Export" API feature (`AccountInitTakeoutSession`). It's designed for users to export their own data with **relaxed rate limits**.
+
+| Without Takeout | With Takeout |
+|-----------------|--------------|
+| Normal flood wait limits | Lower flood wait limits |
+| More likely to get rate-limited on bulk downloads | Designed for bulk export |
+| Faster to hit `FLOOD_WAIT` errors | Can download more before limits |
+
+### vget Implementation
+
+Takeout is automatically enabled when batch downloading multiple Telegram URLs. No user flags needed.
+
+**Usage:**
+
+```bash
+# Single file - no takeout (not needed)
+vget https://t.me/channel/123
+
+# Batch mode with 2+ Telegram URLs - takeout auto-enabled
+vget -f urls.txt
+```
+
+**Implementation files:**
+
+| File | Purpose |
+|------|---------|
+| `telegram/takeout.go` | `TakeoutSession` struct with `Start()`, `Finish()`, `Middleware()` |
+| `telegram/download.go` | `DownloadWithOptions()` accepts `Takeout` bool |
+| `cli/root.go` | `runTelegramBatchDownload()` uses takeout internally |
+| `cli/batch.go` | Detects 2+ Telegram URLs → calls batch function |
+
+**Core takeout logic:**
+
+```go
+// internal/extractor/telegram/takeout.go
+
+type TakeoutSession struct {
+    api       *tg.Client
+    takeoutID int64
+}
+
+func (t *TakeoutSession) Start(ctx context.Context) error {
+    req := &tg.AccountInitTakeoutSessionRequest{
+        Files:       true,
+        FileMaxSize: 4 * 1024 * 1024 * 1024, // 4GB
+    }
+    session, err := t.api.AccountInitTakeoutSession(ctx, req)
+    if err != nil {
+        return err
+    }
+    t.takeoutID = session.ID
+    return nil
+}
+
+func (t *TakeoutSession) Finish(ctx context.Context) error {
+    if t.takeoutID == 0 {
+        return nil
+    }
+    req := &tg.AccountFinishTakeoutSessionRequest{Success: true}
+    _, err := t.api.AccountFinishTakeoutSession(ctx, req)
+    return err
+}
+```
+
+**Batch download flow:**
+
+```
+urls.txt contains:
+  https://t.me/channel/1
+  https://t.me/channel/2
+  https://twitter.com/user/status/123
+
+vget -f urls.txt
+  ↓
+batch.go separates URLs:
+  - telegramURLs: [t.me/1, t.me/2]  (2 URLs → use takeout)
+  - otherURLs: [twitter.com/...]
+  ↓
+runTelegramBatchDownload(telegramURLs)
+  → Each download uses takeout session
+  ↓
+runDownload() for other URLs
+```
+
+### Reference: How tdl Does It
+
+tdl uses a similar pattern with middleware wrapping:
+
+```go
+// Wrap all API calls with takeout session ID
+func (t takeout) Handle(next tg.Invoker) telegram.InvokeFunc {
+    return func(ctx context.Context, input bin.Encoder, output bin.Decoder) error {
+        return next.Invoke(ctx, &tg.InvokeWithTakeoutRequest{
+            TakeoutID: t.id,
+            Query:     nopDecoder{input},
+        }, output)
+    }
+}
+```
 
 ## References
 

@@ -8,9 +8,10 @@ import (
 
 // Re-export telegram package functions for external use
 var (
-	TelegramDownload      = telegram.Download
-	TelegramSessionPath   = telegram.SessionPath
-	TelegramSessionExists = telegram.SessionExists
+	TelegramDownload            = telegram.Download
+	TelegramDownloadWithOptions = telegram.DownloadWithOptions
+	TelegramSessionPath         = telegram.SessionPath
+	TelegramSessionExists       = telegram.SessionExists
 )
 
 // Re-export constants
@@ -20,7 +21,8 @@ const (
 )
 
 // Re-export types
-type TelegramDownloadResult = telegram.DownloadResult
+type TelegramDownloadResult  = telegram.DownloadResult
+type TelegramDownloadOptions = telegram.DownloadOptions
 
 // TelegramExtractor wraps the telegram.Extractor for registration
 type TelegramExtractor struct {

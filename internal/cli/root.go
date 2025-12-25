@@ -647,14 +647,13 @@ func confirmBilibiliNoLogin() bool {
 	return response == "y" || response == "yes" || response == "是"
 }
 
-// runTelegramDownload handles Telegram media downloads with TUI progress
+// runTelegramDownload handles a single Telegram media download with TUI progress
 func runTelegramDownload(urlStr, outputPath string) error {
 	fmt.Println("  Connecting to Telegram...")
 
 	cfg := config.LoadOrDefault()
 	lang := cfg.Language
 
-	// Wrapper to convert extractor result to downloader result type
 	downloadFn := func(url, output string, progressFn func(int64, int64)) (*downloader.TelegramDownloadResult, error) {
 		result, err := extractor.TelegramDownload(url, output, progressFn)
 		if err != nil {
@@ -668,4 +667,48 @@ func runTelegramDownload(urlStr, outputPath string) error {
 	}
 
 	return downloader.RunTelegramDownloadTUI(urlStr, outputPath, lang, downloadFn)
+}
+
+// runTelegramBatchDownload handles multiple Telegram URLs with takeout mode for lower rate limits
+func runTelegramBatchDownload(urls []string) (succeeded, failed int, failedURLs []string) {
+	if len(urls) == 0 {
+		return 0, 0, nil
+	}
+
+	fmt.Printf("  Using takeout mode for %d Telegram URLs\n\n", len(urls))
+
+	cfg := config.LoadOrDefault()
+	lang := cfg.Language
+
+	for i, urlStr := range urls {
+		fmt.Printf("  [%d/%d] %s\n", i+1, len(urls), urlStr)
+
+		downloadFn := func(url, output string, progressFn func(int64, int64)) (*downloader.TelegramDownloadResult, error) {
+			result, err := extractor.TelegramDownloadWithOptions(extractor.TelegramDownloadOptions{
+				URL:        url,
+				OutputPath: output,
+				Takeout:    true,
+				ProgressFn: progressFn,
+			})
+			if err != nil {
+				return nil, err
+			}
+			return &downloader.TelegramDownloadResult{
+				Title:    result.Title,
+				Filename: result.Filename,
+				Size:     result.Size,
+			}, nil
+		}
+
+		if err := downloader.RunTelegramDownloadTUI(urlStr, "", lang, downloadFn); err != nil {
+			fmt.Fprintf(os.Stderr, "  Error: %v\n", err)
+			failed++
+			failedURLs = append(failedURLs, urlStr)
+		} else {
+			succeeded++
+		}
+		fmt.Println()
+	}
+
+	return succeeded, failed, failedURLs
 }
