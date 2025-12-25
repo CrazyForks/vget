@@ -287,6 +287,7 @@ GET /api/ai/result/:jobId
 | `internal/core/ai/summarizer/anthropic.go` | Claude summarization |
 | `internal/core/ai/summarizer/ollama.go` | Local LLM |
 | `internal/core/ai/summarizer/cli.go` | CLI tools (claude, gemini, codex, etc.) |
+| `internal/core/ai/summarizer/router.go` | AI Routers (OpenRouter, MuleRouter) |
 | `internal/core/ai/output/srt.go` | SRT formatter |
 | `internal/core/ai/output/markdown.go` | Markdown formatter |
 | `internal/cli/ai.go` | `vget ai` command |
@@ -367,6 +368,67 @@ vget supports 7 languages: **en, zh, jp, kr, es, fr, de**
 | Deepgram | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | 30+ languages |
 
 All major transcription providers support vget's 7 languages.
+
+### AI Routers (unified access to multiple providers)
+
+Most routers use OpenAI-compatible APIs, so we support them generically:
+
+| Router | Models | Markup | Self-host | Best for |
+|--------|--------|--------|-----------|----------|
+| **OpenRouter** | 300+ | 5% | No | Most popular, easy |
+| **LiteLLM** | 100+ | FREE | **Yes** | Self-hosters |
+| **Groq** | Limited | Low | No | Speed (LPU hardware) |
+| **Gatewayz** | 10,000+ | ? | No | Most models |
+| **MuleRouter** | Qwen | ? | No | Qwen + video |
+
+**Config (generic - works with any OpenAI-compatible router):**
+```yaml
+ai:
+  summarization:
+    provider: router          # Generic router provider
+    base_url: https://openrouter.ai/api/v1  # or any router
+    api_key: sk-xxx
+    model: anthropic/claude-sonnet-4
+```
+
+**Preset shortcuts:**
+```yaml
+ai:
+  summarization:
+    provider: openrouter      # Shortcut: auto-sets base_url
+    api_key: sk-xxx
+    model: google/gemini-2.5-flash  # FREE on OpenRouter!
+```
+
+**Implementation:**
+```go
+// internal/core/ai/summarizer/router.go
+// One implementation handles ALL OpenAI-compatible routers
+type RouterSummarizer struct {
+    apiKey  string
+    model   string
+    baseURL string  // Any OpenAI-compatible endpoint
+}
+
+// Preset base URLs
+var routerPresets = map[string]string{
+    "openrouter": "https://openrouter.ai/api/v1",
+    "groq":       "https://api.groq.com/openai/v1",
+    "gatewayz":   "https://api.gatewayz.ai/v1",
+    "mulerouter": "https://api.mulerouter.ai/v1",
+    // Users can also specify custom base_url for LiteLLM, etc.
+}
+```
+
+**TUI shows:**
+```
+# │    ── AI Routers (OpenAI-compatible) ──            │
+# │      openrouter          OpenRouter (300+ models)   │
+# │      groq                Groq (fast inference)      │
+# │      gatewayz            Gatewayz (10k+ models)     │
+# │      mulerouter          MuleRouter (Qwen focus)    │
+# │      custom              Custom base_url...         │
+```
 
 ### CLI Tools as Providers (use existing installations)
 
@@ -652,6 +714,11 @@ vget init ai
 # │    ── Local (free, requires setup) ──               │
 # │      ollama/llama3       Llama 3 (8B/70B)           │
 # │      ollama/qwen         Qwen 2.5 local             │
+# │                                                     │
+# │    ── AI Routers (OpenAI-compatible) ──            │
+# │      openrouter          OpenRouter (300+ models)   │
+# │      groq                Groq (fast inference)      │
+# │      custom              Custom base_url...         │
 # │                                                     │
 # │    ── CLI Tools (use existing installation) ──     │
 # │      cli/gemini          Gemini CLI (FREE!)         │
