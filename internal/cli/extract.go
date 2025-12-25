@@ -43,10 +43,10 @@ func (s *extractState) setError(err error) {
 	s.done = true
 }
 
-func (s *extractState) get() (bool, error, extractor.Media) {
+func (s *extractState) get() (bool, extractor.Media, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.done, s.err, s.result
+	return s.done, s.result, s.err
 }
 
 type extractTickMsg time.Time
@@ -106,7 +106,7 @@ func (m extractModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m extractModel) View() string {
-	done, err, result := m.state.get()
+	done, result, err := m.state.get()
 
 	if err != nil {
 		// Special handling for YouTube Docker requirement (info message, not error)
@@ -188,7 +188,7 @@ func runExtractWithSpinner(ext extractor.Extractor, url, lang string) (extractor
 		return nil, err
 	}
 
-	done, extractErr, result := state.get()
+	done, result, extractErr := state.get()
 	if extractErr != nil {
 		return nil, extractErr
 	}

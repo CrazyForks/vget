@@ -85,9 +85,7 @@ func (s *downloadState) getFinal() (elapsed time.Duration, avgSpeed float64) {
 type tickMsg time.Time
 
 // downloadDoneMsg signals download completion
-type downloadDoneMsg struct {
-	err error
-}
+type downloadDoneMsg struct{}
 
 // downloadModel is the Bubble Tea model for download progress
 type downloadModel struct {

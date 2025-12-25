@@ -179,7 +179,7 @@ func (b *BilibiliExtractor) Extract(urlStr string) (Media, error) {
 	cid := videoInfo.Pages[0].CID
 
 	// Fetch play URL to get stream info
-	streams, err := b.fetchPlayURL(aid, cid, bvid)
+	streams, err := b.fetchPlayURL(aid, cid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch play URL: %w", err)
 	}
@@ -462,7 +462,7 @@ type BilibiliStreamInfo struct {
 }
 
 // fetchPlayURL retrieves stream URLs
-func (b *BilibiliExtractor) fetchPlayURL(aid, cid int64, bvid string) (*BilibiliStreamInfo, error) {
+func (b *BilibiliExtractor) fetchPlayURL(aid, cid int64) (*BilibiliStreamInfo, error) {
 	params := url.Values{}
 	params.Set("avid", strconv.FormatInt(aid, 10))
 	params.Set("cid", strconv.FormatInt(cid, 10))

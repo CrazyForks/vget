@@ -35,10 +35,9 @@ func DefaultHLSConfig() HLSConfig {
 
 // hlsState tracks HLS download progress
 type hlsState struct {
-	downloaded     int64 // Segments downloaded (atomic)
-	totalSegments  int64 // Total segments
-	bytesWritten   int64 // Total bytes written (atomic)
-	currentSegment int64 // Current segment being downloaded (atomic)
+	downloaded    int64 // Segments downloaded (atomic)
+	totalSegments int64 // Total segments
+	bytesWritten  int64 // Total bytes written (atomic)
 }
 
 func (s *hlsState) getProgress() (downloaded, total int64) {

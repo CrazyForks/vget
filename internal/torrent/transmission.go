@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -413,15 +412,3 @@ func (c *TransmissionClient) ResumeTorrent(id string) error {
 	return err
 }
 
-// Helper to check if string looks like a hash (for ID vs hash detection)
-func isHash(s string) bool {
-	if len(s) != 40 {
-		return false
-	}
-	for _, c := range strings.ToLower(s) {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
-			return false
-		}
-	}
-	return true
-}

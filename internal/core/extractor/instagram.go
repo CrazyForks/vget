@@ -18,7 +18,7 @@ func (e *InstagramExtractor) Match(u *url.URL) bool {
 }
 
 func (e *InstagramExtractor) Extract(url string) (Media, error) {
-	return nil, fmt.Errorf("Instagram support coming soon")
+	return nil, fmt.Errorf("instagram support coming soon")
 }
 
 func init() {

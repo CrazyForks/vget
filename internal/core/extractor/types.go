@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -194,17 +195,13 @@ func SanitizeFilename(name string) string {
 
 	// Handle Windows reserved names (CON, PRN, AUX, NUL, COM1-9, LPT1-9)
 	// These names (with or without extension) cannot be used as filenames on Windows
-	upperResult := strings.ToUpper(result)
 	reservedNames := []string{
 		"CON", "PRN", "AUX", "NUL",
 		"COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
 		"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
 	}
-	for _, reserved := range reservedNames {
-		if upperResult == reserved {
-			result = "_" + result
-			break
-		}
+	if slices.Contains(reservedNames, strings.ToUpper(result)) {
+		result = "_" + result
 	}
 
 	return result
