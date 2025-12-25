@@ -138,6 +138,14 @@ type UITranslations struct {
 	Download         string `yaml:"download" json:"download"`
 	BulkDownload     string `yaml:"bulk_download" json:"bulk_download"`
 	ComingSoon       string `yaml:"coming_soon" json:"coming_soon"`
+	BulkPasteURLs    string `yaml:"bulk_paste_urls" json:"bulk_paste_urls"`
+	BulkSelectFile   string `yaml:"bulk_select_file" json:"bulk_select_file"`
+	BulkDragDrop     string `yaml:"bulk_drag_drop" json:"bulk_drag_drop"`
+	BulkURLCount     string `yaml:"bulk_url_count" json:"bulk_url_count"`
+	BulkSubmitAll    string `yaml:"bulk_submit_all" json:"bulk_submit_all"`
+	BulkSubmitting   string `yaml:"bulk_submitting" json:"bulk_submitting"`
+	BulkClear        string `yaml:"bulk_clear" json:"bulk_clear"`
+	BulkInvalidHint  string `yaml:"bulk_invalid_hint" json:"bulk_invalid_hint"`
 	Adding           string `yaml:"adding" json:"adding"`
 	Jobs             string `yaml:"jobs" json:"jobs"`
 	Total            string `yaml:"total" json:"total"`

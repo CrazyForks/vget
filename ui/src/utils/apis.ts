@@ -133,6 +133,29 @@ export async function postDownload(
   return res.json();
 }
 
+export interface BulkDownloadJob {
+  id: string;
+  url: string;
+  status: string;
+}
+
+export interface BulkDownloadResult {
+  jobs: BulkDownloadJob[];
+  queued: number;
+  failed: string[];
+}
+
+export async function postBulkDownload(
+  urls: string[]
+): Promise<ApiResponse<BulkDownloadResult>> {
+  const res = await fetch("/api/bulk-download", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ urls }),
+  });
+  return res.json();
+}
+
 export async function addWebDAVServer(
   name: string,
   url: string,

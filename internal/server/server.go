@@ -37,6 +37,11 @@ type DownloadRequest struct {
 	ReturnFile bool   `json:"return_file,omitempty"`
 }
 
+// BulkDownloadRequest is the request body for POST /bulk-download
+type BulkDownloadRequest struct {
+	URLs []string `json:"urls" binding:"required"`
+}
+
 // Server is the HTTP server for vget
 type Server struct {
 	port      int
@@ -103,6 +108,7 @@ func (s *Server) Start() error {
 	api := s.engine.Group("/api")
 	api.GET("/health", s.handleHealth)
 	api.POST("/download", s.handleDownload)
+	api.POST("/bulk-download", s.handleBulkDownload)
 	api.GET("/status/:id", s.handleStatus)
 	api.GET("/jobs", s.handleGetJobs)
 	api.DELETE("/jobs", s.handleClearJobs)
@@ -181,6 +187,7 @@ func (s *Server) authMiddleware() gin.HandlerFunc {
 		// Only API routes require auth (those under /api prefix)
 		// Exclude /api/download and /api/jobs which need auth
 		isProtectedAPIRoute := path == "/api/download" ||
+			path == "/api/bulk-download" ||
 			strings.HasPrefix(path, "/api/status/") ||
 			path == "/api/jobs" ||
 			strings.HasPrefix(path, "/api/jobs/")
@@ -295,6 +302,60 @@ func (s *Server) handleDownload(c *gin.Context) {
 			"status": job.Status,
 		},
 		Message: "download started",
+	})
+}
+
+func (s *Server) handleBulkDownload(c *gin.Context) {
+	var req BulkDownloadRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, Response{
+			Code:    400,
+			Data:    nil,
+			Message: "invalid request body: urls array is required",
+		})
+		return
+	}
+
+	if len(req.URLs) == 0 {
+		c.JSON(http.StatusBadRequest, Response{
+			Code:    400,
+			Data:    nil,
+			Message: "urls array cannot be empty",
+		})
+		return
+	}
+
+	// Queue all downloads
+	var jobs []gin.H
+	var failed []string
+
+	for _, url := range req.URLs {
+		url = strings.TrimSpace(url)
+		// Skip empty lines and comments
+		if url == "" || strings.HasPrefix(url, "#") {
+			continue
+		}
+
+		job, err := s.jobQueue.AddJob(url, "")
+		if err != nil {
+			failed = append(failed, url)
+			continue
+		}
+		jobs = append(jobs, gin.H{
+			"id":     job.ID,
+			"url":    job.URL,
+			"status": job.Status,
+		})
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Code: 200,
+		Data: gin.H{
+			"jobs":   jobs,
+			"queued": len(jobs),
+			"failed": failed,
+		},
+		Message: fmt.Sprintf("%d downloads queued", len(jobs)),
 	})
 }
 

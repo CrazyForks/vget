@@ -6,7 +6,11 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import { ToastContainer, type ToastData, type ToastType } from "../components/Toast";
+import {
+  ToastContainer,
+  type ToastData,
+  type ToastType,
+} from "../components/Toast";
 import {
   type UITranslations,
   type ServerTranslations,
@@ -199,17 +203,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     refresh();
   }, [refresh]);
 
-  const updateOutputDir = useCallback(
-    async (dir: string) => {
-      const res = await updateConfig(dir.trim());
-      if (res.code === 200) {
-        setOutputDir(res.data.output_dir);
-        return true;
-      }
-      return false;
-    },
-    []
-  );
+  const updateOutputDir = useCallback(async (dir: string) => {
+    const res = await updateConfig(dir.trim());
+    if (res.code === 200) {
+      setOutputDir(res.data.output_dir);
+      return true;
+    }
+    return false;
+  }, []);
 
   const saveConfig = useCallback(
     async (values: ConfigValues) => {
@@ -300,6 +301,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useApp() {
   const context = useContext(AppContext);
   if (!context) {

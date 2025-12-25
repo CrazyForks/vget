@@ -7,6 +7,14 @@ export interface UITranslations {
   download: string;
   bulk_download: string;
   coming_soon: string;
+  bulk_paste_urls: string;
+  bulk_select_file: string;
+  bulk_drag_drop: string;
+  bulk_url_count: string;
+  bulk_submit_all: string;
+  bulk_submitting: string;
+  bulk_clear: string;
+  bulk_invalid_hint: string;
   adding: string;
   jobs: string;
   total: string;
@@ -87,6 +95,14 @@ export const defaultTranslations: UITranslations = {
   download: "Download",
   bulk_download: "Bulk Download",
   coming_soon: "Coming Soon",
+  bulk_paste_urls: "Paste URLs here (one per line)...",
+  bulk_select_file: "Select File",
+  bulk_drag_drop: "or drag and drop a .txt file here",
+  bulk_url_count: "URLs",
+  bulk_submit_all: "Download All",
+  bulk_submitting: "Submitting...",
+  bulk_clear: "Clear",
+  bulk_invalid_hint: "Empty lines and lines starting with # are ignored",
   adding: "Adding...",
   jobs: "Jobs",
   total: "total",
