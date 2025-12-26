@@ -137,12 +137,13 @@ export interface BulkDownloadJob {
   id: string;
   url: string;
   status: string;
+  error?: string;
 }
 
 export interface BulkDownloadResult {
   jobs: BulkDownloadJob[];
   queued: number;
-  failed: string[];
+  failed: number;
 }
 
 export async function postBulkDownload(

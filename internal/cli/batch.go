@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/guiyumin/vget/internal/core/extractor"
 )
 
 // runBatch reads URLs from a file and downloads each one
@@ -16,14 +18,23 @@ func runBatch(filename string) error {
 	defer file.Close()
 
 	var urls []string
+	var invalidURLs []string
 	scanner := bufio.NewScanner(file)
+	lineNum := 0
 	for scanner.Scan() {
+		lineNum++
 		line := strings.TrimSpace(scanner.Text())
 		// Skip empty lines and comments
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		urls = append(urls, line)
+		// Normalize URL: add https:// if missing
+		normalized, err := extractor.NormalizeURL(line)
+		if err != nil {
+			invalidURLs = append(invalidURLs, fmt.Sprintf("line %d: %s", lineNum, line))
+			continue
+		}
+		urls = append(urls, normalized)
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -31,7 +42,19 @@ func runBatch(filename string) error {
 	}
 
 	if len(urls) == 0 {
+		if len(invalidURLs) > 0 {
+			return fmt.Errorf("no valid URLs found in file (%d invalid)", len(invalidURLs))
+		}
 		return fmt.Errorf("no URLs found in file")
+	}
+
+	// Warn about invalid URLs
+	if len(invalidURLs) > 0 {
+		fmt.Printf("\033[33mWarning: %d invalid URL(s) skipped:\033[0m\n", len(invalidURLs))
+		for _, u := range invalidURLs {
+			fmt.Printf("  - %s\n", u)
+		}
+		fmt.Println()
 	}
 
 	fmt.Printf("Found %d URL(s) to download\n\n", len(urls))

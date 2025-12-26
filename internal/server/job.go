@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/guiyumin/vget/internal/core/extractor"
 )
 
 // JobStatus represents the current state of a download job
@@ -186,8 +188,35 @@ func (jq *JobQueue) RemoveJob(id string) bool {
 	return true
 }
 
+// AddFailedJob creates a job that immediately fails with the given error
+func (jq *JobQueue) AddFailedJob(rawURL, errorMsg string) *Job {
+	id, _ := generateJobID()
+
+	job := &Job{
+		ID:        id,
+		URL:       rawURL,
+		Status:    JobStatusFailed,
+		Error:     errorMsg,
+		Progress:  0,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	jq.mu.Lock()
+	jq.jobs[id] = job
+	jq.mu.Unlock()
+
+	return job
+}
+
 // AddJob creates and queues a new download job
-func (jq *JobQueue) AddJob(url, filename string) (*Job, error) {
+func (jq *JobQueue) AddJob(rawURL, filename string) (*Job, error) {
+	// Normalize URL: add https:// if missing
+	url, err := extractor.NormalizeURL(rawURL)
+	if err != nil {
+		return nil, err
+	}
+
 	id, err := generateJobID()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate job ID: %w", err)

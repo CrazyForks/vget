@@ -1,8 +1,8 @@
 import { useEffect } from "react";
-import { FaCheck, FaXmark, FaCircleInfo } from "react-icons/fa6";
+import { FaCheck, FaXmark, FaCircleInfo, FaTriangleExclamation } from "react-icons/fa6";
 import clsx from "clsx";
 
-export type ToastType = "success" | "error" | "info";
+export type ToastType = "success" | "error" | "info" | "warning";
 
 export interface ToastData {
   id: string;
@@ -27,6 +27,7 @@ export function Toast({ toast, onDismiss }: ToastProps) {
     success: <FaCheck className="text-green-500 text-xl" />,
     error: <FaXmark className="text-red-500 text-xl" />,
     info: <FaCircleInfo className="text-blue-500 text-xl" />,
+    warning: <FaTriangleExclamation className="text-amber-500 text-xl" />,
   };
 
   return (

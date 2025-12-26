@@ -1,6 +1,7 @@
 package extractor
 
 import (
+	"fmt"
 	"net/url"
 	"path"
 	"strings"
@@ -43,6 +44,37 @@ func Register(e Extractor, hosts ...string) {
 	}
 }
 
+// NormalizeURL adds https:// scheme if missing and validates the result
+func NormalizeURL(rawURL string) (string, error) {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return "", fmt.Errorf("empty URL")
+	}
+
+	var candidate string
+	// Already has scheme
+	if strings.HasPrefix(rawURL, "http://") || strings.HasPrefix(rawURL, "https://") {
+		candidate = rawURL
+	} else {
+		// Try adding https://
+		candidate = "https://" + rawURL
+	}
+
+	// Parse and validate with strict parser (requires absolute URI)
+	u, err := url.ParseRequestURI(candidate)
+	if err != nil {
+		return "", fmt.Errorf("invalid URL: %s", rawURL)
+	}
+
+	// Must have a valid hostname with at least one dot (e.g., example.com, not just "asdasd")
+	host := u.Hostname()
+	if host == "" || !strings.Contains(host, ".") {
+		return "", fmt.Errorf("invalid URL (no valid domain): %s", rawURL)
+	}
+
+	return candidate, nil
+}
+
 // RegisterFallback sets the fallback extractor for direct files and unknown hosts
 func RegisterFallback(e Extractor) {
 	fallbackExtractor = e
@@ -51,7 +83,13 @@ func RegisterFallback(e Extractor) {
 // Match finds the extractor for a URL using O(1) hostname lookup
 // Returns nil for unknown hosts (caller should check sites.yml)
 func Match(rawURL string) Extractor {
-	u, err := url.Parse(rawURL)
+	// Normalize URL: add https:// if no scheme present
+	normalized, err := NormalizeURL(rawURL)
+	if err != nil {
+		return nil
+	}
+
+	u, err := url.Parse(normalized)
 	if err != nil {
 		return nil
 	}

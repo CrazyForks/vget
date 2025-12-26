@@ -2,7 +2,6 @@ import { useState } from "react";
 import clsx from "clsx";
 import { useApp } from "../context/AppContext";
 import { DownloadJobCard } from "../components/DownloadJobCard";
-import type { JobStatus } from "../utils/apis";
 
 export function DownloadPage() {
   const {
@@ -55,15 +54,11 @@ export function DownloadPage() {
     setNewOutputDir("");
   };
 
+  // Sort by title (filename or URL) for stable ordering
   const sortedJobs = [...jobs].sort((a, b) => {
-    const order: Record<JobStatus, number> = {
-      downloading: 0,
-      queued: 1,
-      completed: 2,
-      failed: 3,
-      cancelled: 4,
-    };
-    return (order[a.status] ?? 5) - (order[b.status] ?? 5);
+    const titleA = a.filename || a.url;
+    const titleB = b.filename || b.url;
+    return titleA.localeCompare(titleB);
   });
 
   return (

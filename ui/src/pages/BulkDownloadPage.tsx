@@ -89,13 +89,14 @@ export function BulkDownloadPage() {
       const res = await postBulkDownload(urls);
       if (res.code === 200) {
         const { queued, failed } = res.data;
-        if (queued > 0) {
+        setUrlText("");
+        refresh();
+        if (queued > 0 && failed === 0) {
           showToast("success", `${queued} ${t.downloads_queued}`);
-          setUrlText("");
-          refresh();
-        }
-        if (failed && failed.length > 0) {
-          showToast("error", `${failed.length} URLs failed to queue`);
+        } else if (queued > 0 && failed > 0) {
+          showToast("warning", `${queued} queued, ${failed} invalid`);
+        } else if (failed > 0) {
+          showToast("error", `${failed} invalid URL(s)`);
         }
       } else {
         showToast("error", res.message || "Failed to queue downloads");

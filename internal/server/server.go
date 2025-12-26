@@ -327,7 +327,7 @@ func (s *Server) handleBulkDownload(c *gin.Context) {
 
 	// Queue all downloads
 	var jobs []gin.H
-	var failed []string
+	var queued, failed int
 
 	for _, url := range req.URLs {
 		url = strings.TrimSpace(url)
@@ -338,7 +338,15 @@ func (s *Server) handleBulkDownload(c *gin.Context) {
 
 		job, err := s.jobQueue.AddJob(url, "")
 		if err != nil {
-			failed = append(failed, url)
+			// Create a failed job so it shows in the UI
+			failedJob := s.jobQueue.AddFailedJob(url, err.Error())
+			jobs = append(jobs, gin.H{
+				"id":     failedJob.ID,
+				"url":    failedJob.URL,
+				"status": failedJob.Status,
+				"error":  failedJob.Error,
+			})
+			failed++
 			continue
 		}
 		jobs = append(jobs, gin.H{
@@ -346,16 +354,17 @@ func (s *Server) handleBulkDownload(c *gin.Context) {
 			"url":    job.URL,
 			"status": job.Status,
 		})
+		queued++
 	}
 
 	c.JSON(http.StatusOK, Response{
 		Code: 200,
 		Data: gin.H{
 			"jobs":   jobs,
-			"queued": len(jobs),
+			"queued": queued,
 			"failed": failed,
 		},
-		Message: fmt.Sprintf("%d downloads queued", len(jobs)),
+		Message: fmt.Sprintf("%d downloads queued", queued),
 	})
 }
 
