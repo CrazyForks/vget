@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -1287,6 +1288,11 @@ func (s *Server) downloadWithExtractor(ctx context.Context, url, filename string
 
 		s.updateJobFilename(url, outputPath)
 
+		// Handle separate audio stream (e.g., Bilibili DASH)
+		if format.AudioURL != "" {
+			return s.downloadVideoWithAudio(ctx, format, outputPath, progressFn)
+		}
+
 	case *extractor.AudioMedia:
 		downloadURL = m.URL
 
@@ -1369,6 +1375,90 @@ func (s *Server) updateJobFilename(url, filename string) {
 			break
 		}
 	}
+}
+
+// downloadVideoWithAudio downloads video and audio in parallel then merges them with ffmpeg
+func (s *Server) downloadVideoWithAudio(ctx context.Context, format *extractor.VideoFormat, outputPath string, progressFn func(downloaded, total int64)) error {
+	// Determine audio extension based on video format
+	audioExt := "m4a"
+	if format.Ext == "webm" {
+		audioExt = "opus"
+	}
+
+	// Build filenames
+	ext := filepath.Ext(outputPath)
+	baseName := strings.TrimSuffix(outputPath, ext)
+	videoFile := outputPath
+	audioFile := baseName + "." + audioExt
+
+	// Track progress from both downloads
+	var videoDownloaded, videoTotal int64
+	var audioDownloaded, audioTotal int64
+	var mu sync.Mutex
+
+	reportProgress := func() {
+		if progressFn != nil {
+			mu.Lock()
+			total := videoTotal + audioTotal
+			downloaded := videoDownloaded + audioDownloaded
+			mu.Unlock()
+			if total > 0 {
+				progressFn(downloaded, total)
+			}
+		}
+	}
+
+	// Download video and audio in parallel
+	var wg sync.WaitGroup
+	var videoErr, audioErr error
+
+	wg.Add(2)
+
+	// Download video stream
+	go func() {
+		defer wg.Done()
+		videoErr = downloadFile(ctx, format.URL, videoFile, format.Headers, func(downloaded, total int64) {
+			mu.Lock()
+			videoDownloaded = downloaded
+			videoTotal = total
+			mu.Unlock()
+			reportProgress()
+		})
+	}()
+
+	// Download audio stream
+	go func() {
+		defer wg.Done()
+		audioErr = downloadFile(ctx, format.AudioURL, audioFile, format.Headers, func(downloaded, total int64) {
+			mu.Lock()
+			audioDownloaded = downloaded
+			audioTotal = total
+			mu.Unlock()
+			reportProgress()
+		})
+	}()
+
+	wg.Wait()
+
+	// Check for errors
+	if videoErr != nil {
+		return fmt.Errorf("failed to download video stream: %w", videoErr)
+	}
+	if audioErr != nil {
+		return fmt.Errorf("failed to download audio stream: %w", audioErr)
+	}
+
+	// Merge with ffmpeg
+	if !downloader.FFmpegAvailable() {
+		return fmt.Errorf("ffmpeg not available, video and audio downloaded separately: %s, %s", videoFile, audioFile)
+	}
+
+	_, err := downloader.MergeVideoAudioKeepOriginals(videoFile, audioFile)
+	if err != nil {
+		return fmt.Errorf("ffmpeg merge failed: %w (files: %s, %s)", err, videoFile, audioFile)
+	}
+
+	return nil
 }
 
 // downloadAndStream extracts and streams the file directly to the response

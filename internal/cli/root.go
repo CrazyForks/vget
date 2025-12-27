@@ -452,7 +452,7 @@ func downloadVideoWithIndex(m *extractor.VideoMedia, dl *downloader.Downloader, 
 	return dl.Download(format.URL, outputFile, m.ID)
 }
 
-// downloadVideoAndAudio downloads video and audio as separate files
+// downloadVideoAndAudio downloads video and audio as separate files, then merges them if ffmpeg is available
 func downloadVideoAndAudio(format *extractor.VideoFormat, outputFile, videoID string, dl *downloader.Downloader) error {
 	// Determine audio extension based on video format
 	audioExt := "m4a"
@@ -489,11 +489,32 @@ func downloadVideoAndAudio(format *extractor.VideoFormat, outputFile, videoID st
 		return fmt.Errorf("failed to download audio: %w", err)
 	}
 
-	fmt.Printf("\n  Downloaded:\n")
-	fmt.Printf("    Video: %s\n", videoFile)
-	fmt.Printf("    Audio: %s\n", audioFile)
-	fmt.Printf("\n  To merge with ffmpeg:\n")
-	fmt.Printf("    ffmpeg -i \"%s\" -i \"%s\" -c copy \"%s\"\n", videoFile, audioFile, baseName+"_merged.mp4")
+	// Try to merge with ffmpeg if available
+	if downloader.FFmpegAvailable() {
+		fmt.Println("  Merging video and audio...")
+		mergedPath, err := downloader.MergeVideoAudioKeepOriginals(videoFile, audioFile)
+		if err != nil {
+			// Merge failed, show manual command
+			fmt.Printf("\n  Warning: ffmpeg merge failed: %v\n", err)
+			fmt.Printf("\n  Downloaded separately:\n")
+			fmt.Printf("    Video: %s\n", videoFile)
+			fmt.Printf("    Audio: %s\n", audioFile)
+			fmt.Printf("\n  To merge manually:\n")
+			fmt.Printf("    ffmpeg -i \"%s\" -i \"%s\" -c copy \"%s\"\n", videoFile, audioFile, baseName+"_merged.mp4")
+		} else {
+			fmt.Printf("\n  Downloaded:\n")
+			fmt.Printf("    Video: %s\n", videoFile)
+			fmt.Printf("    Audio: %s\n", audioFile)
+			fmt.Printf("    Merged: %s\n", mergedPath)
+		}
+	} else {
+		// No ffmpeg, show manual command
+		fmt.Printf("\n  Downloaded:\n")
+		fmt.Printf("    Video: %s\n", videoFile)
+		fmt.Printf("    Audio: %s\n", audioFile)
+		fmt.Printf("\n  To merge with ffmpeg:\n")
+		fmt.Printf("    ffmpeg -i \"%s\" -i \"%s\" -c copy \"%s\"\n", videoFile, audioFile, baseName+"_merged.mp4")
+	}
 
 	return nil
 }
