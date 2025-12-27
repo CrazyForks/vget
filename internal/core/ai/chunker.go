@@ -293,6 +293,7 @@ func (c *Chunker) getAudioDuration(filePath string) (time.Duration, error) {
 // extractChunk extracts a portion of audio using ffmpeg.
 func (c *Chunker) extractChunk(input, output string, start, duration time.Duration) error {
 	cmd := exec.Command("ffmpeg",
+		"-threads", "1",
 		"-y",
 		"-ss", formatDuration(start),
 		"-i", input,
