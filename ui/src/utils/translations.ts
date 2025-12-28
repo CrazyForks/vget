@@ -97,6 +97,11 @@ export interface UITranslations {
   ai_transcription_url: string;
   ai_summary_model: string;
   ai_summary_url: string;
+  ai_transcribe: string;
+  ai_summarize: string;
+  ai_processing: string;
+  ai_run: string;
+  ai_select_model: string;
 }
 
 export interface ServerTranslations {
@@ -203,6 +208,11 @@ export const defaultTranslations: UITranslations = {
   ai_transcription_url: "Transcription URL",
   ai_summary_model: "Summary Model",
   ai_summary_url: "Summary URL",
+  ai_transcribe: "Transcribe",
+  ai_summarize: "Summarize",
+  ai_processing: "Processing...",
+  ai_run: "Run",
+  ai_select_model: "Select AI and Model",
 };
 
 export const defaultServerTranslations: ServerTranslations = {

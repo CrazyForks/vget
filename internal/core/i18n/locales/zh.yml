@@ -194,6 +194,11 @@ ui:
   ai_transcription_url: "转录 URL"
   ai_summary_model: "摘要模型"
   ai_summary_url: "摘要 URL"
+  ai_transcribe: "转录"
+  ai_summarize: "总结"
+  ai_processing: "处理中..."
+  ai_run: "运行"
+  ai_select_model: "选择 AI 和模型"
 
 # 服务器消息
 server:

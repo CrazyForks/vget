@@ -182,6 +182,11 @@ ui:
   ai_transcription_url: "Transkriptions-URL"
   ai_summary_model: "Zusammenfassungsmodell"
   ai_summary_url: "Zusammenfassungs-URL"
+  ai_transcribe: "Transkribieren"
+  ai_summarize: "Zusammenfassen"
+  ai_processing: "Verarbeitung..."
+  ai_run: "Ausführen"
+  ai_select_model: "KI und Modell auswählen"
 
 # Server-Nachrichten
 server:

@@ -182,6 +182,11 @@ ui:
   ai_transcription_url: "URL de transcription"
   ai_summary_model: "Modèle de résumé"
   ai_summary_url: "URL de résumé"
+  ai_transcribe: "Transcrire"
+  ai_summarize: "Résumer"
+  ai_processing: "Traitement..."
+  ai_run: "Exécuter"
+  ai_select_model: "Sélectionner l'IA et le modèle"
 
 # Messages du serveur
 server:

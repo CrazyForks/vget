@@ -230,6 +230,11 @@ type UITranslations struct {
 	AITranscriptionURL    string `yaml:"ai_transcription_url" json:"ai_transcription_url"`
 	AISummaryModel        string `yaml:"ai_summary_model" json:"ai_summary_model"`
 	AISummaryURL          string `yaml:"ai_summary_url" json:"ai_summary_url"`
+	AITranscribe          string `yaml:"ai_transcribe" json:"ai_transcribe"`
+	AISummarize           string `yaml:"ai_summarize" json:"ai_summarize"`
+	AIProcessing          string `yaml:"ai_processing" json:"ai_processing"`
+	AIRun                 string `yaml:"ai_run" json:"ai_run"`
+	AISelectModel         string `yaml:"ai_select_model" json:"ai_select_model"`
 }
 
 // ServerTranslations holds translations for server messages

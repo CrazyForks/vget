@@ -182,6 +182,11 @@ ui:
   ai_transcription_url: "文字起こしURL"
   ai_summary_model: "要約モデル"
   ai_summary_url: "要約URL"
+  ai_transcribe: "文字起こし"
+  ai_summarize: "要約"
+  ai_processing: "処理中..."
+  ai_run: "実行"
+  ai_select_model: "AIとモデルを選択"
 
 # サーバーメッセージ
 server:

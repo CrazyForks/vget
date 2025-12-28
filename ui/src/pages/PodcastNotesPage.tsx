@@ -492,7 +492,7 @@ export function PodcastNotesPage() {
       {selectedFile && (
         <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
           <h2 className="font-medium text-zinc-900 dark:text-white mb-4">
-            2. AI Configuration
+            2. {t.ai_select_model}
           </h2>
 
           {/* Selected file info */}
@@ -515,7 +515,7 @@ export function PodcastNotesPage() {
           {/* Transcription row */}
           <div className="flex items-center gap-3 mb-3">
             <div className="w-24 text-sm text-zinc-600 dark:text-zinc-400">
-              Transcribe:
+              {t.ai_transcribe}:
             </div>
             <select
               value={transcribeAccount}
@@ -525,7 +525,7 @@ export function PodcastNotesPage() {
             >
               {aiConfig?.accounts.map((acc) => (
                 <option key={acc.label} value={acc.label}>
-                  {acc.label}
+                  {acc.label} ({acc.provider})
                 </option>
               ))}
             </select>
@@ -553,14 +553,14 @@ export function PodcastNotesPage() {
               ) : (
                 <FaMicrophone />
               )}
-              {processing === "transcribe" ? "Processing..." : "Run"}
+              {processing === "transcribe" ? t.ai_processing : t.ai_run}
             </button>
           </div>
 
           {/* Summarization row */}
           <div className="flex items-center gap-3">
             <div className="w-24 text-sm text-zinc-600 dark:text-zinc-400">
-              Summarize:
+              {t.ai_summarize}:
             </div>
             <select
               value={summarizeAccount}
@@ -570,7 +570,7 @@ export function PodcastNotesPage() {
             >
               {aiConfig?.accounts.map((acc) => (
                 <option key={acc.label} value={acc.label}>
-                  {acc.label}
+                  {acc.label} ({acc.provider})
                 </option>
               ))}
             </select>
@@ -598,7 +598,7 @@ export function PodcastNotesPage() {
               ) : (
                 <FaFileLines />
               )}
-              {processing === "summarize" ? "Processing..." : "Run"}
+              {processing === "summarize" ? t.ai_processing : t.ai_run}
             </button>
           </div>
 

@@ -182,6 +182,11 @@ ui:
   ai_transcription_url: "전사 URL"
   ai_summary_model: "요약 모델"
   ai_summary_url: "요약 URL"
+  ai_transcribe: "전사"
+  ai_summarize: "요약"
+  ai_processing: "처리 중..."
+  ai_run: "실행"
+  ai_select_model: "AI 및 모델 선택"
 
 # 서버 메시지
 server:
