@@ -69,12 +69,7 @@ export function Sidebar({ lang }: SidebarProps) {
       label: "哔哩哔哩",
       show: lang === "zh",
     },
-    {
-      to: "/torrent",
-      icon: <FaMagnet />,
-      label: t.torrent,
-      show: true,
-    },
+
     {
       to: "/podcast",
       icon: <FaPodcast />,
@@ -87,7 +82,12 @@ export function Sidebar({ lang }: SidebarProps) {
       label: t.webdav_browser,
       show: true,
     },
-
+    {
+      to: "/torrent",
+      icon: <FaMagnet />,
+      label: t.torrent,
+      show: true,
+    },
     {
       to: "/kuaidi100",
       icon: <FaTruck />,

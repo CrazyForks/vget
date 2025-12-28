@@ -1,20 +1,23 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useApp } from "../context/AppContext";
 import {
-  fetchAudioFiles,
   fetchAIConfig,
+  fetchAudioFiles,
+  uploadAudioFile,
   transcribeAudio,
   summarizeText,
-  type AudioFile,
   type AIConfigData,
+  type AudioFile,
 } from "../utils/apis";
 import {
   FaMicrophone,
   FaFileLines,
   FaSpinner,
-  FaCheck,
   FaLock,
   FaGear,
+  FaUpload,
+  FaFile,
+  FaCheck,
 } from "react-icons/fa6";
 import { Link } from "@tanstack/react-router";
 import clsx from "clsx";
@@ -36,12 +39,23 @@ const SUMMARIZATION_MODELS: Record<string, string[]> = {
   qwen: ["qwen-plus", "qwen-turbo", "qwen-max"],
 };
 
+interface SelectedFile {
+  path: string;
+  filename: string;
+  size: number;
+  source: "downloaded" | "uploaded";
+  has_transcript?: boolean;
+  has_summary?: boolean;
+}
+
 export function PodcastNotesPage() {
   const { t, showToast } = useApp();
-  const [files, setFiles] = useState<AudioFile[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [aiConfig, setAIConfig] = useState<AIConfigData | null>(null);
-  const [selectedFile, setSelectedFile] = useState<AudioFile | null>(null);
+  const [downloadedFiles, setDownloadedFiles] = useState<AudioFile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
   const [processing, setProcessing] = useState<
     "transcribe" | "summarize" | null
   >(null);
@@ -68,21 +82,17 @@ export function PodcastNotesPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const [filesRes, aiRes] = await Promise.all([
-        fetchAudioFiles(),
+      const [aiRes, filesRes] = await Promise.all([
         fetchAIConfig(),
+        fetchAudioFiles(),
       ]);
-      if (filesRes.code === 200) {
-        setFiles(filesRes.data.files || []);
-      }
+
       if (aiRes.code === 200) {
         setAIConfig(aiRes.data);
-        // Set default account for both steps
         const defaultAcc = aiRes.data.default_account || "";
         if (defaultAcc) {
           setTranscribeAccount(defaultAcc);
           setSummarizeAccount(defaultAcc);
-          // Set default models based on provider
           const provider =
             aiRes.data.accounts[defaultAcc]?.provider || "openai";
           setTranscribeModel(
@@ -90,6 +100,10 @@ export function PodcastNotesPage() {
           );
           setSummarizeModel(SUMMARIZATION_MODELS[provider]?.[0] || "gpt-4o");
         }
+      }
+
+      if (filesRes.code === 200) {
+        setDownloadedFiles(filesRes.data.files || []);
       }
     } catch (e) {
       console.error("Failed to load data:", e);
@@ -105,17 +119,14 @@ export function PodcastNotesPage() {
   const hasAIAccount = aiConfig && Object.keys(aiConfig.accounts).length > 0;
   const accountList = aiConfig ? Object.entries(aiConfig.accounts) : [];
 
-  // Get current account's encryption status
   const getAccountEncrypted = (accountName: string) => {
     return aiConfig?.accounts[accountName]?.is_encrypted ?? true;
   };
 
-  // Get provider for account
   const getAccountProvider = (accountName: string) => {
     return aiConfig?.accounts[accountName]?.provider || "openai";
   };
 
-  // Update model when account changes
   const handleTranscribeAccountChange = (accountName: string) => {
     setTranscribeAccount(accountName);
     const provider = getAccountProvider(accountName);
@@ -126,6 +137,50 @@ export function PodcastNotesPage() {
     setSummarizeAccount(accountName);
     const provider = getAccountProvider(accountName);
     setSummarizeModel(SUMMARIZATION_MODELS[provider]?.[0] || "gpt-4o");
+  };
+
+  const handleSelectDownloadedFile = (file: AudioFile) => {
+    setSelectedFile({
+      path: file.full_path,
+      filename: file.name,
+      size: file.size,
+      source: "downloaded",
+      has_transcript: file.has_transcript,
+      has_summary: file.has_summary,
+    });
+    setTranscript(null);
+    setSummary(null);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    setTranscript(null);
+    setSummary(null);
+
+    try {
+      const res = await uploadAudioFile(file);
+      if (res.code === 200) {
+        setSelectedFile({
+          path: res.data.path,
+          filename: res.data.filename,
+          size: res.data.size,
+          source: "uploaded",
+        });
+        showToast("success", `Uploaded: ${res.data.filename}`);
+      } else {
+        showToast("error", res.message || "Upload failed");
+      }
+    } catch {
+      showToast("error", "Upload failed");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   };
 
   const handleTranscribe = useCallback(
@@ -139,7 +194,7 @@ export function PodcastNotesPage() {
 
       try {
         const res = await transcribeAudio({
-          file_path: selectedFile.full_path,
+          file_path: selectedFile.path,
           account: transcribeAccount,
           model: transcribeModel,
           pin: pinToUse || undefined,
@@ -148,6 +203,7 @@ export function PodcastNotesPage() {
         if (res.code === 200) {
           setTranscript(res.data.text);
           showToast("success", "Transcription completed");
+          // Refresh file list to update status
           loadData();
         } else if (res.code === 401) {
           showToast("error", "Incorrect PIN");
@@ -175,15 +231,15 @@ export function PodcastNotesPage() {
       setShowPINInput(false);
 
       try {
-        const transcriptPath = selectedFile.full_path.replace(
+        // Use transcript file if available, otherwise use in-memory transcript
+        const transcriptPath = selectedFile.path.replace(
           /\.[^.]+$/,
           ".transcript.md"
         );
 
         const res = await summarizeText({
           file_path: selectedFile.has_transcript ? transcriptPath : undefined,
-          text:
-            !selectedFile.has_transcript && transcript ? transcript : undefined,
+          text: !selectedFile.has_transcript && transcript ? transcript : undefined,
           account: summarizeAccount,
           model: summarizeModel,
           pin: pinToUse || undefined,
@@ -209,14 +265,7 @@ export function PodcastNotesPage() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      selectedFile,
-      summarizeAccount,
-      summarizeModel,
-      transcript,
-      showToast,
-      loadData,
-    ]
+    [selectedFile, transcript, summarizeAccount, summarizeModel, showToast, loadData]
   );
 
   const requestAction = (action: "transcribe" | "summarize") => {
@@ -250,6 +299,8 @@ export function PodcastNotesPage() {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
+
+  const canSummarize = selectedFile?.has_transcript || transcript;
 
   if (loading) {
     return (
@@ -338,31 +389,51 @@ export function PodcastNotesPage() {
       )}
 
       <div className="grid md:grid-cols-2 gap-6">
-        {/* File List */}
+        {/* Left: File Selection */}
         <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
-          <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-700">
-            <h2 className="font-medium text-zinc-900 dark:text-white">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".mp3,.m4a,.wav,.aac,.ogg,.flac,.opus,.wma"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+          <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-700 flex items-center justify-between">
+            <h2 className="font-medium text-zinc-900 dark:text-white text-sm">
               Audio Files
             </h2>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {uploading ? (
+                <>
+                  <FaSpinner className="animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <FaUpload />
+                  Upload
+                </>
+              )}
+            </button>
           </div>
           <div className="max-h-96 overflow-y-auto">
-            {files.length === 0 ? (
+            {downloadedFiles.length === 0 ? (
               <div className="p-4 text-center text-zinc-500 dark:text-zinc-400 text-sm">
                 No audio files found. Download podcasts first.
               </div>
             ) : (
               <div className="divide-y divide-zinc-200 dark:divide-zinc-700">
-                {files.map((file) => (
+                {downloadedFiles.map((file) => (
                   <button
                     key={file.path}
-                    onClick={() => {
-                      setSelectedFile(file);
-                      setTranscript(null);
-                      setSummary(null);
-                    }}
+                    onClick={() => handleSelectDownloadedFile(file)}
                     className={clsx(
                       "w-full px-4 py-3 text-left hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors",
-                      selectedFile?.path === file.path &&
+                      selectedFile?.path === file.full_path &&
                         "bg-blue-50 dark:bg-blue-900/20"
                     )}
                   >
@@ -396,24 +467,32 @@ export function PodcastNotesPage() {
           </div>
         </div>
 
-        {/* Actions & Results */}
+        {/* Right: Processing */}
         <div className="flex flex-col gap-4">
           {selectedFile ? (
             <>
               {/* Selected File Info */}
               <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
-                <div className="text-sm font-medium text-zinc-900 dark:text-white mb-1">
-                  {selectedFile.name}
-                </div>
-                <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {formatFileSize(selectedFile.size)}
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                    <FaFile className="text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-zinc-900 dark:text-white truncate">
+                      {selectedFile.filename}
+                    </div>
+                    <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                      {formatFileSize(selectedFile.size)}
+                      {selectedFile.source === "uploaded" && " • Uploaded"}
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Transcription Section */}
               <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
                 <div className="text-sm font-medium text-zinc-900 dark:text-white mb-3">
-                  Transcription
+                  Step 1: Transcription
                 </div>
                 <div className="flex flex-wrap gap-2 mb-3">
                   <select
@@ -464,10 +543,23 @@ export function PodcastNotesPage() {
                 </button>
               </div>
 
+              {/* Transcript Result */}
+              {transcript && (
+                <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
+                  <h3 className="font-medium text-zinc-900 dark:text-white mb-2">
+                    Transcript
+                  </h3>
+                  <div className="text-sm text-zinc-700 dark:text-zinc-300 max-h-48 overflow-y-auto whitespace-pre-wrap">
+                    {transcript.slice(0, 2000)}
+                    {transcript.length > 2000 && "..."}
+                  </div>
+                </div>
+              )}
+
               {/* Summarization Section */}
               <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
                 <div className="text-sm font-medium text-zinc-900 dark:text-white mb-3">
-                  Summarization
+                  Step 2: Summarization
                 </div>
                 <div className="flex flex-wrap gap-2 mb-3">
                   <select
@@ -476,10 +568,7 @@ export function PodcastNotesPage() {
                       handleSummarizeAccountChange(e.target.value)
                     }
                     className={selectClass}
-                    disabled={
-                      processing !== null ||
-                      (!selectedFile.has_transcript && !transcript)
-                    }
+                    disabled={processing !== null || !canSummarize}
                   >
                     {accountList.map(([name]) => (
                       <option key={name} value={name}>
@@ -491,10 +580,7 @@ export function PodcastNotesPage() {
                     value={summarizeModel}
                     onChange={(e) => setSummarizeModel(e.target.value)}
                     className={selectClass}
-                    disabled={
-                      processing !== null ||
-                      (!selectedFile.has_transcript && !transcript)
-                    }
+                    disabled={processing !== null || !canSummarize}
                   >
                     {SUMMARIZATION_MODELS[
                       getAccountProvider(summarizeAccount)
@@ -507,10 +593,7 @@ export function PodcastNotesPage() {
                 </div>
                 <button
                   onClick={() => requestAction("summarize")}
-                  disabled={
-                    processing !== null ||
-                    (!selectedFile.has_transcript && !transcript)
-                  }
+                  disabled={processing !== null || !canSummarize}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {processing === "summarize" ? (
@@ -525,26 +608,14 @@ export function PodcastNotesPage() {
                     </>
                   )}
                 </button>
-                {!selectedFile.has_transcript && !transcript && (
+                {!canSummarize && (
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center mt-2">
                     Transcribe the audio first to enable summarization
                   </p>
                 )}
               </div>
 
-              {/* Results */}
-              {transcript && (
-                <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
-                  <h3 className="font-medium text-zinc-900 dark:text-white mb-2">
-                    Transcript
-                  </h3>
-                  <div className="text-sm text-zinc-700 dark:text-zinc-300 max-h-48 overflow-y-auto whitespace-pre-wrap">
-                    {transcript.slice(0, 2000)}
-                    {transcript.length > 2000 && "..."}
-                  </div>
-                </div>
-              )}
-
+              {/* Summary Result */}
               {summary && (
                 <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
                   <h3 className="font-medium text-zinc-900 dark:text-white mb-2">

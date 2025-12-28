@@ -417,6 +417,18 @@ export async function fetchAudioFiles(): Promise<
   return res.json();
 }
 
+export async function uploadAudioFile(
+  file: File
+): Promise<ApiResponse<{ path: string; filename: string; size: number }>> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch("/api/ai/upload", {
+    method: "POST",
+    body: formData,
+  });
+  return res.json();
+}
+
 export async function transcribeAudio(params: {
   file_path: string;
   account?: string;

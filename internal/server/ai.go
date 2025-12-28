@@ -537,3 +537,63 @@ func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
+
+// handleUploadAudio handles audio file uploads for transcription
+func (s *Server) handleUploadAudio(c *gin.Context) {
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, Response{
+			Code:    400,
+			Data:    nil,
+			Message: "file is required",
+		})
+		return
+	}
+
+	// Validate file extension
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+	audioExtensions := map[string]bool{
+		".mp3": true, ".m4a": true, ".wav": true, ".aac": true,
+		".ogg": true, ".flac": true, ".opus": true, ".wma": true,
+	}
+	if !audioExtensions[ext] {
+		c.JSON(http.StatusBadRequest, Response{
+			Code:    400,
+			Data:    nil,
+			Message: "invalid file type. Supported: mp3, m4a, wav, aac, ogg, flac, opus, wma",
+		})
+		return
+	}
+
+	// Create uploads directory in output dir
+	uploadDir := filepath.Join(s.outputDir, "uploads")
+	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, Response{
+			Code:    500,
+			Data:    nil,
+			Message: "failed to create upload directory",
+		})
+		return
+	}
+
+	// Save file
+	destPath := filepath.Join(uploadDir, file.Filename)
+	if err := c.SaveUploadedFile(file, destPath); err != nil {
+		c.JSON(http.StatusInternalServerError, Response{
+			Code:    500,
+			Data:    nil,
+			Message: "failed to save file",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Code: 200,
+		Data: gin.H{
+			"path":     destPath,
+			"filename": file.Filename,
+			"size":     file.Size,
+		},
+		Message: "file uploaded",
+	})
+}

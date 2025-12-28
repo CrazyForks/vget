@@ -151,6 +151,7 @@ func (s *Server) Start() error {
 	api.POST("/ai/config/default", s.handleSetDefaultAIAccount)
 	api.POST("/ai/transcribe", s.handleTranscribe)
 	api.POST("/ai/summarize", s.handleSummarize)
+	api.POST("/ai/upload", s.handleUploadAudio)
 	api.GET("/ai/files", s.handleListDownloadedAudio)
 
 	// Serve embedded UI if available
