@@ -65,7 +65,7 @@ export function AISettings({ isConnected }: AISettingsProps) {
     setSaving(true);
     try {
       const res = await addAIAccount({
-        name,
+        label: name,
         provider,
         api_key: apiKey,
         pin: pin || undefined,
@@ -127,7 +127,7 @@ export function AISettings({ isConnected }: AISettingsProps) {
     );
   }
 
-  const accounts = aiConfig?.accounts ? Object.entries(aiConfig.accounts) : [];
+  const accounts = aiConfig?.accounts || [];
 
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg p-4">
@@ -149,18 +149,18 @@ export function AISettings({ isConnected }: AISettingsProps) {
       {/* Existing Accounts */}
       {accounts.length > 0 && (
         <div className="mb-4 flex flex-col gap-2">
-          {accounts.map(([accountName, account]) => (
+          {accounts.map((account) => (
             <div
-              key={accountName}
+              key={account.label}
               className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-800 rounded-lg"
             >
               <div className="flex items-center gap-3">
-                {aiConfig?.default_account === accountName && (
+                {account.is_default && (
                   <FaStar className="text-yellow-500 text-sm" title="Default" />
                 )}
                 <div>
                   <div className="text-sm font-medium text-zinc-900 dark:text-white">
-                    {accountName}
+                    {account.label}
                   </div>
                   <div className="text-xs text-zinc-500 dark:text-zinc-400">
                     {account.provider}
@@ -168,9 +168,9 @@ export function AISettings({ isConnected }: AISettingsProps) {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {aiConfig?.default_account !== accountName && (
+                {!account.is_default && (
                   <button
-                    onClick={() => handleSetDefault(accountName)}
+                    onClick={() => handleSetDefault(account.label)}
                     className="p-1.5 text-zinc-400 hover:text-yellow-500 transition-colors"
                     title="Set as default"
                   >
@@ -178,7 +178,7 @@ export function AISettings({ isConnected }: AISettingsProps) {
                   </button>
                 )}
                 <button
-                  onClick={() => handleDelete(accountName)}
+                  onClick={() => handleDelete(account.label)}
                   className="p-1.5 text-zinc-400 hover:text-red-500 transition-colors"
                   title="Delete"
                 >

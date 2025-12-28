@@ -16,8 +16,10 @@ import {
   FaLock,
   FaGear,
   FaUpload,
-  FaFile,
   FaCheck,
+  FaVideo,
+  FaMusic,
+  FaFolderOpen,
 } from "react-icons/fa6";
 import { Link } from "@tanstack/react-router";
 import clsx from "clsx";
@@ -25,7 +27,7 @@ import clsx from "clsx";
 // Common models for each provider
 const TRANSCRIPTION_MODELS: Record<string, string[]> = {
   openai: ["whisper-1"],
-  anthropic: ["whisper-1"], // Uses OpenAI whisper
+  anthropic: ["whisper-1"],
   qwen: ["paraformer-v2", "whisper-large-v3"],
 };
 
@@ -38,6 +40,8 @@ const SUMMARIZATION_MODELS: Record<string, string[]> = {
   ],
   qwen: ["qwen-plus", "qwen-turbo", "qwen-max"],
 };
+
+const VIDEO_EXTENSIONS = [".mp4", ".webm", ".mkv", ".avi", ".mov", ".flv", ".wmv"];
 
 interface SelectedFile {
   path: string;
@@ -93,8 +97,10 @@ export function PodcastNotesPage() {
         if (defaultAcc) {
           setTranscribeAccount(defaultAcc);
           setSummarizeAccount(defaultAcc);
-          const provider =
-            aiRes.data.accounts[defaultAcc]?.provider || "openai";
+          const account = aiRes.data.accounts.find(
+            (acc) => acc.label === defaultAcc
+          );
+          const provider = account?.provider || "openai";
           setTranscribeModel(
             TRANSCRIPTION_MODELS[provider]?.[0] || "whisper-1"
           );
@@ -116,15 +122,18 @@ export function PodcastNotesPage() {
     loadData();
   }, [loadData]);
 
-  const hasAIAccount = aiConfig && Object.keys(aiConfig.accounts).length > 0;
-  const accountList = aiConfig ? Object.entries(aiConfig.accounts) : [];
+  const hasAIAccount = aiConfig && aiConfig.accounts.length > 0;
 
-  const getAccountEncrypted = (accountName: string) => {
-    return aiConfig?.accounts[accountName]?.is_encrypted ?? true;
+  const getAccount = (label: string) => {
+    return aiConfig?.accounts.find((acc) => acc.label === label);
   };
 
-  const getAccountProvider = (accountName: string) => {
-    return aiConfig?.accounts[accountName]?.provider || "openai";
+  const getAccountEncrypted = (label: string) => {
+    return getAccount(label)?.is_encrypted ?? true;
+  };
+
+  const getAccountProvider = (label: string) => {
+    return getAccount(label)?.provider || "openai";
   };
 
   const handleTranscribeAccountChange = (accountName: string) => {
@@ -203,7 +212,6 @@ export function PodcastNotesPage() {
         if (res.code === 200) {
           setTranscript(res.data.text);
           showToast("success", "Transcription completed");
-          // Refresh file list to update status
           loadData();
         } else if (res.code === 401) {
           showToast("error", "Incorrect PIN");
@@ -231,7 +239,6 @@ export function PodcastNotesPage() {
       setShowPINInput(false);
 
       try {
-        // Use transcript file if available, otherwise use in-memory transcript
         const transcriptPath = selectedFile.path.replace(
           /\.[^.]+$/,
           ".transcript.md"
@@ -300,6 +307,15 @@ export function PodcastNotesPage() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const isVideoFile = (filename: string) => {
+    const ext = filename.toLowerCase().slice(filename.lastIndexOf("."));
+    return VIDEO_EXTENSIONS.includes(ext);
+  };
+
+  const getBaseName = (filename: string) => {
+    return filename.replace(/\.[^.]+$/, "");
+  };
+
   const canSummarize = selectedFile?.has_transcript || transcript;
 
   if (loading) {
@@ -337,10 +353,10 @@ export function PodcastNotesPage() {
   }
 
   const selectClass =
-    "px-2 py-1.5 border border-zinc-300 dark:border-zinc-600 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-white text-sm focus:outline-none focus:border-blue-500";
+    "px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white text-sm focus:outline-none focus:border-blue-500";
 
   return (
-    <div className="max-w-4xl mx-auto flex flex-col gap-6">
+    <div className="max-w-3xl mx-auto flex flex-col gap-6">
       <h1 className="text-xl font-medium text-zinc-900 dark:text-white">
         {t.ai_podcast_notes}
       </h1>
@@ -388,264 +404,285 @@ export function PodcastNotesPage() {
         </div>
       )}
 
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Left: File Selection */}
-        <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".mp3,.m4a,.wav,.aac,.ogg,.flac,.opus,.wma"
-            onChange={handleFileUpload}
-            className="hidden"
-          />
-          <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-700 flex items-center justify-between">
-            <h2 className="font-medium text-zinc-900 dark:text-white text-sm">
-              Audio Files
-            </h2>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="flex items-center gap-1.5 px-2.5 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {uploading ? (
-                <>
-                  <FaSpinner className="animate-spin" />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <FaUpload />
-                  Upload
-                </>
-              )}
-            </button>
-          </div>
-          <div className="max-h-96 overflow-y-auto">
-            {downloadedFiles.length === 0 ? (
-              <div className="p-4 text-center text-zinc-500 dark:text-zinc-400 text-sm">
-                No audio files found. Download podcasts first.
-              </div>
+      {/* Section 1: File Selection */}
+      <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".mp3,.m4a,.wav,.aac,.ogg,.flac,.opus,.wma,.mp4,.webm,.mkv,.avi,.mov,.flv,.wmv"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+        <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-700 flex items-center justify-between">
+          <h2 className="font-medium text-zinc-900 dark:text-white">
+            1. Select Media File
+          </h2>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {uploading ? (
+              <>
+                <FaSpinner className="animate-spin" />
+                Uploading...
+              </>
             ) : (
-              <div className="divide-y divide-zinc-200 dark:divide-zinc-700">
-                {downloadedFiles.map((file) => (
-                  <button
-                    key={file.path}
-                    onClick={() => handleSelectDownloadedFile(file)}
-                    className={clsx(
-                      "w-full px-4 py-3 text-left hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors",
-                      selectedFile?.path === file.full_path &&
-                        "bg-blue-50 dark:bg-blue-900/20"
+              <>
+                <FaUpload />
+                Upload
+              </>
+            )}
+          </button>
+        </div>
+        <div className="max-h-64 overflow-y-auto">
+          {downloadedFiles.length === 0 ? (
+            <div className="p-4 text-center text-zinc-500 dark:text-zinc-400 text-sm">
+              No media files found
+            </div>
+          ) : (
+            <div className="divide-y divide-zinc-200 dark:divide-zinc-700">
+              {downloadedFiles.map((file) => (
+                <button
+                  key={file.path}
+                  onClick={() => handleSelectDownloadedFile(file)}
+                  className={clsx(
+                    "w-full px-4 py-3 text-left hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors",
+                    selectedFile?.path === file.full_path &&
+                      "bg-blue-50 dark:bg-blue-900/20"
+                  )}
+                >
+                  <div className="flex items-start gap-3">
+                    {isVideoFile(file.name) ? (
+                      <FaVideo className="text-purple-500 mt-1 shrink-0" />
+                    ) : (
+                      <FaMusic className="text-blue-500 mt-1 shrink-0" />
                     )}
-                  >
-                    <div className="flex items-start gap-3">
-                      <FaMicrophone className="text-zinc-400 mt-1 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-zinc-900 dark:text-white truncate">
-                          {file.name}
-                        </div>
-                        <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                          {formatFileSize(file.size)}
-                        </div>
-                        <div className="flex gap-2 mt-1">
-                          {file.has_transcript && (
-                            <span className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                              <FaCheck className="text-[10px]" /> Transcript
-                            </span>
-                          )}
-                          {file.has_summary && (
-                            <span className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                              <FaCheck className="text-[10px]" /> Summary
-                            </span>
-                          )}
-                        </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-zinc-900 dark:text-white truncate">
+                        {file.name}
+                      </div>
+                      <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                        {formatFileSize(file.size)}
+                      </div>
+                      <div className="flex gap-2 mt-1">
+                        {file.has_transcript && (
+                          <span className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                            <FaCheck className="text-[10px]" /> Transcript
+                          </span>
+                        )}
+                        {file.has_summary && (
+                          <span className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                            <FaCheck className="text-[10px]" /> Summary
+                          </span>
+                        )}
                       </div>
                     </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right: Processing */}
-        <div className="flex flex-col gap-4">
-          {selectedFile ? (
-            <>
-              {/* Selected File Info */}
-              <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                    <FaFile className="text-blue-600 dark:text-blue-400" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-zinc-900 dark:text-white truncate">
-                      {selectedFile.filename}
-                    </div>
-                    <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {formatFileSize(selectedFile.size)}
-                      {selectedFile.source === "uploaded" && " • Uploaded"}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Transcription Section */}
-              <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
-                <div className="text-sm font-medium text-zinc-900 dark:text-white mb-3">
-                  Step 1: Transcription
-                </div>
-                <div className="flex flex-wrap gap-2 mb-3">
-                  <select
-                    value={transcribeAccount}
-                    onChange={(e) =>
-                      handleTranscribeAccountChange(e.target.value)
-                    }
-                    className={selectClass}
-                    disabled={processing !== null}
-                  >
-                    {accountList.map(([name]) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={transcribeModel}
-                    onChange={(e) => setTranscribeModel(e.target.value)}
-                    className={selectClass}
-                    disabled={processing !== null}
-                  >
-                    {TRANSCRIPTION_MODELS[
-                      getAccountProvider(transcribeAccount)
-                    ]?.map((model) => (
-                      <option key={model} value={model}>
-                        {model}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <button
-                  onClick={() => requestAction("transcribe")}
-                  disabled={processing !== null}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {processing === "transcribe" ? (
-                    <>
-                      <FaSpinner className="animate-spin" />
-                      Transcribing...
-                    </>
-                  ) : (
-                    <>
-                      <FaMicrophone />
-                      Transcribe
-                    </>
-                  )}
                 </button>
-              </div>
-
-              {/* Transcript Result */}
-              {transcript && (
-                <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
-                  <h3 className="font-medium text-zinc-900 dark:text-white mb-2">
-                    Transcript
-                  </h3>
-                  <div className="text-sm text-zinc-700 dark:text-zinc-300 max-h-48 overflow-y-auto whitespace-pre-wrap">
-                    {transcript.slice(0, 2000)}
-                    {transcript.length > 2000 && "..."}
-                  </div>
-                </div>
-              )}
-
-              {/* Summarization Section */}
-              <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
-                <div className="text-sm font-medium text-zinc-900 dark:text-white mb-3">
-                  Step 2: Summarization
-                </div>
-                <div className="flex flex-wrap gap-2 mb-3">
-                  <select
-                    value={summarizeAccount}
-                    onChange={(e) =>
-                      handleSummarizeAccountChange(e.target.value)
-                    }
-                    className={selectClass}
-                    disabled={processing !== null || !canSummarize}
-                  >
-                    {accountList.map(([name]) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={summarizeModel}
-                    onChange={(e) => setSummarizeModel(e.target.value)}
-                    className={selectClass}
-                    disabled={processing !== null || !canSummarize}
-                  >
-                    {SUMMARIZATION_MODELS[
-                      getAccountProvider(summarizeAccount)
-                    ]?.map((model) => (
-                      <option key={model} value={model}>
-                        {model}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <button
-                  onClick={() => requestAction("summarize")}
-                  disabled={processing !== null || !canSummarize}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {processing === "summarize" ? (
-                    <>
-                      <FaSpinner className="animate-spin" />
-                      Summarizing...
-                    </>
-                  ) : (
-                    <>
-                      <FaFileLines />
-                      Summarize
-                    </>
-                  )}
-                </button>
-                {!canSummarize && (
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center mt-2">
-                    Transcribe the audio first to enable summarization
-                  </p>
-                )}
-              </div>
-
-              {/* Summary Result */}
-              {summary && (
-                <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
-                  <h3 className="font-medium text-zinc-900 dark:text-white mb-2">
-                    Summary
-                  </h3>
-                  <div className="text-sm text-zinc-700 dark:text-zinc-300 mb-4">
-                    {summary.summary}
-                  </div>
-                  {summary.keyPoints.length > 0 && (
-                    <>
-                      <h4 className="font-medium text-zinc-900 dark:text-white mb-2">
-                        Key Points
-                      </h4>
-                      <ul className="text-sm text-zinc-700 dark:text-zinc-300 list-disc list-inside space-y-1">
-                        {summary.keyPoints.map((point, i) => (
-                          <li key={i}>{point}</li>
-                        ))}
-                      </ul>
-                    </>
-                  )}
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-8 text-center text-zinc-500 dark:text-zinc-400">
-              Select an audio file to transcribe and summarize
+              ))}
             </div>
           )}
         </div>
       </div>
+
+      {/* Section 2: AI Configuration & Actions */}
+      {selectedFile && (
+        <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
+          <h2 className="font-medium text-zinc-900 dark:text-white mb-4">
+            2. AI Configuration
+          </h2>
+
+          {/* Selected file info */}
+          <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-700/50 rounded-lg mb-4">
+            {isVideoFile(selectedFile.filename) ? (
+              <FaVideo className="text-purple-500" />
+            ) : (
+              <FaMusic className="text-blue-500" />
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-zinc-900 dark:text-white truncate">
+                {selectedFile.filename}
+              </div>
+              <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                {formatFileSize(selectedFile.size)}
+              </div>
+            </div>
+          </div>
+
+          {/* Transcription row */}
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-24 text-sm text-zinc-600 dark:text-zinc-400">
+              Transcribe:
+            </div>
+            <select
+              value={transcribeAccount}
+              onChange={(e) => handleTranscribeAccountChange(e.target.value)}
+              className={selectClass}
+              disabled={processing !== null}
+            >
+              {aiConfig?.accounts.map((acc) => (
+                <option key={acc.label} value={acc.label}>
+                  {acc.label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={transcribeModel}
+              onChange={(e) => setTranscribeModel(e.target.value)}
+              className={selectClass}
+              disabled={processing !== null}
+            >
+              {TRANSCRIPTION_MODELS[getAccountProvider(transcribeAccount)]?.map(
+                (model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                )
+              )}
+            </select>
+            <button
+              onClick={() => requestAction("transcribe")}
+              disabled={processing !== null}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {processing === "transcribe" ? (
+                <FaSpinner className="animate-spin" />
+              ) : (
+                <FaMicrophone />
+              )}
+              {processing === "transcribe" ? "Processing..." : "Run"}
+            </button>
+          </div>
+
+          {/* Summarization row */}
+          <div className="flex items-center gap-3">
+            <div className="w-24 text-sm text-zinc-600 dark:text-zinc-400">
+              Summarize:
+            </div>
+            <select
+              value={summarizeAccount}
+              onChange={(e) => handleSummarizeAccountChange(e.target.value)}
+              className={selectClass}
+              disabled={processing !== null || !canSummarize}
+            >
+              {aiConfig?.accounts.map((acc) => (
+                <option key={acc.label} value={acc.label}>
+                  {acc.label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={summarizeModel}
+              onChange={(e) => setSummarizeModel(e.target.value)}
+              className={selectClass}
+              disabled={processing !== null || !canSummarize}
+            >
+              {SUMMARIZATION_MODELS[getAccountProvider(summarizeAccount)]?.map(
+                (model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                )
+              )}
+            </select>
+            <button
+              onClick={() => requestAction("summarize")}
+              disabled={processing !== null || !canSummarize}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {processing === "summarize" ? (
+                <FaSpinner className="animate-spin" />
+              ) : (
+                <FaFileLines />
+              )}
+              {processing === "summarize" ? "Processing..." : "Run"}
+            </button>
+          </div>
+
+          {!canSummarize && (
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 ml-24 pl-3">
+              Transcribe first to enable summarization
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Section 3: Outputs */}
+      {selectedFile && (selectedFile.has_transcript || selectedFile.has_summary || transcript || summary) && (
+        <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
+          <h2 className="font-medium text-zinc-900 dark:text-white mb-4">
+            3. Outputs
+          </h2>
+
+          {/* Output files list */}
+          <div className="space-y-2 mb-4">
+            <div className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
+              Base name: <code className="bg-zinc-100 dark:bg-zinc-700 px-1 rounded">{getBaseName(selectedFile.filename)}</code>
+            </div>
+
+            {/* Chunks directory */}
+            <div className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+              <FaFolderOpen className="text-yellow-500" />
+              <span>{getBaseName(selectedFile.filename)}.chunks/</span>
+              <span className="text-xs text-zinc-400">(audio chunks + transcripts)</span>
+            </div>
+
+            {/* Transcript file */}
+            {(selectedFile.has_transcript || transcript) && (
+              <div className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+                <FaFileLines className="text-blue-500" />
+                <span>{getBaseName(selectedFile.filename)}.transcript.md</span>
+                <FaCheck className="text-green-500 text-xs" />
+              </div>
+            )}
+
+            {/* Summary file */}
+            {(selectedFile.has_summary || summary) && (
+              <div className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+                <FaFileLines className="text-purple-500" />
+                <span>{getBaseName(selectedFile.filename)}.summary.md</span>
+                <FaCheck className="text-green-500 text-xs" />
+              </div>
+            )}
+          </div>
+
+          {/* Transcript preview */}
+          {transcript && (
+            <div className="mb-4">
+              <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                Transcript Preview
+              </h3>
+              <div className="text-sm text-zinc-600 dark:text-zinc-400 max-h-32 overflow-y-auto p-3 bg-zinc-50 dark:bg-zinc-700/50 rounded-lg whitespace-pre-wrap">
+                {transcript.slice(0, 1000)}
+                {transcript.length > 1000 && "..."}
+              </div>
+            </div>
+          )}
+
+          {/* Summary preview */}
+          {summary && (
+            <div>
+              <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                Summary
+              </h3>
+              <div className="text-sm text-zinc-600 dark:text-zinc-400 p-3 bg-zinc-50 dark:bg-zinc-700/50 rounded-lg">
+                <p className="mb-3">{summary.summary}</p>
+                {summary.keyPoints.length > 0 && (
+                  <>
+                    <p className="font-medium text-zinc-700 dark:text-zinc-300 mb-1">Key Points:</p>
+                    <ul className="list-disc list-inside space-y-1">
+                      {summary.keyPoints.map((point, i) => (
+                        <li key={i}>{point}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

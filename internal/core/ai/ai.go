@@ -49,11 +49,6 @@ type Result struct {
 // The accountName specifies which AI account to use (empty for default).
 // The pin is the 4-digit PIN used to decrypt the API keys.
 func NewPipeline(cfg *config.Config, accountName string, pin string) (*Pipeline, error) {
-	// Validate PIN format
-	if err := crypto.ValidatePIN(pin); err != nil {
-		return nil, err
-	}
-
 	// Get the specified account (or default)
 	account := cfg.AI.GetAccount(accountName)
 	if account == nil {
@@ -63,54 +58,58 @@ func NewPipeline(cfg *config.Config, accountName string, pin string) (*Pipeline,
 		return nil, fmt.Errorf("AI account '%s' not found\nRun: vget ai config", accountName)
 	}
 
+	return NewPipelineWithAccount(account, "", pin)
+}
+
+// NewPipelineWithAccount creates a new AI processing pipeline from an account.
+// The model parameter optionally overrides the default model.
+// The pin is used to decrypt the API key (empty if account uses plain text keys).
+func NewPipelineWithAccount(account *config.AIAccount, model string, pin string) (*Pipeline, error) {
+	if account == nil {
+		return nil, fmt.Errorf("no AI account provided")
+	}
+
+	// Decrypt API key
+	var apiKey string
+	if strings.HasPrefix(account.APIKey, "plain:") {
+		// Plain text key - no decryption needed
+		apiKey = strings.TrimPrefix(account.APIKey, "plain:")
+	} else {
+		// Encrypted key - validate PIN and decrypt
+		if err := crypto.ValidatePIN(pin); err != nil {
+			return nil, fmt.Errorf("PIN required to decrypt API key: %w", err)
+		}
+		var err error
+		apiKey, err = crypto.Decrypt(account.APIKey, pin)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decrypt API key: %w\nHint: Check your PIN", err)
+		}
+	}
+
+	// Create service config for transcriber/summarizer
+	svcCfg := config.AIServiceConfig{
+		Model: model,
+	}
+
 	p := &Pipeline{
-		config:  cfg,
 		chunker: NewChunker(),
 	}
 
-	// Initialize transcriber if configured
-	if account.Transcription.APIKeyEncrypted != "" {
-		var apiKey string
-		if strings.HasPrefix(account.Transcription.APIKeyEncrypted, "plain:") {
-			// Plain text key - no decryption needed
-			apiKey = strings.TrimPrefix(account.Transcription.APIKeyEncrypted, "plain:")
-		} else {
-			// Encrypted key - decrypt with PIN
-			var err error
-			apiKey, err = crypto.Decrypt(account.Transcription.APIKeyEncrypted, pin)
-			if err != nil {
-				return nil, fmt.Errorf("failed to decrypt transcription API key: %w\nHint: Check your PIN", err)
-			}
-		}
-
-		t, err := transcriber.New(account.Provider, account.Transcription, apiKey)
+	// Initialize transcriber (OpenAI is the only provider that supports transcription)
+	if account.Provider == "openai" {
+		t, err := transcriber.New(account.Provider, svcCfg, apiKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create transcriber: %w", err)
 		}
 		p.transcriber = t
 	}
 
-	// Initialize summarizer if configured
-	if account.Summarization.APIKeyEncrypted != "" {
-		var apiKey string
-		if strings.HasPrefix(account.Summarization.APIKeyEncrypted, "plain:") {
-			// Plain text key - no decryption needed
-			apiKey = strings.TrimPrefix(account.Summarization.APIKeyEncrypted, "plain:")
-		} else {
-			// Encrypted key - decrypt with PIN
-			var err error
-			apiKey, err = crypto.Decrypt(account.Summarization.APIKeyEncrypted, pin)
-			if err != nil {
-				return nil, fmt.Errorf("failed to decrypt summarization API key: %w\nHint: Check your PIN", err)
-			}
-		}
-
-		s, err := summarizer.New(account.Provider, account.Summarization, apiKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create summarizer: %w", err)
-		}
-		p.summarizer = s
+	// Initialize summarizer (all providers support summarization)
+	s, err := summarizer.New(account.Provider, svcCfg, apiKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create summarizer: %w", err)
 	}
+	p.summarizer = s
 
 	return p, nil
 }

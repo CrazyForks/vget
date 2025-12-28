@@ -13,12 +13,9 @@ import (
 	"github.com/guiyumin/vget/internal/core/crypto"
 )
 
-// AI Configuration request types
-
-// AIAccountRequest is the request body for creating/updating an AI account
-// Simplified: just name + provider + API key + optional PIN
+// AIAccountRequest is the request body for creating an AI account
 type AIAccountRequest struct {
-	Name     string `json:"name" binding:"required"`
+	Label    string `json:"label" binding:"required"`
 	Provider string `json:"provider" binding:"required"`
 	APIKey   string `json:"api_key" binding:"required"`
 	PIN      string `json:"pin"` // Optional - if empty, key stored as plain text
@@ -27,33 +24,40 @@ type AIAccountRequest struct {
 // AITranscribeRequest is the request body for transcribing audio
 type AITranscribeRequest struct {
 	FilePath string `json:"file_path" binding:"required"`
-	Account  string `json:"account"`
-	Model    string `json:"model"` // Model to use for transcription (e.g., "whisper-1")
-	PIN      string `json:"pin"`   // Optional if account uses plain text keys
+	Account  string `json:"account"` // Account label
+	Model    string `json:"model"`   // Model to use
+	PIN      string `json:"pin"`     // Optional if account uses plain text keys
 }
 
 // AISummarizeRequest is the request body for summarizing text
 type AISummarizeRequest struct {
 	FilePath string `json:"file_path"` // Path to transcript file
 	Text     string `json:"text"`      // Or direct text input
-	Account  string `json:"account"`
-	Model    string `json:"model"` // Model to use for summarization (e.g., "gpt-4o", "claude-3-5-sonnet")
-	PIN      string `json:"pin"`   // Optional if account uses plain text keys
+	Account  string `json:"account"`   // Account label
+	Model    string `json:"model"`     // Model to use
+	PIN      string `json:"pin"`       // Optional if account uses plain text keys
 }
 
 // handleGetAIConfig returns AI configuration
 func (s *Server) handleGetAIConfig(c *gin.Context) {
 	cfg := config.LoadOrDefault()
 
-	accounts := make(map[string]gin.H)
-	for name, account := range cfg.AI.Accounts {
-		// Check if the key is encrypted or plain text
-		isEncrypted := account.Transcription.APIKeyEncrypted != "" &&
-			!strings.HasPrefix(account.Transcription.APIKeyEncrypted, "plain:")
+	// Build accounts list for response
+	accounts := make([]gin.H, len(cfg.AI.Accounts))
+	var defaultAccount string
 
-		accounts[name] = gin.H{
-			"provider":     account.Provider,
+	for i, acc := range cfg.AI.Accounts {
+		isEncrypted := acc.APIKey != "" && !strings.HasPrefix(acc.APIKey, "plain:")
+
+		accounts[i] = gin.H{
+			"label":        acc.Label,
+			"provider":     acc.Provider,
 			"is_encrypted": isEncrypted,
+			"is_default":   acc.IsDefault,
+		}
+
+		if acc.IsDefault {
+			defaultAccount = acc.Label
 		}
 	}
 
@@ -61,20 +65,20 @@ func (s *Server) handleGetAIConfig(c *gin.Context) {
 		Code: 200,
 		Data: gin.H{
 			"accounts":        accounts,
-			"default_account": cfg.AI.DefaultAccount,
+			"default_account": defaultAccount,
 		},
 		Message: "AI config retrieved",
 	})
 }
 
-// handleAddAIAccount creates or updates an AI account
+// handleAddAIAccount creates a new AI account
 func (s *Server) handleAddAIAccount(c *gin.Context) {
 	var req AIAccountRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, Response{
 			Code:    400,
 			Data:    nil,
-			Message: "name, provider, and api_key are required",
+			Message: "label, provider, and api_key are required",
 		})
 		return
 	}
@@ -105,11 +109,10 @@ func (s *Server) handleAddAIAccount(c *gin.Context) {
 	}
 
 	// Encrypt or store plain text
-	var apiKeyEnc string
+	var apiKey string
 	if req.PIN != "" {
-		// Encrypt with PIN
 		var err error
-		apiKeyEnc, err = crypto.Encrypt(req.APIKey, req.PIN)
+		apiKey, err = crypto.Encrypt(req.APIKey, req.PIN)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, Response{
 				Code:    500,
@@ -119,30 +122,32 @@ func (s *Server) handleAddAIAccount(c *gin.Context) {
 			return
 		}
 	} else {
-		// Store as plain text (prefix with "plain:" to distinguish)
-		apiKeyEnc = "plain:" + req.APIKey
+		apiKey = "plain:" + req.APIKey
 	}
 
 	cfg := config.LoadOrDefault()
 
-	// Create account - store same key for both transcription and summarization
-	// Models are selected at runtime, not stored in config
+	// Check if label already exists
+	for _, acc := range cfg.AI.Accounts {
+		if acc.Label == req.Label {
+			c.JSON(http.StatusBadRequest, Response{
+				Code:    400,
+				Data:    nil,
+				Message: fmt.Sprintf("account '%s' already exists", req.Label),
+			})
+			return
+		}
+	}
+
+	// Create account
 	account := config.AIAccount{
-		Provider: req.Provider,
-		Transcription: config.AIServiceConfig{
-			APIKeyEncrypted: apiKeyEnc,
-		},
-		Summarization: config.AIServiceConfig{
-			APIKeyEncrypted: apiKeyEnc,
-		},
+		Label:     req.Label,
+		Provider:  req.Provider,
+		APIKey:    apiKey,
+		IsDefault: len(cfg.AI.Accounts) == 0, // First account is default
 	}
 
-	cfg.AI.SetAccount(req.Name, account)
-
-	// Set as default if it's the first account
-	if cfg.AI.DefaultAccount == "" {
-		cfg.AI.DefaultAccount = req.Name
-	}
+	cfg.AI.AddAccount(account)
 
 	if err := config.Save(cfg); err != nil {
 		c.JSON(http.StatusInternalServerError, Response{
@@ -156,18 +161,18 @@ func (s *Server) handleAddAIAccount(c *gin.Context) {
 	s.cfg = cfg
 	c.JSON(http.StatusOK, Response{
 		Code:    200,
-		Data:    gin.H{"name": req.Name},
+		Data:    gin.H{"label": req.Label},
 		Message: "AI account created",
 	})
 }
 
 // handleDeleteAIAccount deletes an AI account
 func (s *Server) handleDeleteAIAccount(c *gin.Context) {
-	name := c.Param("name")
+	label := c.Param("name")
 
 	cfg := config.LoadOrDefault()
 
-	if cfg.AI.GetAccount(name) == nil {
+	if cfg.AI.GetAccount(label) == nil {
 		c.JSON(http.StatusNotFound, Response{
 			Code:    404,
 			Data:    nil,
@@ -176,17 +181,7 @@ func (s *Server) handleDeleteAIAccount(c *gin.Context) {
 		return
 	}
 
-	cfg.AI.DeleteAccount(name)
-
-	// Clear default if it was this account
-	if cfg.AI.DefaultAccount == name {
-		accounts := cfg.AI.ListAccounts()
-		if len(accounts) > 0 {
-			cfg.AI.DefaultAccount = accounts[0]
-		} else {
-			cfg.AI.DefaultAccount = ""
-		}
-	}
+	cfg.AI.DeleteAccount(label)
 
 	if err := config.Save(cfg); err != nil {
 		c.JSON(http.StatusInternalServerError, Response{
@@ -200,7 +195,7 @@ func (s *Server) handleDeleteAIAccount(c *gin.Context) {
 	s.cfg = cfg
 	c.JSON(http.StatusOK, Response{
 		Code:    200,
-		Data:    gin.H{"name": name},
+		Data:    gin.H{"label": label},
 		Message: "AI account deleted",
 	})
 }
@@ -208,20 +203,20 @@ func (s *Server) handleDeleteAIAccount(c *gin.Context) {
 // handleSetDefaultAIAccount sets the default AI account
 func (s *Server) handleSetDefaultAIAccount(c *gin.Context) {
 	var req struct {
-		Name string `json:"name" binding:"required"`
+		Label string `json:"label" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, Response{
 			Code:    400,
 			Data:    nil,
-			Message: "name is required",
+			Message: "label is required",
 		})
 		return
 	}
 
 	cfg := config.LoadOrDefault()
 
-	if cfg.AI.GetAccount(req.Name) == nil {
+	if !cfg.AI.SetDefault(req.Label) {
 		c.JSON(http.StatusNotFound, Response{
 			Code:    404,
 			Data:    nil,
@@ -229,8 +224,6 @@ func (s *Server) handleSetDefaultAIAccount(c *gin.Context) {
 		})
 		return
 	}
-
-	cfg.AI.DefaultAccount = req.Name
 
 	if err := config.Save(cfg); err != nil {
 		c.JSON(http.StatusInternalServerError, Response{
@@ -244,7 +237,7 @@ func (s *Server) handleSetDefaultAIAccount(c *gin.Context) {
 	s.cfg = cfg
 	c.JSON(http.StatusOK, Response{
 		Code:    200,
-		Data:    gin.H{"default_account": req.Name},
+		Data:    gin.H{"default_account": req.Label},
 		Message: "default AI account updated",
 	})
 }
@@ -263,12 +256,9 @@ func (s *Server) handleTranscribe(c *gin.Context) {
 
 	cfg := config.LoadOrDefault()
 
-	// Determine which account to use
-	accountName := req.Account
-	if accountName == "" {
-		accountName = cfg.AI.DefaultAccount
-	}
-	if accountName == "" {
+	// Get account
+	account := cfg.AI.GetAccount(req.Account)
+	if account == nil {
 		c.JSON(http.StatusBadRequest, Response{
 			Code:    400,
 			Data:    nil,
@@ -292,17 +282,9 @@ func (s *Server) handleTranscribe(c *gin.Context) {
 		return
 	}
 
-	// Set model in config temporarily if provided
-	account := cfg.AI.GetAccount(accountName)
-	if account != nil && req.Model != "" {
-		account.Transcription.Model = req.Model
-		cfg.AI.SetAccount(accountName, *account)
-	}
-
 	// Create AI pipeline
-	pipeline, err := ai.NewPipeline(cfg, accountName, req.PIN)
+	pipeline, err := ai.NewPipelineWithAccount(account, req.Model, req.PIN)
 	if err != nil {
-		// Check if it's a PIN error
 		if strings.Contains(err.Error(), "PIN") || strings.Contains(err.Error(), "decrypt") {
 			c.JSON(http.StatusUnauthorized, Response{
 				Code:    401,
@@ -319,7 +301,7 @@ func (s *Server) handleTranscribe(c *gin.Context) {
 		return
 	}
 
-	// Transcribe only
+	// Transcribe
 	result, err := pipeline.Process(c.Request.Context(), filePath, ai.Options{
 		Transcribe: true,
 		Summarize:  false,
@@ -409,12 +391,9 @@ func (s *Server) handleSummarize(c *gin.Context) {
 
 	cfg := config.LoadOrDefault()
 
-	// Determine which account to use
-	accountName := req.Account
-	if accountName == "" {
-		accountName = cfg.AI.DefaultAccount
-	}
-	if accountName == "" {
+	// Get account
+	account := cfg.AI.GetAccount(req.Account)
+	if account == nil {
 		c.JSON(http.StatusBadRequest, Response{
 			Code:    400,
 			Data:    nil,
@@ -423,17 +402,9 @@ func (s *Server) handleSummarize(c *gin.Context) {
 		return
 	}
 
-	// Set model in config temporarily if provided
-	account := cfg.AI.GetAccount(accountName)
-	if account != nil && req.Model != "" {
-		account.Summarization.Model = req.Model
-		cfg.AI.SetAccount(accountName, *account)
-	}
-
 	// Create AI pipeline
-	pipeline, err := ai.NewPipeline(cfg, accountName, req.PIN)
+	pipeline, err := ai.NewPipelineWithAccount(account, req.Model, req.PIN)
 	if err != nil {
-		// Check if it's a PIN error
 		if strings.Contains(err.Error(), "PIN") || strings.Contains(err.Error(), "decrypt") {
 			c.JSON(http.StatusUnauthorized, Response{
 				Code:    401,
@@ -450,7 +421,7 @@ func (s *Server) handleSummarize(c *gin.Context) {
 		return
 	}
 
-	// Summarize only
+	// Summarize
 	result, err := pipeline.Process(c.Request.Context(), filePath, ai.Options{
 		Transcribe: false,
 		Summarize:  true,
@@ -475,13 +446,17 @@ func (s *Server) handleSummarize(c *gin.Context) {
 	})
 }
 
-// handleListDownloadedAudio lists audio files in the output directory
+// handleListDownloadedAudio lists audio and video files in the output directory
 func (s *Server) handleListDownloadedAudio(c *gin.Context) {
 	var audioFiles []gin.H
 
-	audioExtensions := map[string]bool{
+	mediaExtensions := map[string]bool{
+		// Audio
 		".mp3": true, ".m4a": true, ".wav": true, ".aac": true,
 		".ogg": true, ".flac": true, ".opus": true, ".wma": true,
+		// Video
+		".mp4": true, ".webm": true, ".mkv": true, ".avi": true,
+		".mov": true, ".flv": true, ".wmv": true,
 	}
 
 	err := filepath.Walk(s.outputDir, func(path string, info os.FileInfo, err error) error {
@@ -493,7 +468,7 @@ func (s *Server) handleListDownloadedAudio(c *gin.Context) {
 		}
 
 		ext := strings.ToLower(filepath.Ext(path))
-		if audioExtensions[ext] {
+		if mediaExtensions[ext] {
 			relPath, _ := filepath.Rel(s.outputDir, path)
 
 			// Check for existing transcript/summary
@@ -529,7 +504,7 @@ func (s *Server) handleListDownloadedAudio(c *gin.Context) {
 			"files":      audioFiles,
 			"output_dir": s.outputDir,
 		},
-		Message: fmt.Sprintf("%d audio files found", len(audioFiles)),
+		Message: fmt.Sprintf("%d media files found", len(audioFiles)),
 	})
 }
 
@@ -552,15 +527,19 @@ func (s *Server) handleUploadAudio(c *gin.Context) {
 
 	// Validate file extension
 	ext := strings.ToLower(filepath.Ext(file.Filename))
-	audioExtensions := map[string]bool{
+	mediaExtensions := map[string]bool{
+		// Audio
 		".mp3": true, ".m4a": true, ".wav": true, ".aac": true,
 		".ogg": true, ".flac": true, ".opus": true, ".wma": true,
+		// Video
+		".mp4": true, ".webm": true, ".mkv": true, ".avi": true,
+		".mov": true, ".flv": true, ".wmv": true,
 	}
-	if !audioExtensions[ext] {
+	if !mediaExtensions[ext] {
 		c.JSON(http.StatusBadRequest, Response{
 			Code:    400,
 			Data:    nil,
-			Message: "invalid file type. Supported: mp3, m4a, wav, aac, ogg, flac, opus, wma",
+			Message: "invalid file type. Supported: mp3, m4a, wav, aac, ogg, flac, opus, wma, mp4, webm, mkv, avi, mov, flv, wmv",
 		})
 		return
 	}

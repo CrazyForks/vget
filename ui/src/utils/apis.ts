@@ -339,12 +339,14 @@ export async function fetchPodcastEpisodes(
 // AI APIs
 
 export interface AIAccount {
+  label: string;
   provider: string;
   is_encrypted: boolean;
+  is_default: boolean;
 }
 
 export interface AIConfigData {
-  accounts: Record<string, AIAccount>;
+  accounts: AIAccount[];
   default_account: string;
 }
 
@@ -377,11 +379,11 @@ export async function fetchAIConfig(): Promise<ApiResponse<AIConfigData>> {
 }
 
 export async function addAIAccount(params: {
-  name: string;
+  label: string;
   provider: string;
   api_key: string;
   pin?: string;
-}): Promise<ApiResponse<{ name: string }>> {
+}): Promise<ApiResponse<{ label: string }>> {
   const res = await fetch("/api/ai/config/account", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -391,21 +393,21 @@ export async function addAIAccount(params: {
 }
 
 export async function deleteAIAccount(
-  name: string
-): Promise<ApiResponse<{ name: string }>> {
-  const res = await fetch(`/api/ai/config/account/${encodeURIComponent(name)}`, {
+  label: string
+): Promise<ApiResponse<{ label: string }>> {
+  const res = await fetch(`/api/ai/config/account/${encodeURIComponent(label)}`, {
     method: "DELETE",
   });
   return res.json();
 }
 
 export async function setDefaultAIAccount(
-  name: string
+  label: string
 ): Promise<ApiResponse<{ default_account: string }>> {
   const res = await fetch("/api/ai/config/default", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ label }),
   });
   return res.json();
 }

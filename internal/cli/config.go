@@ -64,26 +64,17 @@ var configShowCmd = &cobra.Command{
 		// Show AI config
 		if len(cfg.AI.Accounts) > 0 {
 			fmt.Println("\nAI Accounts:")
-			for name, account := range cfg.AI.Accounts {
+			for _, account := range cfg.AI.Accounts {
 				defaultMarker := ""
-				if name == cfg.AI.DefaultAccount {
+				if account.IsDefault {
 					defaultMarker = " (default)"
 				}
-				fmt.Printf("  %s%s:\n", name, defaultMarker)
+				fmt.Printf("  %s%s:\n", account.Label, defaultMarker)
 				fmt.Printf("    Provider: %s\n", account.Provider)
-				if account.Transcription.Model != "" {
-					fmt.Printf("    Transcription: %s", account.Transcription.Model)
-					if account.Transcription.APIKeyEncrypted != "" {
-						fmt.Print(" [key encrypted]")
-					}
-					fmt.Println()
-				}
-				if account.Summarization.Model != "" {
-					fmt.Printf("    Summarization: %s", account.Summarization.Model)
-					if account.Summarization.APIKeyEncrypted != "" {
-						fmt.Print(" [key encrypted]")
-					}
-					fmt.Println()
+				if strings.HasPrefix(account.APIKey, "plain:") {
+					fmt.Println("    API Key: [plain text]")
+				} else if account.APIKey != "" {
+					fmt.Println("    API Key: [encrypted]")
 				}
 			}
 		}
@@ -284,7 +275,9 @@ func setAIConfigValue(cfg *config.Config, key, value string) error {
 			}
 			return fmt.Errorf("account '%s' not found. Available: %v", value, accounts)
 		}
-		cfg.AI.DefaultAccount = value
+		if value != "" {
+			cfg.AI.SetDefault(value)
+		}
 	default:
 		return fmt.Errorf("unknown AI config key: %s\nSupported: ai.default_account", key)
 	}
@@ -341,7 +334,11 @@ func getConfigValue(cfg *config.Config, key string) (string, error) {
 func getAIConfigValue(cfg *config.Config, key string) (string, error) {
 	switch key {
 	case "ai.default_account":
-		return cfg.AI.DefaultAccount, nil
+		account := cfg.AI.GetDefaultAccount()
+		if account != nil {
+			return account.Label, nil
+		}
+		return "", nil
 	default:
 		return "", fmt.Errorf("unknown AI config key: %s\nSupported: ai.default_account", key)
 	}
@@ -395,7 +392,14 @@ func unsetConfigValue(cfg *config.Config, key string) error {
 func unsetAIConfigValue(cfg *config.Config, key string) error {
 	switch key {
 	case "ai.default_account":
-		cfg.AI.DefaultAccount = ""
+		// Clear default flag from all accounts
+		for i := range cfg.AI.Accounts {
+			cfg.AI.Accounts[i].IsDefault = false
+		}
+		// Set first account as default if any exist
+		if len(cfg.AI.Accounts) > 0 {
+			cfg.AI.Accounts[0].IsDefault = true
+		}
 	default:
 		return fmt.Errorf("unknown AI config key: %s\nSupported: ai.default_account", key)
 	}

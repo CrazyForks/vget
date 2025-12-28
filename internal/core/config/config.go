@@ -92,99 +92,118 @@ type BilibiliConfig struct {
 	Cookie string `yaml:"cookie,omitempty"`
 }
 
-// AIConfig holds AI transcription and summarization settings with multi-account support
+// AIConfig holds AI transcription and summarization settings
 type AIConfig struct {
-	// Multiple accounts with aliases (e.g., "personal", "work")
-	Accounts map[string]AIAccount `yaml:"accounts,omitempty"`
-
-	// Default account to use when --account flag is not specified
-	DefaultAccount string `yaml:"default_account,omitempty"`
+	// List of configured accounts
+	Accounts []AIAccount `yaml:"accounts,omitempty"`
 }
 
 // AIAccount represents a configured AI provider account
 type AIAccount struct {
-	// Provider name: "openai", "anthropic", "ollama", etc.
-	Provider string `yaml:"provider,omitempty"`
+	// Label is the display name for this account (e.g., "vget", "work")
+	Label string `yaml:"label"`
 
-	// Transcription settings for speech-to-text
-	Transcription AIServiceConfig `yaml:"transcription,omitempty"`
+	// Provider name: "openai", "anthropic", "qwen"
+	Provider string `yaml:"provider"`
 
-	// Summarization settings for text summarization
-	Summarization AIServiceConfig `yaml:"summarization,omitempty"`
+	// APIKey is the encrypted API key (or "plain:xxx" for unencrypted)
+	APIKey string `yaml:"api_key"`
+
+	// IsDefault marks this as the default account
+	IsDefault bool `yaml:"is_default,omitempty"`
 }
 
-// AIServiceConfig holds settings for a specific AI service (transcription or summarization)
+// AIServiceConfig holds settings for an AI service (transcription or summarization).
+// This is used by the transcriber/summarizer packages.
 type AIServiceConfig struct {
 	// Model to use (e.g., "whisper-1", "gpt-4o")
 	Model string `yaml:"model,omitempty"`
 
-	// APIKeyEncrypted is the AES-256-GCM encrypted API key (base64 encoded)
-	// Format: base64(salt + nonce + ciphertext)
-	// NEVER store plain text API keys
-	APIKeyEncrypted string `yaml:"api_key_encrypted,omitempty"`
-
-	// BaseURL for custom API endpoints (optional)
+	// Optional custom base URL
 	BaseURL string `yaml:"base_url,omitempty"`
 }
 
-// GetAccount returns the specified account or the default account
-func (c *AIConfig) GetAccount(name string) *AIAccount {
-	if c.Accounts == nil {
+// GetAccount returns the account with the given label, or the default account
+func (c *AIConfig) GetAccount(label string) *AIAccount {
+	if len(c.Accounts) == 0 {
 		return nil
 	}
 
-	// If no name specified, use default
-	if name == "" {
-		name = c.DefaultAccount
-	}
-
-	if account, ok := c.Accounts[name]; ok {
-		return &account
-	}
-	return nil
-}
-
-// SetAccount adds or updates an account
-func (c *AIConfig) SetAccount(name string, account AIAccount) {
-	if c.Accounts == nil {
-		c.Accounts = make(map[string]AIAccount)
-	}
-	c.Accounts[name] = account
-
-	// Set as default if it's the first account
-	if c.DefaultAccount == "" {
-		c.DefaultAccount = name
-	}
-}
-
-// DeleteAccount removes an account by name
-func (c *AIConfig) DeleteAccount(name string) {
-	if c.Accounts != nil {
-		delete(c.Accounts, name)
-
-		// Clear default if it was the deleted account
-		if c.DefaultAccount == name {
-			c.DefaultAccount = ""
-			// Set first remaining account as default
-			for n := range c.Accounts {
-				c.DefaultAccount = n
-				break
+	// If label specified, find it
+	if label != "" {
+		for i := range c.Accounts {
+			if c.Accounts[i].Label == label {
+				return &c.Accounts[i]
 			}
+		}
+		return nil
+	}
+
+	// Return default account
+	for i := range c.Accounts {
+		if c.Accounts[i].IsDefault {
+			return &c.Accounts[i]
+		}
+	}
+
+	// Return first account if no default
+	return &c.Accounts[0]
+}
+
+// GetDefaultAccount returns the default account
+func (c *AIConfig) GetDefaultAccount() *AIAccount {
+	return c.GetAccount("")
+}
+
+// AddAccount adds a new account
+func (c *AIConfig) AddAccount(account AIAccount) {
+	// If this is the first account or marked as default, clear other defaults
+	if account.IsDefault || len(c.Accounts) == 0 {
+		for i := range c.Accounts {
+			c.Accounts[i].IsDefault = false
+		}
+		account.IsDefault = true
+	}
+	c.Accounts = append(c.Accounts, account)
+}
+
+// DeleteAccount removes an account by label
+func (c *AIConfig) DeleteAccount(label string) {
+	for i := range c.Accounts {
+		if c.Accounts[i].Label == label {
+			wasDefault := c.Accounts[i].IsDefault
+			c.Accounts = append(c.Accounts[:i], c.Accounts[i+1:]...)
+
+			// If deleted was default, make first remaining account default
+			if wasDefault && len(c.Accounts) > 0 {
+				c.Accounts[0].IsDefault = true
+			}
+			return
 		}
 	}
 }
 
-// ListAccounts returns all account names
-func (c *AIConfig) ListAccounts() []string {
-	if c.Accounts == nil {
-		return nil
+// SetDefault sets the default account by label
+func (c *AIConfig) SetDefault(label string) bool {
+	found := false
+	for i := range c.Accounts {
+		if c.Accounts[i].Label == label {
+			c.Accounts[i].IsDefault = true
+			found = true
+		} else {
+			c.Accounts[i].IsDefault = false
+		}
 	}
+	return found
+}
 
-	names := make([]string, 0, len(c.Accounts))
-	for name := range c.Accounts {
-		names = append(names, name)
+// ListAccounts returns all account labels
+func (c *AIConfig) ListAccounts() []string {
+	labels := make([]string, len(c.Accounts))
+	for i, acc := range c.Accounts {
+		labels[i] = acc.Label
 	}
-	return names
+	return labels
 }
 
 // TorrentConfig holds configuration for remote torrent client integration

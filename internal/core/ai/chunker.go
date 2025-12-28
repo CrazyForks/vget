@@ -127,9 +127,9 @@ func (c *Chunker) Split(filePath string) ([]ChunkInfo, error) {
 			end = duration
 		}
 
-		chunkPath := filepath.Join(chunkDir, fmt.Sprintf("chunk_%03d%s", i+1, ext))
+		chunkPath := filepath.Join(chunkDir, fmt.Sprintf("chunk_%03d.mp3", i+1))
 
-		// Use ffmpeg to extract chunk
+		// Use ffmpeg to extract chunk (re-encodes to MP3)
 		if err := c.extractChunk(filePath, chunkPath, start, end-start); err != nil {
 			return nil, fmt.Errorf("failed to extract chunk %d: %w", i+1, err)
 		}
@@ -186,9 +186,9 @@ func (c *Chunker) SplitWithManifest(filePath string) ([]ChunkInfo, *Manifest, er
 			end = duration
 		}
 
-		chunkPath := filepath.Join(chunkDir, fmt.Sprintf("chunk_%03d%s", i+1, ext))
+		chunkPath := filepath.Join(chunkDir, fmt.Sprintf("chunk_%03d.mp3", i+1))
 
-		// Use ffmpeg to extract chunk
+		// Use ffmpeg to extract chunk (re-encodes to MP3)
 		if err := c.extractChunk(filePath, chunkPath, start, end-start); err != nil {
 			return nil, nil, fmt.Errorf("failed to extract chunk %d: %w", i+1, err)
 		}
@@ -291,14 +291,23 @@ func (c *Chunker) getAudioDuration(filePath string) (time.Duration, error) {
 }
 
 // extractChunk extracts a portion of audio using ffmpeg.
+// Re-encodes to mono MP3 at 64kbps to ensure chunks stay under 25MB.
+// 10 min at 64kbps = ~4.7MB, well under the 25MB limit.
 func (c *Chunker) extractChunk(input, output string, start, duration time.Duration) error {
+	// Change output extension to .mp3 for consistent encoding
+	output = strings.TrimSuffix(output, filepath.Ext(output)) + ".mp3"
+
 	cmd := exec.Command("ffmpeg",
 		"-threads", "1",
 		"-y",
 		"-ss", formatDuration(start),
 		"-i", input,
 		"-t", formatDuration(duration),
-		"-c", "copy",
+		"-vn",           // Remove video (extract audio only)
+		"-ac", "1",      // Mono (reduces size by half)
+		"-ar", "16000",  // 16kHz sample rate (good for speech)
+		"-b:a", "64k",   // 64kbps bitrate
+		"-f", "mp3",     // Force MP3 format
 		output,
 	)
 
