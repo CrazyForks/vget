@@ -166,7 +166,7 @@ ui:
   podcast_download_started: "다운로드 시작됨"
   # AI
   ai: "AI"
-  ai_podcast_notes: "팟캐스트 노트"
+  ai_speech_to_text: "음성 텍스트 변환"
   ai_settings: "AI 설정"
   ai_no_accounts: "AI 계정이 설정되지 않았습니다. 전사 및 요약 기능을 사용하려면 추가하세요."
   ai_encryption_note: "API 키는 PIN을 사용하여 AES-256-GCM으로 암호화됩니다. PIN을 비워두면 평문으로 저장됩니다."

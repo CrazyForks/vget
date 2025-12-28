@@ -485,3 +485,95 @@ export async function summarizeText(params: {
   });
   return res.json();
 }
+
+// AI Processing Job Types
+export type AIJobStatus =
+  | "queued"
+  | "processing"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export type StepStatus =
+  | "pending"
+  | "in_progress"
+  | "completed"
+  | "skipped"
+  | "failed";
+
+export interface ProcessingStep {
+  key: string;
+  name: string;
+  status: StepStatus;
+  progress: number;
+  detail?: string;
+  started_at?: string;
+  finished_at?: string;
+}
+
+export interface AIJobResult {
+  transcript_path?: string;
+  summary_path?: string;
+  raw_text?: string;
+  cleaned_text?: string;
+  summary?: string;
+}
+
+export interface AIJob {
+  id: string;
+  file_path: string;
+  file_name: string;
+  status: AIJobStatus;
+  current_step: string;
+  steps: ProcessingStep[];
+  overall_progress: number;
+  result?: AIJobResult;
+  error?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// AI Processing Job API Functions
+export async function startAIProcessing(params: {
+  file_path: string;
+  account: string;
+  transcription_model?: string;
+  summarization_model?: string;
+  pin?: string;
+  include_summary: boolean;
+}): Promise<ApiResponse<{ job_id: string; status: AIJobStatus }>> {
+  const res = await fetch("/api/ai/process", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  return res.json();
+}
+
+export async function getAIJob(id: string): Promise<ApiResponse<AIJob>> {
+  const res = await fetch(`/api/ai/jobs/${id}`);
+  return res.json();
+}
+
+export async function getAIJobs(): Promise<ApiResponse<{ jobs: AIJob[] }>> {
+  const res = await fetch("/api/ai/jobs");
+  return res.json();
+}
+
+export async function cancelAIJob(
+  id: string
+): Promise<ApiResponse<{ id: string }>> {
+  const res = await fetch(`/api/ai/jobs/${id}`, {
+    method: "DELETE",
+  });
+  return res.json();
+}
+
+export async function clearAIJobs(): Promise<
+  ApiResponse<{ cleared: number }>
+> {
+  const res = await fetch("/api/ai/jobs", {
+    method: "DELETE",
+  });
+  return res.json();
+}

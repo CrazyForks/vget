@@ -52,7 +52,7 @@ export function Sidebar({ lang }: SidebarProps) {
         {
           to: "/ai/podcast-notes",
           icon: <FaMicrophone />,
-          label: t.ai_podcast_notes,
+          label: t.ai_speech_to_text,
           show: true,
         },
         {

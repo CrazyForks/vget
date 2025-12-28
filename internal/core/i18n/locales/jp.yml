@@ -166,7 +166,7 @@ ui:
   podcast_download_started: "ダウンロードを開始しました"
   # AI
   ai: "AI"
-  ai_podcast_notes: "ポッドキャストノート"
+  ai_speech_to_text: "音声テキスト変換"
   ai_settings: "AI設定"
   ai_no_accounts: "AIアカウントが設定されていません。文字起こしと要約機能を使用するには追加してください。"
   ai_encryption_note: "APIキーはPINを使用してAES-256-GCMで暗号化されます。空のPINで平文保存。"

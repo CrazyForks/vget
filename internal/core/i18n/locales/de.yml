@@ -166,7 +166,7 @@ ui:
   podcast_download_started: "Download gestartet"
   # AI
   ai: "KI"
-  ai_podcast_notes: "Podcast-Notizen"
+  ai_speech_to_text: "Sprache zu Text"
   ai_settings: "KI-Einstellungen"
   ai_no_accounts: "Keine KI-Konten konfiguriert. Fügen Sie eines hinzu, um Transkription und Zusammenfassung zu nutzen."
   ai_encryption_note: "API-Schlüssel werden mit Ihrer PIN mittels AES-256-GCM verschlüsselt. Lassen Sie die PIN leer für Klartext."

@@ -81,7 +81,7 @@ export interface UITranslations {
   podcast_download_started: string;
   // AI
   ai: string;
-  ai_podcast_notes: string;
+  ai_speech_to_text: string;
   ai_settings: string;
   ai_no_accounts: string;
   ai_encryption_note: string;
@@ -192,7 +192,7 @@ export const defaultTranslations: UITranslations = {
   podcast_download_started: "Download started",
   // AI
   ai: "AI",
-  ai_podcast_notes: "Podcast Notes",
+  ai_speech_to_text: "Speech to Text",
   ai_settings: "AI Settings",
   ai_no_accounts: "No AI accounts configured. Add one to use transcription and summarization.",
   ai_encryption_note: "API keys are encrypted with your PIN using AES-256-GCM. Leave PIN empty to store keys in plain text.",

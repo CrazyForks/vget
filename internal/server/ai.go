@@ -21,23 +21,6 @@ type AIAccountRequest struct {
 	PIN      string `json:"pin"` // Optional - if empty, key stored as plain text
 }
 
-// AITranscribeRequest is the request body for transcribing audio
-type AITranscribeRequest struct {
-	FilePath string `json:"file_path" binding:"required"`
-	Account  string `json:"account"` // Account label
-	Model    string `json:"model"`   // Model to use
-	PIN      string `json:"pin"`     // Optional if account uses plain text keys
-}
-
-// AISummarizeRequest is the request body for summarizing text
-type AISummarizeRequest struct {
-	FilePath string `json:"file_path"` // Path to transcript file
-	Text     string `json:"text"`      // Or direct text input
-	Account  string `json:"account"`   // Account label
-	Model    string `json:"model"`     // Model to use
-	PIN      string `json:"pin"`       // Optional if account uses plain text keys
-}
-
 // handleGetAIModels returns available AI models for each provider
 func (s *Server) handleGetAIModels(c *gin.Context) {
 	// Build OpenAI models list from ai package
@@ -303,212 +286,7 @@ func (s *Server) handleSetDefaultAIAccount(c *gin.Context) {
 	})
 }
 
-// handleTranscribe handles audio transcription
-func (s *Server) handleTranscribe(c *gin.Context) {
-	var req AITranscribeRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, Response{
-			Code:    400,
-			Data:    nil,
-			Message: "file_path is required",
-		})
-		return
-	}
-
-	cfg := config.LoadOrDefault()
-
-	// Get account
-	account := cfg.AI.GetAccount(req.Account)
-	if account == nil {
-		c.JSON(http.StatusBadRequest, Response{
-			Code:    400,
-			Data:    nil,
-			Message: "no AI account configured. Add an account in Settings first.",
-		})
-		return
-	}
-
-	// Check if file exists
-	filePath := req.FilePath
-	if !filepath.IsAbs(filePath) {
-		filePath = filepath.Join(s.outputDir, filePath)
-	}
-
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		c.JSON(http.StatusBadRequest, Response{
-			Code:    400,
-			Data:    nil,
-			Message: fmt.Sprintf("file not found: %s", req.FilePath),
-		})
-		return
-	}
-
-	// Create AI pipeline
-	pipeline, err := ai.NewPipelineWithAccount(account, req.Model, req.PIN)
-	if err != nil {
-		if strings.Contains(err.Error(), "PIN") || strings.Contains(err.Error(), "decrypt") {
-			c.JSON(http.StatusUnauthorized, Response{
-				Code:    401,
-				Data:    nil,
-				Message: "incorrect PIN or corrupted key",
-			})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, Response{
-			Code:    500,
-			Data:    nil,
-			Message: fmt.Sprintf("failed to create AI pipeline: %v", err),
-		})
-		return
-	}
-
-	// Transcribe
-	result, err := pipeline.Process(c.Request.Context(), filePath, ai.Options{
-		Transcribe: true,
-		Summarize:  false,
-	})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, Response{
-			Code:    500,
-			Data:    nil,
-			Message: fmt.Sprintf("transcription failed: %v", err),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, Response{
-		Code: 200,
-		Data: gin.H{
-			"raw_text":     result.Transcript.RawText,
-			"cleaned_text": result.Transcript.CleanedText,
-			"output_path":  result.TranscriptPath,
-			"duration":     result.Transcript.Duration,
-			"language":     result.Transcript.Language,
-		},
-		Message: "transcription completed",
-	})
-}
-
-// handleSummarize handles text summarization
-func (s *Server) handleSummarize(c *gin.Context) {
-	var req AISummarizeRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, Response{
-			Code:    400,
-			Data:    nil,
-			Message: "either file_path or text must be provided",
-		})
-		return
-	}
-
-	// Determine input file path
-	var filePath string
-
-	if req.FilePath != "" {
-		filePath = req.FilePath
-		if !filepath.IsAbs(filePath) {
-			filePath = filepath.Join(s.outputDir, filePath)
-		}
-
-		if _, err := os.Stat(filePath); os.IsNotExist(err) {
-			c.JSON(http.StatusBadRequest, Response{
-				Code:    400,
-				Data:    nil,
-				Message: fmt.Sprintf("file not found: %s", req.FilePath),
-			})
-			return
-		}
-	} else if req.Text != "" {
-		// Create a temporary file with the text content
-		tmpFile, err := os.CreateTemp("", "vget-summarize-*.txt")
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, Response{
-				Code:    500,
-				Data:    nil,
-				Message: "failed to create temporary file",
-			})
-			return
-		}
-		defer os.Remove(tmpFile.Name())
-
-		if _, err := tmpFile.WriteString(req.Text); err != nil {
-			tmpFile.Close()
-			c.JSON(http.StatusInternalServerError, Response{
-				Code:    500,
-				Data:    nil,
-				Message: "failed to write temporary file",
-			})
-			return
-		}
-		tmpFile.Close()
-		filePath = tmpFile.Name()
-	} else {
-		c.JSON(http.StatusBadRequest, Response{
-			Code:    400,
-			Data:    nil,
-			Message: "either file_path or text must be provided",
-		})
-		return
-	}
-
-	cfg := config.LoadOrDefault()
-
-	// Get account
-	account := cfg.AI.GetAccount(req.Account)
-	if account == nil {
-		c.JSON(http.StatusBadRequest, Response{
-			Code:    400,
-			Data:    nil,
-			Message: "no AI account configured. Add an account in Settings first.",
-		})
-		return
-	}
-
-	// Create AI pipeline
-	pipeline, err := ai.NewPipelineWithAccount(account, req.Model, req.PIN)
-	if err != nil {
-		if strings.Contains(err.Error(), "PIN") || strings.Contains(err.Error(), "decrypt") {
-			c.JSON(http.StatusUnauthorized, Response{
-				Code:    401,
-				Data:    nil,
-				Message: "incorrect PIN or corrupted key",
-			})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, Response{
-			Code:    500,
-			Data:    nil,
-			Message: fmt.Sprintf("failed to create AI pipeline: %v", err),
-		})
-		return
-	}
-
-	// Summarize
-	result, err := pipeline.Process(c.Request.Context(), filePath, ai.Options{
-		Transcribe: false,
-		Summarize:  true,
-	})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, Response{
-			Code:    500,
-			Data:    nil,
-			Message: fmt.Sprintf("summarization failed: %v", err),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, Response{
-		Code: 200,
-		Data: gin.H{
-			"summary":     result.Summary.Summary,
-			"key_points":  result.Summary.KeyPoints,
-			"output_path": result.SummaryPath,
-		},
-		Message: "summarization completed",
-	})
-}
-
-// handleListDownloadedAudio lists audio and video files in the output directory
+// handleListDownloadedAudio lists audio and video files in the output directory root only
 func (s *Server) handleListDownloadedAudio(c *gin.Context) {
 	var audioFiles []gin.H
 
@@ -521,36 +299,8 @@ func (s *Server) handleListDownloadedAudio(c *gin.Context) {
 		".mov": true, ".flv": true, ".wmv": true,
 	}
 
-	err := filepath.Walk(s.outputDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil // Skip errors
-		}
-		if info.IsDir() {
-			return nil
-		}
-
-		ext := strings.ToLower(filepath.Ext(path))
-		if mediaExtensions[ext] {
-			relPath, _ := filepath.Rel(s.outputDir, path)
-
-			// Check for existing transcript/summary
-			basePath := strings.TrimSuffix(path, ext)
-			hasTranscript := fileExists(basePath + ".transcript.md")
-			hasSummary := fileExists(basePath + ".summary.md")
-
-			audioFiles = append(audioFiles, gin.H{
-				"name":           info.Name(),
-				"path":           relPath,
-				"full_path":      path,
-				"size":           info.Size(),
-				"mod_time":       info.ModTime(),
-				"has_transcript": hasTranscript,
-				"has_summary":    hasSummary,
-			})
-		}
-		return nil
-	})
-
+	// Only list files in root directory (not subdirectories)
+	entries, err := os.ReadDir(s.outputDir)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, Response{
 			Code:    500,
@@ -558,6 +308,40 @@ func (s *Server) handleListDownloadedAudio(c *gin.Context) {
 			Message: fmt.Sprintf("failed to list files: %v", err),
 		})
 		return
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+
+		name := entry.Name()
+		ext := strings.ToLower(filepath.Ext(name))
+		if !mediaExtensions[ext] {
+			continue
+		}
+
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+
+		fullPath := filepath.Join(s.outputDir, name)
+
+		// Check for existing transcript/summary
+		basePath := strings.TrimSuffix(fullPath, ext)
+		hasTranscript := fileExists(basePath + ".transcript.md")
+		hasSummary := fileExists(basePath + ".summary.md")
+
+		audioFiles = append(audioFiles, gin.H{
+			"name":           name,
+			"path":           name,
+			"full_path":      fullPath,
+			"size":           info.Size(),
+			"mod_time":       info.ModTime(),
+			"has_transcript": hasTranscript,
+			"has_summary":    hasSummary,
+		})
 	}
 
 	c.JSON(http.StatusOK, Response{
@@ -573,6 +357,152 @@ func (s *Server) handleListDownloadedAudio(c *gin.Context) {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// handleStartAIProcess starts a new AI processing job
+func (s *Server) handleStartAIProcess(c *gin.Context) {
+	// AI processing is only available in Docker
+	if !config.IsRunningInDocker() {
+		c.JSON(http.StatusForbidden, Response{
+			Code:    403,
+			Data:    nil,
+			Message: "AI processing is only available in Docker mode",
+		})
+		return
+	}
+
+	var req AIJobRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, Response{
+			Code:    400,
+			Data:    nil,
+			Message: "file_path is required",
+		})
+		return
+	}
+
+	// Validate file path
+	filePath := req.FilePath
+	if !filepath.IsAbs(filePath) {
+		filePath = filepath.Join(s.outputDir, filePath)
+	}
+	req.FilePath = filePath
+
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		c.JSON(http.StatusBadRequest, Response{
+			Code:    400,
+			Data:    nil,
+			Message: fmt.Sprintf("file not found: %s", req.FilePath),
+		})
+		return
+	}
+
+	// Validate account exists
+	cfg := config.LoadOrDefault()
+	account := cfg.AI.GetAccount(req.Account)
+	if account == nil {
+		c.JSON(http.StatusBadRequest, Response{
+			Code:    400,
+			Data:    nil,
+			Message: "no AI account configured. Add an account in Settings first.",
+		})
+		return
+	}
+
+	// Validate PIN if account is encrypted
+	isEncrypted := account.APIKey != "" && !strings.HasPrefix(account.APIKey, "plain:")
+	if isEncrypted && req.PIN == "" {
+		c.JSON(http.StatusBadRequest, Response{
+			Code:    400,
+			Data:    nil,
+			Message: "PIN required for encrypted account",
+		})
+		return
+	}
+
+	// Add job to queue
+	job, err := s.aiJobQueue.AddJob(req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, Response{
+			Code:    500,
+			Data:    nil,
+			Message: fmt.Sprintf("failed to queue job: %v", err),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Code: 200,
+		Data: gin.H{
+			"job_id": job.ID,
+			"status": job.Status,
+		},
+		Message: "AI processing started",
+	})
+}
+
+// handleGetAIJob returns the status of an AI job
+func (s *Server) handleGetAIJob(c *gin.Context) {
+	id := c.Param("id")
+
+	job := s.aiJobQueue.GetJob(id)
+	if job == nil {
+		c.JSON(http.StatusNotFound, Response{
+			Code:    404,
+			Data:    nil,
+			Message: "AI job not found",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Code:    200,
+		Data:    job,
+		Message: string(job.Status),
+	})
+}
+
+// handleGetAIJobs returns all AI jobs
+func (s *Server) handleGetAIJobs(c *gin.Context) {
+	jobs := s.aiJobQueue.GetAllJobs()
+
+	c.JSON(http.StatusOK, Response{
+		Code: 200,
+		Data: gin.H{
+			"jobs": jobs,
+		},
+		Message: fmt.Sprintf("%d AI jobs", len(jobs)),
+	})
+}
+
+// handleCancelAIJob cancels an AI job
+func (s *Server) handleCancelAIJob(c *gin.Context) {
+	id := c.Param("id")
+
+	if s.aiJobQueue.CancelJob(id) {
+		c.JSON(http.StatusOK, Response{
+			Code:    200,
+			Data:    gin.H{"id": id},
+			Message: "AI job cancelled",
+		})
+	} else {
+		c.JSON(http.StatusNotFound, Response{
+			Code:    404,
+			Data:    nil,
+			Message: "AI job not found or cannot be cancelled",
+		})
+	}
+}
+
+// handleClearAIJobs clears AI job history
+func (s *Server) handleClearAIJobs(c *gin.Context) {
+	count := s.aiJobQueue.ClearHistory()
+
+	c.JSON(http.StatusOK, Response{
+		Code:    200,
+		Data:    gin.H{"cleared": count},
+		Message: fmt.Sprintf("Cleared %d AI jobs", count),
+	})
 }
 
 // handleUploadAudio handles audio file uploads for transcription
@@ -606,19 +536,8 @@ func (s *Server) handleUploadAudio(c *gin.Context) {
 		return
 	}
 
-	// Create uploads directory in output dir
-	uploadDir := filepath.Join(s.outputDir, "uploads")
-	if err := os.MkdirAll(uploadDir, 0755); err != nil {
-		c.JSON(http.StatusInternalServerError, Response{
-			Code:    500,
-			Data:    nil,
-			Message: "failed to create upload directory",
-		})
-		return
-	}
-
-	// Save file
-	destPath := filepath.Join(uploadDir, file.Filename)
+	// Save file directly to output directory
+	destPath := filepath.Join(s.outputDir, file.Filename)
 	if err := c.SaveUploadedFile(file, destPath); err != nil {
 		c.JSON(http.StatusInternalServerError, Response{
 			Code:    500,

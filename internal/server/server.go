@@ -45,13 +45,14 @@ type BulkDownloadRequest struct {
 
 // Server is the HTTP server for vget
 type Server struct {
-	port      int
-	outputDir string
-	apiKey    string
-	jobQueue  *JobQueue
-	cfg       *config.Config
-	server    *http.Server
-	engine    *gin.Engine
+	port       int
+	outputDir  string
+	apiKey     string
+	jobQueue   *JobQueue
+	aiJobQueue *AIJobQueue
+	cfg        *config.Config
+	server     *http.Server
+	engine     *gin.Engine
 }
 
 // NewServer creates a new HTTP server
@@ -67,6 +68,9 @@ func NewServer(port int, outputDir, apiKey string, maxConcurrent int) *Server {
 
 	// Create job queue with download function
 	s.jobQueue = NewJobQueue(maxConcurrent, outputDir, s.downloadWithExtractor)
+
+	// Create AI job queue (limit to 2 concurrent to avoid API rate limits)
+	s.aiJobQueue = NewAIJobQueue(2, outputDir, cfg)
 
 	return s
 }
@@ -91,6 +95,9 @@ func (s *Server) Start() error {
 
 	// Start job queue workers
 	s.jobQueue.Start()
+
+	// Start AI job queue workers
+	s.aiJobQueue.Start()
 
 	// Set Gin mode
 	gin.SetMode(gin.ReleaseMode)
@@ -151,10 +158,15 @@ func (s *Server) Start() error {
 	api.POST("/ai/config/account", s.handleAddAIAccount)
 	api.DELETE("/ai/config/account/:name", s.handleDeleteAIAccount)
 	api.POST("/ai/config/default", s.handleSetDefaultAIAccount)
-	api.POST("/ai/transcribe", s.handleTranscribe)
-	api.POST("/ai/summarize", s.handleSummarize)
 	api.POST("/ai/upload", s.handleUploadAudio)
 	api.GET("/ai/files", s.handleListDownloadedAudio)
+
+	// AI processing job routes
+	api.POST("/ai/process", s.handleStartAIProcess)
+	api.GET("/ai/jobs", s.handleGetAIJobs)
+	api.GET("/ai/jobs/:id", s.handleGetAIJob)
+	api.DELETE("/ai/jobs/:id", s.handleCancelAIJob)
+	api.DELETE("/ai/jobs", s.handleClearAIJobs)
 
 	// Serve embedded UI if available
 	if distFS := GetDistFS(); distFS != nil {
@@ -182,6 +194,7 @@ func (s *Server) Start() error {
 // Stop gracefully shuts down the server
 func (s *Server) Stop(ctx context.Context) error {
 	s.jobQueue.Stop()
+	s.aiJobQueue.Stop()
 	return s.server.Shutdown(ctx)
 }
 

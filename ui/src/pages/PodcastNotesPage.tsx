@@ -1,33 +1,28 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useApp } from "../context/AppContext";
 import {
   fetchAIConfig,
   fetchAIModels,
   fetchAudioFiles,
   uploadAudioFile,
-  transcribeAudio,
-  summarizeText,
   type AIConfigData,
   type AIModelsData,
   type AudioFile,
 } from "../utils/apis";
 import {
-  FaMicrophone,
-  FaFileLines,
   FaSpinner,
   FaLock,
   FaGear,
-  FaUpload,
-  FaCheck,
-  FaVideo,
-  FaMusic,
+  FaPlay,
+  FaStop,
+  FaFileLines,
   FaFolderOpen,
   FaDownload,
 } from "react-icons/fa6";
 import { Link } from "@tanstack/react-router";
-import clsx from "clsx";
-
-const VIDEO_EXTENSIONS = [".mp4", ".webm", ".mkv", ".avi", ".mov", ".flv", ".wmv"];
+import { FileSelector } from "../components/podcast-notes/FileSelector";
+import { ProcessingStepper } from "../components/podcast-notes/ProcessingStepper";
+import { useProcessing } from "../components/podcast-notes/useProcessing";
 
 interface SelectedFile {
   path: string;
@@ -40,36 +35,33 @@ interface SelectedFile {
 
 export function PodcastNotesPage() {
   const { t, showToast } = useApp();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [aiConfig, setAIConfig] = useState<AIConfigData | null>(null);
   const [aiModels, setAIModels] = useState<AIModelsData | null>(null);
   const [downloadedFiles, setDownloadedFiles] = useState<AudioFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
-  const [processing, setProcessing] = useState<
-    "transcribe" | "summarize" | null
-  >(null);
 
-  // Account and model selection for each step
-  const [transcribeAccount, setTranscribeAccount] = useState("");
-  const [transcribeModel, setTranscribeModel] = useState("");
-  const [summarizeAccount, setSummarizeAccount] = useState("");
-  const [summarizeModel, setSummarizeModel] = useState("");
+  // Account and model selection
+  const [account, setAccount] = useState("");
+  const [transcriptionModel, setTranscriptionModel] = useState("");
+  const [summarizationModel, setSummarizationModel] = useState("");
+  const [includeSummary, setIncludeSummary] = useState(true);
 
   // PIN handling
   const [pin, setPIN] = useState("");
   const [showPINInput, setShowPINInput] = useState(false);
-  const [pendingAction, setPendingAction] = useState<
-    "transcribe" | "summarize" | null
-  >(null);
 
-  // Results
-  const [transcript, setTranscript] = useState<string | null>(null);
-  const [summary, setSummary] = useState<{
-    summary: string;
-    keyPoints: string[];
-  } | null>(null);
+  // Processing hook
+  const {
+    state: processingState,
+    startProcessing,
+    cancel,
+    reset,
+    isProcessing,
+    isComplete,
+    isError,
+  } = useProcessing();
 
   const loadData = useCallback(async () => {
     try {
@@ -89,21 +81,18 @@ export function PodcastNotesPage() {
         setAIConfig(aiRes.data);
         const defaultAcc = aiRes.data.default_account || "";
         if (defaultAcc) {
-          setTranscribeAccount(defaultAcc);
-          setSummarizeAccount(defaultAcc);
-          const account = aiRes.data.accounts.find(
-            (acc) => acc.label === defaultAcc
-          );
-          const provider = account?.provider || "openai";
+          setAccount(defaultAcc);
+          const acc = aiRes.data.accounts.find((a) => a.label === defaultAcc);
+          const provider = acc?.provider || "openai";
           if (models) {
-            const transcriptionProvider = provider as keyof typeof models.transcription;
-            setTranscribeModel(
-              models.transcription[transcriptionProvider]?.[0] || "whisper-1"
-            );
-            const defaultModel = models.summarization.default || "gpt-5-nano";
+            // Set default transcription model
+            const transcriptionModels = models.transcription[provider as keyof typeof models.transcription] || [];
+            setTranscriptionModel(transcriptionModels[0] || "whisper-1");
+
+            // Set default summarization model
             const summaryProvider = provider as "openai" | "anthropic" | "qwen";
             const summaryModels = models.summarization[summaryProvider];
-            setSummarizeModel(summaryModels?.[0]?.id || defaultModel);
+            setSummarizationModel(summaryModels?.[0]?.id || models.summarization.default);
           }
         }
       }
@@ -122,6 +111,21 @@ export function PodcastNotesPage() {
     loadData();
   }, [loadData]);
 
+  // Reload files when processing completes
+  useEffect(() => {
+    if (isComplete) {
+      loadData();
+      showToast("success", "Processing completed!");
+    }
+  }, [isComplete, loadData, showToast]);
+
+  // Show error toast
+  useEffect(() => {
+    if (isError && processingState.error) {
+      showToast("error", processingState.error);
+    }
+  }, [isError, processingState.error, showToast]);
+
   const hasAIAccount = aiConfig && aiConfig.accounts.length > 0;
 
   const getAccount = (label: string) => {
@@ -137,8 +141,7 @@ export function PodcastNotesPage() {
   };
 
   const getTranscriptionModels = (provider: string) => {
-    const p = provider as keyof NonNullable<typeof aiModels>["transcription"];
-    return aiModels?.transcription[p] || [];
+    return aiModels?.transcription[provider as keyof typeof aiModels.transcription] || [];
   };
 
   const getSummarizationModels = (provider: string) => {
@@ -146,20 +149,20 @@ export function PodcastNotesPage() {
     return aiModels?.summarization[p] || [];
   };
 
-  const handleTranscribeAccountChange = (accountName: string) => {
-    setTranscribeAccount(accountName);
-    const provider = getAccountProvider(accountName) as keyof NonNullable<typeof aiModels>["transcription"];
-    setTranscribeModel(aiModels?.transcription[provider]?.[0] || "whisper-1");
+  const handleAccountChange = (accountName: string) => {
+    setAccount(accountName);
+    const provider = getAccountProvider(accountName);
+
+    // Update transcription model
+    const transcriptionModels = getTranscriptionModels(provider);
+    setTranscriptionModel(transcriptionModels[0] || "whisper-1");
+
+    // Update summarization model
+    const summaryModels = getSummarizationModels(provider);
+    setSummarizationModel(summaryModels[0]?.id || aiModels?.summarization.default || "");
   };
 
-  const handleSummarizeAccountChange = (accountName: string) => {
-    setSummarizeAccount(accountName);
-    const provider = getAccountProvider(accountName) as "openai" | "anthropic" | "qwen";
-    const defaultModel = aiModels?.summarization.default || "gpt-5-nano";
-    setSummarizeModel(aiModels?.summarization[provider]?.[0]?.id || defaultModel);
-  };
-
-  const handleSelectDownloadedFile = (file: AudioFile) => {
+  const handleSelectFile = (file: AudioFile) => {
     setSelectedFile({
       path: file.full_path,
       filename: file.name,
@@ -168,18 +171,11 @@ export function PodcastNotesPage() {
       has_transcript: file.has_transcript,
       has_summary: file.has_summary,
     });
-    setTranscript(null);
-    setSummary(null);
+    reset();
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const handleUpload = async (file: File) => {
     setUploading(true);
-    setTranscript(null);
-    setSummary(null);
-
     try {
       const res = await uploadAudioFile(file);
       if (res.code === 200) {
@@ -190,6 +186,7 @@ export function PodcastNotesPage() {
           source: "uploaded",
         });
         showToast("success", `Uploaded: ${res.data.filename}`);
+        reset();
       } else {
         showToast("error", res.message || "Upload failed");
       }
@@ -197,138 +194,46 @@ export function PodcastNotesPage() {
       showToast("error", "Upload failed");
     } finally {
       setUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
     }
   };
 
-  const handleTranscribe = useCallback(
-    async (pinToUse?: string) => {
-      if (!selectedFile) return;
-      const isEncrypted = getAccountEncrypted(transcribeAccount);
-      if (isEncrypted && !pinToUse) return;
+  const handleStartProcessing = async (pinToUse?: string) => {
+    if (!selectedFile) return;
 
-      setProcessing("transcribe");
-      setShowPINInput(false);
-
-      try {
-        const res = await transcribeAudio({
-          file_path: selectedFile.path,
-          account: transcribeAccount,
-          model: transcribeModel,
-          pin: pinToUse || undefined,
-        });
-
-        if (res.code === 200) {
-          setTranscript(res.data.text);
-          showToast("success", "Transcription completed");
-          loadData();
-        } else if (res.code === 401) {
-          showToast("error", "Incorrect PIN");
-        } else {
-          showToast("error", res.message || "Transcription failed");
-        }
-      } catch {
-        showToast("error", "Transcription failed");
-      } finally {
-        setProcessing(null);
-        setPIN("");
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedFile, transcribeAccount, transcribeModel, showToast, loadData]
-  );
-
-  const handleSummarize = useCallback(
-    async (pinToUse?: string) => {
-      if (!selectedFile) return;
-      const isEncrypted = getAccountEncrypted(summarizeAccount);
-      if (isEncrypted && !pinToUse) return;
-
-      setProcessing("summarize");
-      setShowPINInput(false);
-
-      try {
-        // Always use file_path to ensure summary is written next to the original file
-        // Use the transcript file if it exists, otherwise use the original file path
-        const transcriptPath = selectedFile.path.replace(
-          /\.[^.]+$/,
-          ".transcript.md"
-        );
-
-        const res = await summarizeText({
-          file_path: selectedFile.has_transcript || transcript ? transcriptPath : selectedFile.path,
-          account: summarizeAccount,
-          model: summarizeModel,
-          pin: pinToUse || undefined,
-        });
-
-        if (res.code === 200) {
-          setSummary({
-            summary: res.data.summary,
-            keyPoints: res.data.key_points,
-          });
-          showToast("success", "Summarization completed");
-          loadData();
-        } else if (res.code === 401) {
-          showToast("error", "Incorrect PIN");
-        } else {
-          showToast("error", res.message || "Summarization failed");
-        }
-      } catch {
-        showToast("error", "Summarization failed");
-      } finally {
-        setProcessing(null);
-        setPIN("");
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedFile, transcript, summarizeAccount, summarizeModel, showToast, loadData]
-  );
-
-  const requestAction = (action: "transcribe" | "summarize") => {
-    const accountName =
-      action === "transcribe" ? transcribeAccount : summarizeAccount;
-    const isEncrypted = getAccountEncrypted(accountName);
-
-    if (isEncrypted) {
-      setPendingAction(action);
+    const isEncrypted = getAccountEncrypted(account);
+    if (isEncrypted && !pinToUse) {
       setShowPINInput(true);
       setPIN("");
-    } else {
-      if (action === "transcribe") {
-        handleTranscribe();
-      } else {
-        handleSummarize();
+      return;
+    }
+
+    setShowPINInput(false);
+
+    const result = await startProcessing(
+      selectedFile.path,
+      account,
+      transcriptionModel,
+      summarizationModel,
+      includeSummary,
+      pinToUse
+    );
+
+    if (!result.success) {
+      if (result.error?.includes("PIN") || result.error?.includes("decrypt")) {
+        showToast("error", "Incorrect PIN");
       }
     }
+
+    setPIN("");
   };
 
   const submitPIN = () => {
-    if (pendingAction === "transcribe") {
-      handleTranscribe(pin);
-    } else if (pendingAction === "summarize") {
-      handleSummarize(pin);
-    }
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
-  const isVideoFile = (filename: string) => {
-    const ext = filename.toLowerCase().slice(filename.lastIndexOf("."));
-    return VIDEO_EXTENSIONS.includes(ext);
+    handleStartProcessing(pin);
   };
 
   const getBaseName = (filename: string) => {
     return filename.replace(/\.[^.]+$/, "");
   };
-
-  const canSummarize = selectedFile?.has_transcript || transcript;
 
   if (loading) {
     return (
@@ -340,9 +245,9 @@ export function PodcastNotesPage() {
 
   if (!hasAIAccount) {
     return (
-      <div className="max-w-3xl mx-auto flex flex-col gap-4">
+      <div className="max-w-4xl mx-auto flex flex-col gap-4">
         <h1 className="text-xl font-medium text-zinc-900 dark:text-white">
-          {t.ai_podcast_notes}
+          {t.ai_speech_to_text}
         </h1>
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 flex flex-col gap-3">
           <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
@@ -365,12 +270,12 @@ export function PodcastNotesPage() {
   }
 
   const selectClass =
-    "px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white text-sm focus:outline-none focus:border-blue-500";
+    "px-2.5 py-1.5 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white text-sm focus:outline-none focus:border-blue-500";
 
   return (
-    <div className="max-w-3xl mx-auto flex flex-col gap-6">
-      <h1 className="text-xl font-medium text-zinc-900 dark:text-white">
-        {t.ai_podcast_notes}
+    <div className="max-w-4xl mx-auto flex flex-col gap-4 h-[calc(100vh-8rem)]">
+      <h1 className="text-xl font-medium text-zinc-900 dark:text-white flex-shrink-0">
+        {t.ai_speech_to_text}
       </h1>
 
       {/* PIN Modal */}
@@ -402,268 +307,205 @@ export function PodcastNotesPage() {
                 onClick={() => setShowPINInput(false)}
                 className="flex-1 px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700"
               >
-                Cancel
+                {t.cancel}
               </button>
               <button
                 onClick={submitPIN}
                 disabled={pin.length !== 4}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Confirm
+                {t.save}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Section 1: File Selection */}
-      <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".mp3,.m4a,.wav,.aac,.ogg,.flac,.opus,.wma,.mp4,.webm,.mkv,.avi,.mov,.flv,.wmv"
-          onChange={handleFileUpload}
-          className="hidden"
+      {/* Section 1: File List */}
+      <div className="flex-1 min-h-0">
+        <FileSelector
+          files={downloadedFiles}
+          selectedPath={selectedFile?.path || null}
+          onSelect={handleSelectFile}
+          onUpload={handleUpload}
+          uploading={uploading}
+          disabled={isProcessing}
         />
-        <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-700 flex items-center justify-between">
-          <h2 className="font-medium text-zinc-900 dark:text-white">
-            1. Select Media File
-          </h2>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {uploading ? (
-              <>
-                <FaSpinner className="animate-spin" />
-                Uploading...
-              </>
-            ) : (
-              <>
-                <FaUpload />
-                Upload
-              </>
-            )}
-          </button>
-        </div>
-        <div className="max-h-64 overflow-y-auto">
-          {downloadedFiles.length === 0 ? (
-            <div className="p-4 text-center text-zinc-500 dark:text-zinc-400 text-sm">
-              No media files found
+      </div>
+
+      {/* Section 2: Model Configuration */}
+      <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 flex-shrink-0">
+        <h3 className="text-sm font-medium text-zinc-900 dark:text-white mb-3">
+          {t.ai_settings || "Settings"}
+        </h3>
+
+        <div className="grid grid-cols-2 gap-4">
+          {/* Left: Account & Models */}
+          <div className="space-y-3">
+            {/* Account Selection */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-zinc-600 dark:text-zinc-400 w-28">
+                {t.ai_account_name || "Account"}:
+              </label>
+              <select
+                value={account}
+                onChange={(e) => handleAccountChange(e.target.value)}
+                className={`${selectClass} flex-1`}
+                disabled={isProcessing}
+              >
+                {aiConfig?.accounts.map((acc) => (
+                  <option key={acc.label} value={acc.label}>
+                    {acc.label}
+                  </option>
+                ))}
+              </select>
             </div>
-          ) : (
-            <div className="divide-y divide-zinc-200 dark:divide-zinc-700">
-              {downloadedFiles.map((file) => (
+
+            {/* Transcription Model */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-zinc-600 dark:text-zinc-400 w-28">
+                {t.ai_transcription_model || "Transcription"}:
+              </label>
+              <select
+                value={transcriptionModel}
+                onChange={(e) => setTranscriptionModel(e.target.value)}
+                className={`${selectClass} flex-1`}
+                disabled={isProcessing}
+              >
+                {getTranscriptionModels(getAccountProvider(account)).map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Summarization Model */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-zinc-600 dark:text-zinc-400 w-28">
+                {t.ai_summary_model || "Summarization"}:
+              </label>
+              <select
+                value={summarizationModel}
+                onChange={(e) => setSummarizationModel(e.target.value)}
+                className={`${selectClass} flex-1`}
+                disabled={isProcessing || !includeSummary}
+              >
+                {getSummarizationModels(getAccountProvider(account)).map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Right: Options & Button */}
+          <div className="flex flex-col justify-between">
+            {/* Include Summary Toggle */}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={includeSummary}
+                onChange={(e) => setIncludeSummary(e.target.checked)}
+                disabled={isProcessing}
+                className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                {t.ai_summarize || "Include Summary"}
+              </span>
+            </label>
+
+            {/* Start/Cancel Button */}
+            <div className="flex gap-2 mt-auto">
+              {isProcessing ? (
                 <button
-                  key={file.path}
-                  onClick={() => handleSelectDownloadedFile(file)}
-                  className={clsx(
-                    "w-full px-4 py-3 text-left hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors",
-                    selectedFile?.path === file.full_path &&
-                      "bg-blue-50 dark:bg-blue-900/20"
-                  )}
+                  onClick={cancel}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                 >
-                  <div className="flex items-start gap-3">
-                    {isVideoFile(file.name) ? (
-                      <FaVideo className="text-purple-500 mt-1 shrink-0" />
-                    ) : (
-                      <FaMusic className="text-blue-500 mt-1 shrink-0" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-zinc-900 dark:text-white truncate">
-                        {file.name}
-                      </div>
-                      <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                        {formatFileSize(file.size)}
-                      </div>
-                      <div className="flex gap-2 mt-1">
-                        {file.has_transcript && (
-                          <span className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                            <FaCheck className="text-[10px]" /> Transcript
-                          </span>
-                        )}
-                        {file.has_summary && (
-                          <span className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                            <FaCheck className="text-[10px]" /> Summary
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                  <FaStop />
+                  {t.cancel}
                 </button>
-              ))}
+              ) : (
+                <button
+                  onClick={() => handleStartProcessing()}
+                  disabled={!selectedFile}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <FaPlay />
+                  {t.ai_run || "Start Processing"}
+                </button>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
 
-      {/* Section 2: AI Configuration & Actions */}
-      {selectedFile && (
-        <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
-          <h2 className="font-medium text-zinc-900 dark:text-white mb-4">
-            2. {t.ai_select_model}
-          </h2>
+      {/* Section 3: Processing Steps */}
+      <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 flex-shrink-0">
+        <h3 className="text-sm font-medium text-zinc-900 dark:text-white mb-3">
+          {t.ai_processing || "Processing Steps"}
+        </h3>
+        <ProcessingStepper
+          steps={processingState.steps}
+          currentStepIndex={processingState.currentStepIndex}
+          overallProgress={processingState.overallProgress}
+          isProcessing={isProcessing}
+        />
+      </div>
 
-          {/* Selected file info */}
-          <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-700/50 rounded-lg mb-4">
-            {isVideoFile(selectedFile.filename) ? (
-              <FaVideo className="text-purple-500" />
-            ) : (
-              <FaMusic className="text-blue-500" />
-            )}
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-zinc-900 dark:text-white truncate">
-                {selectedFile.filename}
+      {/* Section 4: Outputs */}
+      {selectedFile &&
+        (selectedFile.has_transcript ||
+          selectedFile.has_summary ||
+          isComplete) && (
+          <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 flex-shrink-0">
+            <h2 className="font-medium text-zinc-900 dark:text-white mb-3">
+              {t.download || "Outputs"}
+            </h2>
+
+            <div className="space-y-2">
+              {/* Chunks directory */}
+              <div className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+                <FaFolderOpen className="text-yellow-500 shrink-0" />
+                <span>{getBaseName(selectedFile.filename)}.chunks/</span>
+                <span className="text-xs text-zinc-400">(audio chunks)</span>
               </div>
-              <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                {formatFileSize(selectedFile.size)}
-              </div>
+
+              {/* Transcript file */}
+              {(selectedFile.has_transcript ||
+                processingState.result?.transcript_path) && (
+                <a
+                  href={`/api/download?path=${encodeURIComponent(
+                    selectedFile.path.replace(/\.[^.]+$/, ".transcript.md")
+                  )}`}
+                  download
+                  className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                >
+                  <FaFileLines className="text-blue-500 shrink-0" />
+                  <span>{getBaseName(selectedFile.filename)}.transcript.md</span>
+                  <FaDownload className="text-xs" />
+                </a>
+              )}
+
+              {/* Summary file */}
+              {(selectedFile.has_summary ||
+                processingState.result?.summary_path) && (
+                <a
+                  href={`/api/download?path=${encodeURIComponent(
+                    selectedFile.path.replace(/\.[^.]+$/, ".summary.md")
+                  )}`}
+                  download
+                  className="flex items-center gap-2 text-sm text-purple-600 dark:text-purple-400 hover:underline cursor-pointer"
+                >
+                  <FaFileLines className="text-purple-500 shrink-0" />
+                  <span>{getBaseName(selectedFile.filename)}.summary.md</span>
+                  <FaDownload className="text-xs" />
+                </a>
+              )}
             </div>
           </div>
-
-          {/* Transcription row */}
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-24 text-sm text-zinc-600 dark:text-zinc-400">
-              {t.ai_transcribe}:
-            </div>
-            <select
-              value={transcribeAccount}
-              onChange={(e) => handleTranscribeAccountChange(e.target.value)}
-              className={selectClass}
-              disabled={processing !== null}
-            >
-              {aiConfig?.accounts.map((acc) => (
-                <option key={acc.label} value={acc.label}>
-                  {acc.label} ({acc.provider})
-                </option>
-              ))}
-            </select>
-            <select
-              value={transcribeModel}
-              onChange={(e) => setTranscribeModel(e.target.value)}
-              className={selectClass}
-              disabled={processing !== null}
-            >
-              {getTranscriptionModels(getAccountProvider(transcribeAccount)).map(
-                (model) => (
-                  <option key={model} value={model}>
-                    {model}
-                  </option>
-                )
-              )}
-            </select>
-            <button
-              onClick={() => requestAction("transcribe")}
-              disabled={processing !== null}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {processing === "transcribe" ? (
-                <FaSpinner className="animate-spin" />
-              ) : (
-                <FaMicrophone />
-              )}
-              {processing === "transcribe" ? t.ai_processing : t.ai_run}
-            </button>
-          </div>
-
-          {/* Summarization row */}
-          <div className="flex items-center gap-3">
-            <div className="w-24 text-sm text-zinc-600 dark:text-zinc-400">
-              {t.ai_summarize}:
-            </div>
-            <select
-              value={summarizeAccount}
-              onChange={(e) => handleSummarizeAccountChange(e.target.value)}
-              className={selectClass}
-              disabled={processing !== null || !canSummarize}
-            >
-              {aiConfig?.accounts.map((acc) => (
-                <option key={acc.label} value={acc.label}>
-                  {acc.label} ({acc.provider})
-                </option>
-              ))}
-            </select>
-            <select
-              value={summarizeModel}
-              onChange={(e) => setSummarizeModel(e.target.value)}
-              className={selectClass}
-              disabled={processing !== null || !canSummarize}
-            >
-              {getSummarizationModels(getAccountProvider(summarizeAccount)).map(
-                (model) => (
-                  <option key={model.id} value={model.id}>
-                    {model.name}
-                  </option>
-                )
-              )}
-            </select>
-            <button
-              onClick={() => requestAction("summarize")}
-              disabled={processing !== null || !canSummarize}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {processing === "summarize" ? (
-                <FaSpinner className="animate-spin" />
-              ) : (
-                <FaFileLines />
-              )}
-              {processing === "summarize" ? t.ai_processing : t.ai_run}
-            </button>
-          </div>
-
-          {!canSummarize && (
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 ml-24 pl-3">
-              Transcribe first to enable summarization
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Section 3: Outputs */}
-      {selectedFile && (selectedFile.has_transcript || selectedFile.has_summary || transcript || summary) && (
-        <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-4">
-          <h2 className="font-medium text-zinc-900 dark:text-white mb-4">
-            3. Outputs
-          </h2>
-
-          {/* Output files list */}
-          <div className="space-y-2">
-            {/* Chunks directory */}
-            <div className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
-              <FaFolderOpen className="text-yellow-500 shrink-0" />
-              <span>{getBaseName(selectedFile.filename)}.chunks/</span>
-              <span className="text-xs text-zinc-400">(audio chunks)</span>
-            </div>
-
-            {/* Transcript file */}
-            {(selectedFile.has_transcript || transcript) && (
-              <a
-                href={`/api/download?path=${encodeURIComponent(selectedFile.path.replace(/\.[^.]+$/, ".transcript.md"))}`}
-                download
-                className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-              >
-                <FaFileLines className="text-blue-500 shrink-0" />
-                <span>{getBaseName(selectedFile.filename)}.transcript.md</span>
-                <FaDownload className="text-xs" />
-              </a>
-            )}
-
-            {/* Summary file */}
-            {(selectedFile.has_summary || summary) && (
-              <a
-                href={`/api/download?path=${encodeURIComponent(selectedFile.path.replace(/\.[^.]+$/, ".summary.md"))}`}
-                download
-                className="flex items-center gap-2 text-sm text-purple-600 dark:text-purple-400 hover:underline cursor-pointer"
-              >
-                <FaFileLines className="text-purple-500 shrink-0" />
-                <span>{getBaseName(selectedFile.filename)}.summary.md</span>
-                <FaDownload className="text-xs" />
-              </a>
-            )}
-          </div>
-        </div>
-      )}
+        )}
     </div>
   );
 }

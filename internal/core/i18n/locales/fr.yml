@@ -166,7 +166,7 @@ ui:
   podcast_download_started: "Téléchargement démarré"
   # AI
   ai: "IA"
-  ai_podcast_notes: "Notes de Podcast"
+  ai_speech_to_text: "Reconnaissance Vocale"
   ai_settings: "Paramètres IA"
   ai_no_accounts: "Aucun compte IA configuré. Ajoutez-en un pour utiliser la transcription et le résumé."
   ai_encryption_note: "Les clés API sont chiffrées avec votre PIN en AES-256-GCM. Laissez le PIN vide pour stocker en clair."

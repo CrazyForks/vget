@@ -61,13 +61,14 @@ func NewPipeline(cfg *config.Config, accountName string, pin string) (*Pipeline,
 		return nil, fmt.Errorf("AI account '%s' not found\nRun: vget ai config", accountName)
 	}
 
-	return NewPipelineWithAccount(account, "", pin)
+	return NewPipelineWithAccount(account, "", "", pin)
 }
 
 // NewPipelineWithAccount creates a new AI processing pipeline from an account.
-// The model parameter optionally overrides the default model.
+// transcriptionModel optionally overrides the default transcription model (whisper).
+// summarizationModel optionally overrides the default summarization model.
 // The pin is used to decrypt the API key (empty if account uses plain text keys).
-func NewPipelineWithAccount(account *config.AIAccount, model string, pin string) (*Pipeline, error) {
+func NewPipelineWithAccount(account *config.AIAccount, transcriptionModel, summarizationModel, pin string) (*Pipeline, error) {
 	if account == nil {
 		return nil, fmt.Errorf("no AI account provided")
 	}
@@ -89,9 +90,14 @@ func NewPipelineWithAccount(account *config.AIAccount, model string, pin string)
 		}
 	}
 
-	// Create service config for transcriber/summarizer
-	svcCfg := config.AIServiceConfig{
-		Model: model,
+	// Create service config for transcriber (uses whisper models)
+	transcriptionCfg := config.AIServiceConfig{
+		Model: transcriptionModel,
+	}
+
+	// Create service config for summarizer/cleaner (uses LLM models)
+	summarizationCfg := config.AIServiceConfig{
+		Model: summarizationModel,
 	}
 
 	p := &Pipeline{
@@ -100,22 +106,22 @@ func NewPipelineWithAccount(account *config.AIAccount, model string, pin string)
 
 	// Initialize transcriber (OpenAI is the only provider that supports transcription)
 	if account.Provider == "openai" {
-		t, err := transcriber.New(account.Provider, svcCfg, apiKey)
+		t, err := transcriber.New(account.Provider, transcriptionCfg, apiKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create transcriber: %w", err)
 		}
 		p.transcriber = t
 	}
 
-	// Initialize cleaner (post-transcription cleanup)
-	c, err := cleaner.New(account.Provider, svcCfg, apiKey)
+	// Initialize cleaner (post-transcription cleanup) - uses summarization model
+	c, err := cleaner.New(account.Provider, summarizationCfg, apiKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cleaner: %w", err)
 	}
 	p.cleaner = c
 
 	// Initialize summarizer (all providers support summarization)
-	s, err := summarizer.New(account.Provider, svcCfg, apiKey)
+	s, err := summarizer.New(account.Provider, summarizationCfg, apiKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create summarizer: %w", err)
 	}

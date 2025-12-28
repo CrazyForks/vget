@@ -214,7 +214,7 @@ type UITranslations struct {
 	PodcastDownloadStarted string `yaml:"podcast_download_started" json:"podcast_download_started"`
 	// AI
 	AI                    string `yaml:"ai" json:"ai"`
-	AIPodcastNotes        string `yaml:"ai_podcast_notes" json:"ai_podcast_notes"`
+	AISpeechToText        string `yaml:"ai_speech_to_text" json:"ai_speech_to_text"`
 	AISettings            string `yaml:"ai_settings" json:"ai_settings"`
 	AINoAccounts          string `yaml:"ai_no_accounts" json:"ai_no_accounts"`
 	AIEncryptionNote      string `yaml:"ai_encryption_note" json:"ai_encryption_note"`
