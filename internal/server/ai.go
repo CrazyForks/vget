@@ -379,10 +379,11 @@ func (s *Server) handleTranscribe(c *gin.Context) {
 	c.JSON(http.StatusOK, Response{
 		Code: 200,
 		Data: gin.H{
-			"text":        result.Transcript.Text,
-			"output_path": result.TranscriptPath,
-			"duration":    result.Transcript.Duration,
-			"language":    result.Transcript.Language,
+			"raw_text":     result.Transcript.RawText,
+			"cleaned_text": result.Transcript.CleanedText,
+			"output_path":  result.TranscriptPath,
+			"duration":     result.Transcript.Duration,
+			"language":     result.Transcript.Language,
 		},
 		Message: "transcription completed",
 	})

@@ -1,0 +1,17 @@
+package cleaner
+
+// CleaningPrompt is the system prompt for cleaning raw transcriptions.
+// Adapted from Handy (https://github.com/Handy).
+const CleaningPrompt = `Clean this transcript:
+1. Fix spelling, capitalization, and punctuation errors
+2. Convert number words to digits (twenty-five → 25, ten percent → 10%, five dollars → $5)
+3. Replace spoken punctuation with symbols (period → ., comma → ,, question mark → ?)
+4. Remove filler words (um, uh, like as filler)
+5. Keep the language in the original version (if it was Chinese, keep it in Chinese; if English, keep it in English)
+
+Preserve exact meaning and word order. Do not paraphrase or reorder content.
+
+Return only the cleaned transcript.
+
+Transcript:
+`

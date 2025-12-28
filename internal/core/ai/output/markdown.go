@@ -39,8 +39,16 @@ func WriteTranscript(outputPath, sourcePath string, result *transcriber.Result) 
 			}
 		}
 	} else {
-		// No segments, just output the text
-		b.WriteString(result.Text)
+		// No segments, output raw text
+		b.WriteString(result.RawText)
+		b.WriteString("\n")
+	}
+
+	// If cleaned text is available, add it as a separate section
+	if result.CleanedText != "" {
+		b.WriteString("\n---\n\n")
+		b.WriteString("## Cleaned Transcript\n\n")
+		b.WriteString(result.CleanedText)
 		b.WriteString("\n")
 	}
 

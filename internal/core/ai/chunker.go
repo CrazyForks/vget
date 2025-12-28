@@ -421,10 +421,10 @@ func (c *Chunker) MergeTranscripts(results []*transcriber.Result, chunks []Chunk
 		}
 
 		// Concatenate text (with deduplication for overlap)
-		text := result.Text
+		text := result.RawText
 		if i > 0 {
 			// Simple deduplication: skip first few words that might overlap
-			text = c.removeOverlapText(results[i-1].Text, text)
+			text = c.removeOverlapText(results[i-1].RawText, text)
 		}
 
 		if allText.Len() > 0 {
@@ -438,7 +438,7 @@ func (c *Chunker) MergeTranscripts(results []*transcriber.Result, chunks []Chunk
 		}
 	}
 
-	merged.Text = allText.String()
+	merged.RawText = allText.String()
 	merged.Duration = totalDuration
 
 	return merged, nil

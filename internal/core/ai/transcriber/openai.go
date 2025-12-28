@@ -67,8 +67,9 @@ func (o *OpenAI) Transcribe(ctx context.Context, filePath string) (*Result, erro
 	}
 
 	// Convert response to Result
+	// RawText contains the original transcription; CleanedText will be populated later by post-processing
 	result := &Result{
-		Text:     resp.Text,
+		RawText:  resp.Text,
 		Language: resp.Language,
 		Duration: time.Duration(resp.Duration * float64(time.Second)),
 	}
