@@ -62,12 +62,12 @@ func newOpenAICleaner(cfg config.AIServiceConfig, apiKey string) (*openAICleaner
 }
 
 func (c *openAICleaner) Clean(ctx context.Context, rawText string) (string, error) {
+	// Note: Avoid Temperature as newer models (o1, gpt-5) don't support it
 	resp, err := c.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Model: c.model,
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.UserMessage(CleaningPrompt + rawText),
 		},
-		Temperature: openai.Float(0.1), // Low temperature for consistent cleaning
 	})
 	if err != nil {
 		return "", fmt.Errorf("cleaning API error: %w", err)

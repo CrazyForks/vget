@@ -60,13 +60,12 @@ func (o *OpenAI) Summarize(ctx context.Context, text string) (*Result, error) {
 	}
 
 	// Create chat completion request
+	// Note: Avoid MaxTokens/MaxCompletionTokens/Temperature as newer models (o1, gpt-5) don't support them
 	resp, err := o.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Model: o.model,
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.UserMessage(SummarizationPrompt + text),
 		},
-		MaxTokens:   openai.Int(8000),
-		Temperature: openai.Float(0.3),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("summarization API error: %w", err)
@@ -84,49 +83,45 @@ func (o *OpenAI) Summarize(ctx context.Context, text string) (*Result, error) {
 
 // parseResponse extracts summary and key points from the response.
 func parseResponse(content string) *Result {
+	trimmed := strings.TrimSpace(content)
 	result := &Result{
-		Summary: content,
+		Summary: trimmed,
 	}
 
-	// Try to extract key points
-	lines := strings.Split(content, "\n")
+	// Try to extract key points (legacy format) without stripping headings.
+	lines := strings.Split(trimmed, "\n")
 	var keyPoints []string
-	var summaryLines []string
 	inKeyPoints := false
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
 
 		if strings.HasPrefix(line, "## Key Points") || strings.HasPrefix(line, "**Key Points") {
 			inKeyPoints = true
 			continue
 		}
 
-		if strings.HasPrefix(line, "## Summary") || strings.HasPrefix(line, "**Summary") {
-			inKeyPoints = false
-			continue
+		if strings.HasPrefix(line, "## ") || strings.HasPrefix(line, "### ") || strings.HasPrefix(line, "**") {
+			if inKeyPoints {
+				inKeyPoints = false
+			}
 		}
 
-		if inKeyPoints {
-			if strings.HasPrefix(line, "-") || strings.HasPrefix(line, "*") {
-				point := strings.TrimPrefix(line, "-")
-				point = strings.TrimPrefix(point, "*")
-				point = strings.TrimSpace(point)
-				if point != "" {
-					keyPoints = append(keyPoints, point)
-				}
+		if inKeyPoints && (strings.HasPrefix(line, "-") || strings.HasPrefix(line, "*")) {
+			point := strings.TrimPrefix(line, "-")
+			point = strings.TrimPrefix(point, "*")
+			point = strings.TrimSpace(point)
+			if point != "" {
+				keyPoints = append(keyPoints, point)
 			}
-		} else if !strings.HasPrefix(line, "##") && line != "" {
-			summaryLines = append(summaryLines, line)
 		}
 	}
 
 	if len(keyPoints) > 0 {
 		result.KeyPoints = keyPoints
-	}
-
-	if len(summaryLines) > 0 {
-		result.Summary = strings.Join(summaryLines, "\n")
 	}
 
 	return result

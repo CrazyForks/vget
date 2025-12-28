@@ -57,6 +57,20 @@ func WriteTranscript(outputPath, sourcePath string, result *transcriber.Result) 
 
 // WriteSummary writes a summarization result to a markdown file.
 func WriteSummary(outputPath, sourcePath string, result *summarizer.Result) error {
+	summary := strings.TrimSpace(result.Summary)
+	hasHeadings := false
+	for _, line := range strings.Split(summary, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "## ") || strings.HasPrefix(line, "### ") {
+			hasHeadings = true
+			break
+		}
+	}
+
+	if hasHeadings {
+		return os.WriteFile(outputPath, []byte(summary+"\n"), 0644)
+	}
+
 	var b strings.Builder
 
 	// Header
@@ -78,7 +92,7 @@ func WriteSummary(outputPath, sourcePath string, result *summarizer.Result) erro
 
 	// Summary
 	b.WriteString("## Summary\n\n")
-	b.WriteString(result.Summary)
+	b.WriteString(summary)
 	b.WriteString("\n")
 
 	return os.WriteFile(outputPath, []byte(b.String()), 0644)
