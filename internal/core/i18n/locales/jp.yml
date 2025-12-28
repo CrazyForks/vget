@@ -164,6 +164,9 @@ ui:
   podcast_episodes_count: "エピソード"
   podcast_back: "戻る"
   podcast_download_started: "ダウンロードを開始しました"
+  # AI
+  ai: "AI"
+  ai_podcast_notes: "ポッドキャストノート"
 
 # サーバーメッセージ
 server:

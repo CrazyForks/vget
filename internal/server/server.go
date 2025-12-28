@@ -144,6 +144,15 @@ func (s *Server) Start() error {
 	api.GET("/bilibili/qr/poll", s.handleBilibiliQRPoll)
 	api.GET("/bilibili/status", s.handleBilibiliStatus)
 
+	// AI routes
+	api.GET("/ai/config", s.handleGetAIConfig)
+	api.POST("/ai/config/account", s.handleAddAIAccount)
+	api.DELETE("/ai/config/account/:name", s.handleDeleteAIAccount)
+	api.POST("/ai/config/default", s.handleSetDefaultAIAccount)
+	api.POST("/ai/transcribe", s.handleTranscribe)
+	api.POST("/ai/summarize", s.handleSummarize)
+	api.GET("/ai/files", s.handleListDownloadedAudio)
+
 	// Serve embedded UI if available
 	if distFS := GetDistFS(); distFS != nil {
 		s.setupStaticFiles(distFS)

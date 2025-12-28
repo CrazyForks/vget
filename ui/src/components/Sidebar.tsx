@@ -10,6 +10,8 @@ import {
   FaCloud,
   FaPodcast,
   FaB,
+  FaWandMagicSparkles,
+  FaMicrophone,
 } from "react-icons/fa6";
 import { useApp } from "../context/AppContext";
 
@@ -18,10 +20,11 @@ interface SidebarProps {
 }
 
 interface NavItem {
-  to: string;
+  to?: string;
   icon: React.ReactNode;
   label: string;
   show?: boolean;
+  children?: NavItem[];
 }
 
 export function Sidebar({ lang }: SidebarProps) {
@@ -40,6 +43,19 @@ export function Sidebar({ lang }: SidebarProps) {
       icon: <FaLayerGroup />,
       label: t.bulk_download,
       show: true,
+    },
+    {
+      icon: <FaWandMagicSparkles />,
+      label: t.ai,
+      show: true,
+      children: [
+        {
+          to: "/ai/podcast-notes",
+          icon: <FaMicrophone />,
+          label: t.ai_podcast_notes,
+          show: true,
+        },
+      ],
     },
     {
       to: "/bilibili",
@@ -82,6 +98,61 @@ export function Sidebar({ lang }: SidebarProps) {
 
   const visibleItems = navItems.filter((item) => item.show !== false);
 
+  const renderNavItem = (item: NavItem, isChild = false) => {
+    const hasChildren = item.children && item.children.length > 0;
+    const visibleChildren =
+      item.children?.filter((c) => c.show !== false) ?? [];
+
+    // Check if this item or any child is active
+    const isActive = item.to
+      ? item.to === "/"
+        ? location.pathname === "/"
+        : location.pathname.startsWith(item.to)
+      : false;
+    const hasActiveChild = visibleChildren.some(
+      (child) => child.to && location.pathname.startsWith(child.to)
+    );
+
+    if (hasChildren) {
+      // Always expanded section (non-collapsible)
+      return (
+        <div key={item.label}>
+          <div
+            className={clsx(
+              "flex items-center gap-3 px-3 py-2.5 text-sm",
+              hasActiveChild
+                ? "text-blue-600 dark:text-blue-400 font-medium"
+                : "text-zinc-600 dark:text-zinc-400"
+            )}
+          >
+            <span className="text-lg">{item.icon}</span>
+            <span>{item.label}</span>
+          </div>
+          <div className="ml-4 mt-1 flex flex-col gap-1">
+            {visibleChildren.map((child) => renderNavItem(child, true))}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <Link
+        key={item.to}
+        to={item.to!}
+        className={clsx(
+          "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
+          isChild && "pl-4",
+          isActive
+            ? "bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 font-medium"
+            : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+        )}
+      >
+        <span className="text-lg">{item.icon}</span>
+        <span>{item.label}</span>
+      </Link>
+    );
+  };
+
   return (
     <aside
       className={clsx(
@@ -91,28 +162,7 @@ export function Sidebar({ lang }: SidebarProps) {
     >
       <div className="flex-1 py-4">
         <nav className="flex flex-col gap-1 px-2">
-          {visibleItems.map((item) => {
-            const isActive =
-              item.to === "/"
-                ? location.pathname === "/"
-                : location.pathname.startsWith(item.to);
-
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                className={clsx(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
-                  isActive
-                    ? "bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 font-medium"
-                    : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                )}
-              >
-                <span className="text-lg">{item.icon}</span>
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
+          {visibleItems.map((item) => renderNavItem(item))}
         </nav>
       </div>
     </aside>

@@ -79,6 +79,9 @@ export interface UITranslations {
   podcast_episodes_count: string;
   podcast_back: string;
   podcast_download_started: string;
+  // AI
+  ai: string;
+  ai_podcast_notes: string;
 }
 
 export interface ServerTranslations {
@@ -167,6 +170,9 @@ export const defaultTranslations: UITranslations = {
   podcast_episodes_count: "episodes",
   podcast_back: "Back",
   podcast_download_started: "Download started",
+  // AI
+  ai: "AI",
+  ai_podcast_notes: "Podcast Notes",
 };
 
 export const defaultServerTranslations: ServerTranslations = {

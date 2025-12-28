@@ -164,6 +164,9 @@ ui:
   podcast_episodes_count: "episodios"
   podcast_back: "Volver"
   podcast_download_started: "Descarga iniciada"
+  # AI
+  ai: "IA"
+  ai_podcast_notes: "Notas de Podcast"
 
 # Mensajes del servidor
 server:

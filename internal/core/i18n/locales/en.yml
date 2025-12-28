@@ -176,6 +176,9 @@ ui:
   podcast_episodes_count: "episodes"
   podcast_back: "Back"
   podcast_download_started: "Download started"
+  # AI
+  ai: "AI"
+  ai_podcast_notes: "Podcast Notes"
 
 # Server messages
 server:

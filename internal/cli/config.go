@@ -116,7 +116,7 @@ Supported keys:
   server.max_concurrent  Max concurrent downloads
   server.api_key     Server API key
 
-AI configuration (use 'vget ai config' for interactive setup):
+AI configuration:
   ai.default_account          Default account name to use
 
 Express tracking (dynamic keys):
@@ -131,8 +131,6 @@ Examples:
   vget config set language en
   vget config set output_dir ~/Videos
   vget config set twitter.auth_token YOUR_TOKEN
-  vget config set ai.transcription.provider openai
-  vget config set ai.transcription.api_key sk-xxx
   vget config set express.kuaidi100.key YOUR_KEY`,
 	Args: cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -282,13 +280,13 @@ func setAIConfigValue(cfg *config.Config, key, value string) error {
 		if cfg.AI.GetAccount(value) == nil && value != "" {
 			accounts := cfg.AI.ListAccounts()
 			if len(accounts) == 0 {
-				return fmt.Errorf("no AI accounts configured. Run: vget ai config")
+				return fmt.Errorf("no AI accounts configured. Configure AI in the web UI Settings page")
 			}
 			return fmt.Errorf("account '%s' not found. Available: %v", value, accounts)
 		}
 		cfg.AI.DefaultAccount = value
 	default:
-		return fmt.Errorf("unknown AI config key: %s\nUse 'vget ai config' for interactive AI setup\nSupported: ai.default_account", key)
+		return fmt.Errorf("unknown AI config key: %s\nSupported: ai.default_account", key)
 	}
 	return nil
 }
@@ -345,7 +343,7 @@ func getAIConfigValue(cfg *config.Config, key string) (string, error) {
 	case "ai.default_account":
 		return cfg.AI.DefaultAccount, nil
 	default:
-		return "", fmt.Errorf("unknown AI config key: %s\nUse 'vget ai config' for interactive AI setup\nSupported: ai.default_account", key)
+		return "", fmt.Errorf("unknown AI config key: %s\nSupported: ai.default_account", key)
 	}
 }
 
@@ -399,7 +397,7 @@ func unsetAIConfigValue(cfg *config.Config, key string) error {
 	case "ai.default_account":
 		cfg.AI.DefaultAccount = ""
 	default:
-		return fmt.Errorf("unknown AI config key: %s\nUse 'vget ai config' for interactive AI setup\nSupported: ai.default_account", key)
+		return fmt.Errorf("unknown AI config key: %s\nSupported: ai.default_account", key)
 	}
 	return nil
 }
@@ -599,33 +597,6 @@ var configTwitterClearCmd = &cobra.Command{
 	},
 }
 
-// vget config ai - alias for vget ai config
-var configAICmd = &cobra.Command{
-	Use:   "ai",
-	Short: "Configure AI transcription and summarization",
-	Long: `Launch interactive TUI wizard to configure AI transcription and summarization providers.
-
-This is an alias for 'vget ai config'.
-
-This wizard will help you set up:
-  - Transcription provider (OpenAI Whisper, etc.)
-  - Summarization provider (OpenAI GPT, etc.)
-  - API keys for each service`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg, err := config.RunAIWizard()
-		if err != nil {
-			return err
-		}
-
-		if err := config.Save(cfg); err != nil {
-			return err
-		}
-
-		fmt.Printf("\nSaved to %s\n", config.SavePath())
-		return nil
-	},
-}
-
 func init() {
 	// config subcommands
 	configCmd.AddCommand(configShowCmd)
@@ -646,9 +617,6 @@ func init() {
 	configTwitterCmd.AddCommand(configTwitterSetCmd)
 	configTwitterCmd.AddCommand(configTwitterClearCmd)
 	configCmd.AddCommand(configTwitterCmd)
-
-	// config ai subcommand (alias for vget ai config)
-	configCmd.AddCommand(configAICmd)
 
 	rootCmd.AddCommand(configCmd)
 }

@@ -176,6 +176,9 @@ ui:
   podcast_episodes_count: "集"
   podcast_back: "返回"
   podcast_download_started: "下载已开始"
+  # AI
+  ai: "AI"
+  ai_podcast_notes: "播客笔记"
 
 # 服务器消息
 server:
