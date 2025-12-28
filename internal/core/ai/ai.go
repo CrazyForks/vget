@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/guiyumin/vget/internal/core/ai/cleaner"
 	"github.com/guiyumin/vget/internal/core/ai/output"
 	"github.com/guiyumin/vget/internal/core/ai/summarizer"
 	"github.com/guiyumin/vget/internal/core/ai/transcriber"
@@ -21,7 +20,6 @@ import (
 type Pipeline struct {
 	config      *config.Config
 	transcriber transcriber.Transcriber
-	cleaner     cleaner.Cleaner
 	summarizer  summarizer.Summarizer
 	chunker     *Chunker
 }
@@ -39,7 +37,6 @@ const (
 	ProgressStepCompress   ProgressStep = "compress"
 	ProgressStepChunk      ProgressStep = "chunk"
 	ProgressStepTranscribe ProgressStep = "transcribe"
-	ProgressStepCleanup    ProgressStep = "cleanup"
 	ProgressStepMerge      ProgressStep = "merge"
 )
 
@@ -130,13 +127,6 @@ func NewPipelineWithAccount(account *config.AIAccount, transcriptionModel, summa
 		p.transcriber = t
 	}
 
-	// Initialize cleaner (post-transcription cleanup) - uses summarization model
-	c, err := cleaner.New(account.Provider, summarizationCfg, apiKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create cleaner: %w", err)
-	}
-	p.cleaner = c
-
 	// Initialize summarizer (all providers support summarization)
 	s, err := summarizer.New(account.Provider, summarizationCfg, apiKey)
 	if err != nil {
@@ -199,23 +189,6 @@ func (p *Pipeline) ProcessWithProgress(ctx context.Context, filePath string, opt
 			}
 		}
 
-		// Clean the transcript using LLM (post-transcription cleanup)
-		if p.cleaner != nil && transcript.RawText != "" {
-			progressFn(ProgressStepCleanup, 0, "Cleaning transcript...")
-			fmt.Println("  Cleaning transcript...")
-			cleanedText, err := p.cleaner.Clean(ctx, transcript.RawText)
-			if err != nil {
-				// Log warning but don't fail - raw transcript is still available
-				fmt.Printf("  Warning: failed to clean transcript: %v\n", err)
-				progressFn(ProgressStepCleanup, 100, "Skipped (cleanup failed)")
-			} else {
-				transcript.CleanedText = cleanedText
-				progressFn(ProgressStepCleanup, 100, "Transcript cleaned")
-			}
-		} else {
-			progressFn(ProgressStepCleanup, 100, "Skipped")
-		}
-
 		// Write transcript to file
 		transcriptPath := getOutputPath(filePath, ".transcript.md")
 		if err := output.WriteTranscript(transcriptPath, filePath, transcript); err != nil {
@@ -235,12 +208,7 @@ func (p *Pipeline) ProcessWithProgress(ctx context.Context, filePath string, opt
 		var sourcePath string
 
 		if result.Transcript != nil {
-			// Use cleaned transcript if available, otherwise use raw
-			if result.Transcript.CleanedText != "" {
-				text = result.Transcript.CleanedText
-			} else {
-				text = result.Transcript.RawText
-			}
+			text = result.Transcript.RawText
 			sourcePath = result.TranscriptPath
 		} else {
 			// Read from input file

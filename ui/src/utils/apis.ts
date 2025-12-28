@@ -515,7 +515,6 @@ export interface AIJobResult {
   transcript_path?: string;
   summary_path?: string;
   raw_text?: string;
-  cleaned_text?: string;
   summary?: string;
 }
 

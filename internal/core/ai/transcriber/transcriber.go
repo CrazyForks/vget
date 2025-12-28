@@ -18,11 +18,10 @@ type Segment struct {
 
 // Result contains the transcription output.
 type Result struct {
-	RawText     string        // Original transcript from speech-to-text
-	CleanedText string        // Cleaned transcript (filler words removed, punctuation fixed, etc.)
-	Segments    []Segment     // Timestamped segments (from raw transcription)
-	Language    string        // Detected language
-	Duration    time.Duration // Audio duration
+	RawText  string        // Original transcript from speech-to-text
+	Segments []Segment     // Timestamped segments (from raw transcription)
+	Language string        // Detected language
+	Duration time.Duration // Audio duration
 }
 
 // Transcriber converts audio to text.

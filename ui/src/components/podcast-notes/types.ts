@@ -4,7 +4,6 @@ export type StepKey =
   | "compress_audio"
   | "chunk_audio"
   | "transcribe"
-  | "cleanup"
   | "merge"
   | "summarize";
 
@@ -40,7 +39,6 @@ export interface AIJobResult {
   transcript_path?: string;
   summary_path?: string;
   raw_text?: string;
-  cleaned_text?: string;
   summary?: string;
 }
 
@@ -103,7 +101,6 @@ export const DEFAULT_STEPS: ProcessingStep[] = [
   { key: "compress_audio", name: "Compress Audio", status: "pending", progress: 0 },
   { key: "chunk_audio", name: "Chunk Audio", status: "pending", progress: 0 },
   { key: "transcribe", name: "Transcribe", status: "pending", progress: 0 },
-  { key: "cleanup", name: "Clean Transcript", status: "pending", progress: 0 },
   { key: "merge", name: "Merge Chunks", status: "pending", progress: 0 },
   { key: "summarize", name: "Generate Summary", status: "pending", progress: 0 },
 ];

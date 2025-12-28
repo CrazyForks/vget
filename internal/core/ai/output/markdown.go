@@ -44,14 +44,6 @@ func WriteTranscript(outputPath, sourcePath string, result *transcriber.Result) 
 		b.WriteString("\n")
 	}
 
-	// If cleaned text is available, add it as a separate section
-	if result.CleanedText != "" {
-		b.WriteString("\n---\n\n")
-		b.WriteString("## Cleaned Transcript\n\n")
-		b.WriteString(result.CleanedText)
-		b.WriteString("\n")
-	}
-
 	return os.WriteFile(outputPath, []byte(b.String()), 0644)
 }
 

@@ -45,7 +45,6 @@ const (
 	StepCompress     StepKey = "compress_audio"
 	StepChunk        StepKey = "chunk_audio"
 	StepTranscribe   StepKey = "transcribe"
-	StepCleanup      StepKey = "cleanup"
 	StepMerge        StepKey = "merge"
 	StepSummarize    StepKey = "summarize"
 )
@@ -55,9 +54,8 @@ var stepWeights = map[StepKey]float64{
 	StepExtractAudio: 0.05,
 	StepCompress:     0.10,
 	StepChunk:        0.05,
-	StepTranscribe:   0.45,
-	StepCleanup:      0.15,
-	StepMerge:        0.05,
+	StepTranscribe:   0.55,
+	StepMerge:        0.10,
 	StepSummarize:    0.15,
 }
 
@@ -77,7 +75,6 @@ type AIJobResult struct {
 	TranscriptPath string `json:"transcript_path,omitempty"`
 	SummaryPath    string `json:"summary_path,omitempty"`
 	RawText        string `json:"raw_text,omitempty"`
-	CleanedText    string `json:"cleaned_text,omitempty"`
 	Summary        string `json:"summary,omitempty"`
 }
 
@@ -264,7 +261,6 @@ func (q *AIJobQueue) initializeSteps(filePath string, includeSummary bool) []AIJ
 		{Key: StepChunk, Name: "Chunk Audio", Status: StepStatusPending},
 		{Key: StepTranscribe, Name: "Transcribe", Status: StepStatusPending},
 		{Key: StepMerge, Name: "Merge Chunks", Status: StepStatusPending},
-		{Key: StepCleanup, Name: "Clean Transcript", Status: StepStatusPending},
 	}
 
 	// If transcript exists, mark transcription steps as completed (resume point)
@@ -448,7 +444,6 @@ func (q *AIJobQueue) executeWithProgress(ctx context.Context, pipeline *ai.Pipel
 		progressFn(StepCompress, 100, "Skipped (transcript exists)")
 		progressFn(StepChunk, 100, "Skipped (transcript exists)")
 		progressFn(StepTranscribe, 100, "Skipped (transcript exists)")
-		progressFn(StepCleanup, 100, "Skipped (transcript exists)")
 		progressFn(StepMerge, 100, "Skipped (transcript exists)")
 
 		// Read existing transcript
@@ -458,7 +453,6 @@ func (q *AIJobQueue) executeWithProgress(ctx context.Context, pipeline *ai.Pipel
 		}
 		transcriptText = data
 		result.TranscriptPath = transcriptPath
-		result.CleanedText = transcriptText
 	} else {
 		// Determine file type
 		ext := strings.ToLower(filepath.Ext(job.FilePath))
@@ -515,12 +509,6 @@ func (q *AIJobQueue) executeWithProgress(ctx context.Context, pipeline *ai.Pipel
 				progressFn(StepMerge, progress, detail)
 				if progress >= 100 {
 					q.completeStep(job.ID, StepMerge)
-					q.startStep(job.ID, StepCleanup)
-				}
-			case ai.ProgressStepCleanup:
-				progressFn(StepCleanup, progress, detail)
-				if progress >= 100 {
-					q.completeStep(job.ID, StepCleanup)
 				}
 			}
 		}
@@ -540,13 +528,7 @@ func (q *AIJobQueue) executeWithProgress(ctx context.Context, pipeline *ai.Pipel
 		result.TranscriptPath = pipelineResult.TranscriptPath
 		if pipelineResult.Transcript != nil {
 			result.RawText = pipelineResult.Transcript.RawText
-			result.CleanedText = pipelineResult.Transcript.CleanedText
-			// Use cleaned text if available, otherwise raw text
-			if pipelineResult.Transcript.CleanedText != "" {
-				transcriptText = pipelineResult.Transcript.CleanedText
-			} else {
-				transcriptText = pipelineResult.Transcript.RawText
-			}
+			transcriptText = pipelineResult.Transcript.RawText
 		}
 	}
 
@@ -609,30 +591,26 @@ func readTranscriptText(path string) (string, error) {
 
 	content := string(data)
 
-	// The transcript markdown has sections like "## Transcript" or "## Cleaned Transcript"
-	// We want to extract the text content, preferring cleaned if available
+	// Extract text content from the transcript markdown
+	// Skip metadata lines and extract the actual transcript text
 	lines := strings.Split(content, "\n")
 	var textLines []string
-	inTranscript := false
+	inContent := false
 
 	for _, line := range lines {
-		if strings.HasPrefix(line, "## Cleaned Transcript") {
-			inTranscript = true
-			textLines = nil // Reset to prefer cleaned transcript
+		// Start collecting after the separator
+		if line == "---" {
+			inContent = true
 			continue
 		}
-		if strings.HasPrefix(line, "## Transcript") {
-			if len(textLines) == 0 { // Only use raw if we haven't found cleaned
-				inTranscript = true
-			}
+		// Skip if we haven't passed the header yet
+		if !inContent {
 			continue
 		}
-		if strings.HasPrefix(line, "## ") {
-			inTranscript = false
-			continue
-		}
-		if inTranscript && strings.TrimSpace(line) != "" {
-			textLines = append(textLines, line)
+		// Collect non-empty lines
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" {
+			textLines = append(textLines, trimmed)
 		}
 	}
 
