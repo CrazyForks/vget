@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -227,6 +228,9 @@ func (q *AIJobQueue) AddJob(req AIJobRequest) (*AIJob, error) {
 		includeSummary:     req.IncludeSummary,
 	}
 
+	// Calculate initial overall progress (for resume capability)
+	q.updateOverallProgress(job)
+
 	q.mu.Lock()
 	q.jobs[id] = job
 	q.mu.Unlock()
@@ -244,8 +248,16 @@ func (q *AIJobQueue) AddJob(req AIJobRequest) (*AIJob, error) {
 	}
 }
 
-// initializeSteps creates the step list based on options
-func (q *AIJobQueue) initializeSteps(_ string, includeSummary bool) []AIJobStep {
+// initializeSteps creates the step list based on options and existing artifacts
+func (q *AIJobQueue) initializeSteps(filePath string, includeSummary bool) []AIJobStep {
+	// Check for existing artifacts to enable resume capability
+	basePath := strings.TrimSuffix(filePath, filepath.Ext(filePath))
+	transcriptPath := basePath + ".transcript.md"
+	summaryPath := basePath + ".summary.md"
+
+	hasTranscript := fileExists(transcriptPath)
+	hasSummary := fileExists(summaryPath)
+
 	steps := []AIJobStep{
 		{Key: StepExtractAudio, Name: "Extract Audio", Status: StepStatusPending},
 		{Key: StepCompress, Name: "Compress Audio", Status: StepStatusPending},
@@ -255,8 +267,25 @@ func (q *AIJobQueue) initializeSteps(_ string, includeSummary bool) []AIJobStep 
 		{Key: StepMerge, Name: "Merge Chunks", Status: StepStatusPending},
 	}
 
+	// If transcript exists, mark transcription steps as completed (resume point)
+	if hasTranscript {
+		for i := range steps {
+			steps[i].Status = StepStatusCompleted
+			steps[i].Progress = 100
+		}
+	}
+
 	if includeSummary {
-		steps = append(steps, AIJobStep{Key: StepSummarize, Name: "Generate Summary", Status: StepStatusPending})
+		summaryStatus := StepStatusPending
+		if hasSummary {
+			summaryStatus = StepStatusCompleted
+		}
+		steps = append(steps, AIJobStep{
+			Key:      StepSummarize,
+			Name:     "Generate Summary",
+			Status:   summaryStatus,
+			Progress: func() float64 { if hasSummary { return 100 }; return 0 }(),
+		})
 	}
 
 	return steps
@@ -399,76 +428,189 @@ func (q *AIJobQueue) processJob(job *AIJob) {
 }
 
 // executeWithProgress runs the pipeline with step-by-step progress updates
+// It supports resume capability by checking if steps are already completed
 func (q *AIJobQueue) executeWithProgress(ctx context.Context, pipeline *ai.Pipeline, job *AIJob, progressFn func(StepKey, float64, string)) (*AIJobResult, error) {
 	result := &AIJobResult{}
 
-	// Determine file type
-	ext := strings.ToLower(filepath.Ext(job.FilePath))
-	isVideo := ext == ".mp4" || ext == ".mkv" || ext == ".webm" || ext == ".avi" || ext == ".mov"
+	// Check if transcription is already done (resume capability)
+	transcriptionDone := q.isStepCompleted(job.ID, StepTranscribe)
 
-	// Step 0: Extract audio (if video)
-	if isVideo {
-		q.startStep(job.ID, StepExtractAudio)
-		progressFn(StepExtractAudio, 0, "Extracting audio from video...")
-		// Note: Actual extraction happens in chunker, we track it here
-		progressFn(StepExtractAudio, 100, "Audio extracted")
-		q.completeStep(job.ID, StepExtractAudio)
+	// Determine output paths
+	basePath := strings.TrimSuffix(job.FilePath, filepath.Ext(job.FilePath))
+	transcriptPath := basePath + ".transcript.md"
+	summaryPath := basePath + ".summary.md"
+
+	var transcriptText string
+
+	if transcriptionDone {
+		// Resume: Load existing transcript
+		progressFn(StepExtractAudio, 100, "Skipped (transcript exists)")
+		progressFn(StepCompress, 100, "Skipped (transcript exists)")
+		progressFn(StepChunk, 100, "Skipped (transcript exists)")
+		progressFn(StepTranscribe, 100, "Skipped (transcript exists)")
+		progressFn(StepCleanup, 100, "Skipped (transcript exists)")
+		progressFn(StepMerge, 100, "Skipped (transcript exists)")
+
+		// Read existing transcript
+		data, err := readTranscriptText(transcriptPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read existing transcript: %w", err)
+		}
+		transcriptText = data
+		result.TranscriptPath = transcriptPath
+		result.CleanedText = transcriptText
 	} else {
-		q.skipStep(job.ID, StepExtractAudio, "Already audio")
+		// Determine file type
+		ext := strings.ToLower(filepath.Ext(job.FilePath))
+		isVideo := ext == ".mp4" || ext == ".mkv" || ext == ".webm" || ext == ".avi" || ext == ".mov"
+
+		// Step 0: Extract audio (if video)
+		if isVideo {
+			q.startStep(job.ID, StepExtractAudio)
+			progressFn(StepExtractAudio, 0, "Extracting audio from video...")
+			// Note: Actual extraction happens in chunker, we track it here
+			progressFn(StepExtractAudio, 100, "Audio extracted")
+			q.completeStep(job.ID, StepExtractAudio)
+		} else {
+			q.skipStep(job.ID, StepExtractAudio, "Already audio")
+		}
+
+		// Check for cancellation
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+
+		// Steps 1-5: Transcription (handled by pipeline)
+		q.startStep(job.ID, StepCompress)
+		progressFn(StepCompress, 0, "Compressing audio...")
+
+		// Run the actual pipeline (transcription only for now)
+		opts := ai.Options{
+			Transcribe: true,
+			Summarize:  false, // We'll handle summarization separately for resume support
+		}
+
+		pipelineResult, err := pipeline.Process(ctx, job.FilePath, opts)
+		if err != nil {
+			return nil, err
+		}
+
+		// Update steps based on pipeline result
+		q.completeStep(job.ID, StepCompress)
+
+		// Check if chunking was used
+		if pipelineResult.ChunksDir != "" {
+			q.completeStep(job.ID, StepChunk)
+			q.completeStep(job.ID, StepMerge)
+		} else {
+			q.skipStep(job.ID, StepChunk, "File small enough")
+			q.skipStep(job.ID, StepMerge, "No chunks to merge")
+		}
+
+		q.completeStep(job.ID, StepTranscribe)
+		q.completeStep(job.ID, StepCleanup)
+
+		// Build result
+		result.TranscriptPath = pipelineResult.TranscriptPath
+		if pipelineResult.Transcript != nil {
+			result.RawText = pipelineResult.Transcript.RawText
+			result.CleanedText = pipelineResult.Transcript.CleanedText
+			// Use cleaned text if available, otherwise raw text
+			if pipelineResult.Transcript.CleanedText != "" {
+				transcriptText = pipelineResult.Transcript.CleanedText
+			} else {
+				transcriptText = pipelineResult.Transcript.RawText
+			}
+		}
 	}
 
-	// Check for cancellation
+	// Check for cancellation before summarization
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
 
-	// Steps 1-5: Transcription (handled by pipeline)
-	q.startStep(job.ID, StepCompress)
-	progressFn(StepCompress, 0, "Compressing audio...")
-
-	// Run the actual pipeline
-	opts := ai.Options{
-		Transcribe: true,
-		Summarize:  job.includeSummary,
-	}
-
-	pipelineResult, err := pipeline.Process(ctx, job.FilePath, opts)
-	if err != nil {
-		return nil, err
-	}
-
-	// Update steps based on pipeline result
-	q.completeStep(job.ID, StepCompress)
-
-	// Check if chunking was used
-	if pipelineResult.ChunksDir != "" {
-		q.completeStep(job.ID, StepChunk)
-		q.completeStep(job.ID, StepMerge)
-	} else {
-		q.skipStep(job.ID, StepChunk, "File small enough")
-		q.skipStep(job.ID, StepMerge, "No chunks to merge")
-	}
-
-	q.completeStep(job.ID, StepTranscribe)
-	q.completeStep(job.ID, StepCleanup)
-
-	// Build result
-	result.TranscriptPath = pipelineResult.TranscriptPath
-	if pipelineResult.Transcript != nil {
-		result.RawText = pipelineResult.Transcript.RawText
-		result.CleanedText = pipelineResult.Transcript.CleanedText
-	}
-
-	// Step 6: Summary
+	// Step 6: Summary (with resume support)
 	if job.includeSummary {
-		q.completeStep(job.ID, StepSummarize)
-		result.SummaryPath = pipelineResult.SummaryPath
-		if pipelineResult.Summary != nil {
-			result.Summary = pipelineResult.Summary.Summary
+		summaryDone := q.isStepCompleted(job.ID, StepSummarize)
+
+		if summaryDone {
+			// Resume: Load existing summary
+			progressFn(StepSummarize, 100, "Skipped (summary exists)")
+			result.SummaryPath = summaryPath
+		} else {
+			// Run summarization
+			q.startStep(job.ID, StepSummarize)
+			progressFn(StepSummarize, 0, "Generating summary...")
+
+			// Run summarization through pipeline
+			summaryResult, err := pipeline.SummarizeText(ctx, transcriptText, job.FilePath)
+			if err != nil {
+				return nil, fmt.Errorf("summarization failed: %w", err)
+			}
+
+			progressFn(StepSummarize, 100, "Summary generated")
+			q.completeStep(job.ID, StepSummarize)
+
+			result.SummaryPath = summaryResult.SummaryPath
+			result.Summary = summaryResult.Summary
 		}
 	}
 
 	return result, nil
+}
+
+// isStepCompleted checks if a step is already completed
+func (q *AIJobQueue) isStepCompleted(jobID string, stepKey StepKey) bool {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+
+	if job, ok := q.jobs[jobID]; ok {
+		for _, step := range job.Steps {
+			if step.Key == stepKey {
+				return step.Status == StepStatusCompleted
+			}
+		}
+	}
+	return false
+}
+
+// readTranscriptText reads the transcript text from a markdown file
+func readTranscriptText(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+
+	content := string(data)
+
+	// The transcript markdown has sections like "## Transcript" or "## Cleaned Transcript"
+	// We want to extract the text content, preferring cleaned if available
+	lines := strings.Split(content, "\n")
+	var textLines []string
+	inTranscript := false
+
+	for _, line := range lines {
+		if strings.HasPrefix(line, "## Cleaned Transcript") {
+			inTranscript = true
+			textLines = nil // Reset to prefer cleaned transcript
+			continue
+		}
+		if strings.HasPrefix(line, "## Transcript") {
+			if len(textLines) == 0 { // Only use raw if we haven't found cleaned
+				inTranscript = true
+			}
+			continue
+		}
+		if strings.HasPrefix(line, "## ") {
+			inTranscript = false
+			continue
+		}
+		if inTranscript && strings.TrimSpace(line) != "" {
+			textLines = append(textLines, line)
+		}
+	}
+
+	return strings.Join(textLines, "\n"), nil
 }
 
 // Step state management helpers

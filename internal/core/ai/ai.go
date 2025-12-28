@@ -239,6 +239,41 @@ func (p *Pipeline) Process(ctx context.Context, filePath string, opts Options) (
 	return result, nil
 }
 
+// SummarizeTextResult contains the output of text summarization.
+type SummarizeTextResult struct {
+	SummaryPath string
+	Summary     string
+}
+
+// SummarizeText runs summarization on provided text content.
+// This is useful for resuming from an existing transcript.
+// The originalFilePath is used to determine the output path.
+func (p *Pipeline) SummarizeText(ctx context.Context, text string, originalFilePath string) (*SummarizeTextResult, error) {
+	if p.summarizer == nil {
+		return nil, fmt.Errorf("summarization not configured\nRun: vget ai config")
+	}
+
+	fmt.Printf("Summarizing...\n")
+
+	// Summarize the text
+	summary, err := p.summarizer.Summarize(ctx, text)
+	if err != nil {
+		return nil, fmt.Errorf("summarization failed: %w", err)
+	}
+
+	// Write summary to file
+	summaryPath := getOutputPath(originalFilePath, ".summary.md")
+	if err := output.WriteSummary(summaryPath, originalFilePath, summary); err != nil {
+		return nil, fmt.Errorf("failed to write summary: %w", err)
+	}
+	fmt.Printf("  Written: %s\n", summaryPath)
+
+	return &SummarizeTextResult{
+		SummaryPath: summaryPath,
+		Summary:     summary.Summary,
+	}, nil
+}
+
 // transcribe handles the transcription process, including chunking for large files.
 func (p *Pipeline) transcribe(ctx context.Context, filePath string) (*transcriber.Result, string, error) {
 	// Check if file needs chunking
