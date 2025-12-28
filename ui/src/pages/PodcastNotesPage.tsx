@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import clsx from "clsx";
 import { useApp } from "../context/AppContext";
 import {
   fetchAIConfig,
@@ -393,7 +394,7 @@ export function PodcastNotesPage() {
               </select>
             </div>
 
-            {/* Summarization Model */}
+            {/* Summarization Model with toggle */}
             <div className="flex items-center gap-2">
               <label className="text-sm text-zinc-600 dark:text-zinc-400 w-28">
                 {t.ai_summary_model}:
@@ -401,7 +402,7 @@ export function PodcastNotesPage() {
               <select
                 value={summarizationModel}
                 onChange={(e) => setSummarizationModel(e.target.value)}
-                className={`${selectClass} flex-1`}
+                className={clsx(selectClass, "flex-1", !includeSummary && "opacity-50")}
                 disabled={isProcessing || !includeSummary}
               >
                 {getSummarizationModels(getAccountProvider(account)).map(
@@ -412,24 +413,14 @@ export function PodcastNotesPage() {
                   )
                 )}
               </select>
-            </div>
-          </div>
-
-          {/* Right: Options */}
-          <div className="flex flex-col justify-start">
-            {/* Include Summary Toggle */}
-            <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={includeSummary}
                 onChange={(e) => setIncludeSummary(e.target.checked)}
                 disabled={isProcessing}
-                className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
+                className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500 cursor-pointer"
               />
-              <span className="text-sm text-zinc-600 dark:text-zinc-400">
-                {t.ai_summarize}
-              </span>
-            </label>
+            </div>
           </div>
         </div>
 
