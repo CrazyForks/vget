@@ -55,7 +55,7 @@ RUN git clone --depth 1 --branch v${WHISPER_VERSION} https://github.com/ggergano
 
 # Set environment variables for CGO
 ENV CGO_ENABLED=1
-ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH=/usr/local/lib
 
 # C_INCLUDE_PATH and LIBRARY_PATH for whisper.cpp Go bindings
 ENV C_INCLUDE_PATH=/usr/local/include

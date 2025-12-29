@@ -105,8 +105,8 @@ func (w *WhisperTranscriber) Transcribe(ctx context.Context, filePath string) (*
 		}
 	}
 
-	// Process audio
-	if err := wctx.Process(samples, nil, nil); err != nil {
+	// Process audio (4 callbacks: encoder begin, segment, progress, abort)
+	if err := wctx.Process(samples, nil, nil, nil); err != nil {
 		return nil, fmt.Errorf("failed to process audio: %w", err)
 	}
 
