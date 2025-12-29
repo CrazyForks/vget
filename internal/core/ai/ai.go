@@ -18,7 +18,6 @@ import (
 
 // Pipeline processes audio/video files through transcription and summarization.
 type Pipeline struct {
-	config      *config.Config
 	transcriber transcriber.Transcriber
 	summarizer  summarizer.Summarizer
 	chunker     *Chunker
@@ -275,11 +274,6 @@ func (p *Pipeline) SummarizeText(ctx context.Context, text string, originalFileP
 		SummaryPath: summaryPath,
 		Summary:     summary.Summary,
 	}, nil
-}
-
-// transcribe handles the transcription process, including chunking for large files.
-func (p *Pipeline) transcribe(ctx context.Context, filePath string) (*transcriber.Result, string, error) {
-	return p.transcribeWithProgress(ctx, filePath, nil)
 }
 
 // transcribeWithProgress handles transcription with progress reporting.
