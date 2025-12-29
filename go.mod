@@ -16,6 +16,7 @@ require (
 	github.com/go-rod/rod v0.116.2
 	github.com/go-rod/stealth v0.4.9
 	github.com/gotd/td v0.136.0
+	github.com/k2-fsa/sherpa-onnx-go v1.12.20
 	github.com/mattn/go-runewidth v0.0.16
 	github.com/nsf/termbox-go v1.1.1
 	github.com/openai/openai-go v1.12.0
@@ -71,6 +72,9 @@ require (
 	github.com/hashicorp/go-version v1.7.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/k2-fsa/sherpa-onnx-go-linux v1.12.20 // indirect
+	github.com/k2-fsa/sherpa-onnx-go-macos v1.12.20 // indirect
+	github.com/k2-fsa/sherpa-onnx-go-windows v1.12.20 // indirect
 	github.com/klauspost/compress v1.18.2 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect

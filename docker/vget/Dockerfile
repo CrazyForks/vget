@@ -7,7 +7,7 @@ COPY ui/ ./
 RUN npm run build
 
 # Build stage for Go binary
-# Uses pre-built base image with whisper.cpp already compiled
+# Uses pre-built base image with sherpa-onnx + whisper.cpp already installed
 # Base image is built by .github/workflows/build-base-image.yml
 FROM ghcr.io/guiyumin/vget-base:latest AS go-builder
 WORKDIR /app
@@ -22,26 +22,25 @@ COPY . .
 # Copy built UI into embed location
 COPY --from=ui-builder /app/ui/dist ./internal/server/dist
 
-# Build the server binary with CGO enabled for whisper.cpp
-# WHISPER_PATH, C_INCLUDE_PATH, LIBRARY_PATH are set in base image
+# Build the server binary with CGO enabled for sherpa-onnx
 RUN go build -ldflags="-s -w" -o /vget-server ./cmd/vget-server
 
 # Final runtime stage
 FROM debian:bookworm-slim
 
-# Whisper model to bundle (none, small, medium, large)
-# - none: No model, user downloads on first use (~150MB image)
-# - small: ggml-small.bin for NAS <8GB RAM (~400MB image)
-# - medium: ggml-medium.bin for 8-16GB RAM (~900MB image)
-# - large: ggml-large-v3-turbo.bin for GPU users (~1.7GB image)
-ARG WHISPER_MODEL=none
+# Model variant to bundle (none, small, medium, large)
+# - none: No models, user downloads on first use (~200MB image)
+# - small: Parakeet V3 + Whisper Small for NAS <8GB RAM (~1.0GB image)
+# - medium: Parakeet V3 + Whisper Medium for 8-16GB RAM (~1.5GB image)
+# - large: Parakeet V3 + Whisper Large Turbo for GPU or 32GB+ RAM (~2.3GB image)
+ARG MODEL_VARIANT=none
 
 # Install runtime dependencies
 # - ca-certificates: for HTTPS requests
 # - chromium: for browser-based extractors (XHS, etc.)
 # - font packages: for proper text rendering in headless browser
 # - python3/pip: for yt-dlp and youtube-dl
-# - ffmpeg: for merging video/audio streams
+# - ffmpeg: for merging video/audio streams and audio conversion
 # - nodejs: for yt-dlp JS challenge solving (N parameter)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -55,6 +54,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nodejs \
     gosu \
     curl \
+    libbz2-1.0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install yt-dlp and youtube-dl
@@ -68,24 +68,37 @@ RUN groupadd -g 1000 vget && \
     mkdir -p /home/vget/downloads /home/vget/.config/vget/models && \
     chown -R vget:vget /home/vget
 
-# Download whisper model if specified
-RUN if [ "$WHISPER_MODEL" = "small" ]; then \
-        echo "Downloading ggml-small.bin (244MB)..." && \
-        curl -L -o /home/vget/.config/vget/models/ggml-small.bin \
-            https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin && \
+# Copy sherpa-onnx shared libraries from builder (for Parakeet)
+COPY --from=go-builder /usr/local/lib/libsherpa-onnx-*.so* /usr/local/lib/
+COPY --from=go-builder /usr/local/lib/libonnxruntime*.so* /usr/local/lib/
+
+# Copy whisper.cpp shared libraries from builder (for Whisper)
+COPY --from=go-builder /usr/local/lib/libwhisper*.so* /usr/local/lib/
+COPY --from=go-builder /usr/local/lib/libggml*.so* /usr/local/lib/
+RUN ldconfig
+
+# Download models based on variant
+RUN if [ "$MODEL_VARIANT" = "small" ] || [ "$MODEL_VARIANT" = "medium" ] || [ "$MODEL_VARIANT" = "large" ]; then \
+        echo "Downloading Parakeet V3 INT8 model (~640MB)..." && \
+        curl -L https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2 | tar -xjf - -C /home/vget/.config/vget/models/ && \
+        chown -R vget:vget /home/vget/.config/vget/models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8; \
+    fi
+
+# Download Whisper ggml models for whisper.cpp
+RUN if [ "$MODEL_VARIANT" = "small" ]; then \
+        echo "Downloading Whisper Small ggml model (~466MB)..." && \
+        curl -L -o /home/vget/.config/vget/models/ggml-small.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin && \
         chown vget:vget /home/vget/.config/vget/models/ggml-small.bin; \
-    elif [ "$WHISPER_MODEL" = "medium" ]; then \
-        echo "Downloading ggml-medium.bin (769MB)..." && \
-        curl -L -o /home/vget/.config/vget/models/ggml-medium.bin \
-            https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin && \
+    elif [ "$MODEL_VARIANT" = "medium" ]; then \
+        echo "Downloading Whisper Medium ggml model (~1.5GB)..." && \
+        curl -L -o /home/vget/.config/vget/models/ggml-medium.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin && \
         chown vget:vget /home/vget/.config/vget/models/ggml-medium.bin; \
-    elif [ "$WHISPER_MODEL" = "large" ]; then \
-        echo "Downloading ggml-large-v3-turbo.bin (1.5GB)..." && \
-        curl -L -o /home/vget/.config/vget/models/ggml-large-v3-turbo.bin \
-            https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin && \
+    elif [ "$MODEL_VARIANT" = "large" ]; then \
+        echo "Downloading Whisper Large V3 Turbo ggml model (~1.6GB)..." && \
+        curl -L -o /home/vget/.config/vget/models/ggml-large-v3-turbo.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin && \
         chown vget:vget /home/vget/.config/vget/models/ggml-large-v3-turbo.bin; \
     else \
-        echo "No model bundled (WHISPER_MODEL=$WHISPER_MODEL)"; \
+        echo "No Whisper models bundled (MODEL_VARIANT=$MODEL_VARIANT)"; \
     fi
 
 # Copy binary from builder
@@ -93,6 +106,7 @@ COPY --from=go-builder /vget-server /usr/local/bin/vget-server
 
 # Tell rod to use system chromium instead of downloading
 ENV ROD_BROWSER=/usr/bin/chromium
+ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 
 # Copy entrypoint script
 COPY docker/vget/entrypoint.sh /usr/local/bin/

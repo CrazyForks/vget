@@ -1,10 +1,14 @@
 # vget Docker Compose
 #
 # Image variants (choose based on your system):
-#   ghcr.io/guiyumin/vget:latest  - No model bundled, downloads on first use (~150MB)
-#   ghcr.io/guiyumin/vget:small   - ggml-small.bin for NAS <8GB RAM (~400MB)
-#   ghcr.io/guiyumin/vget:medium  - ggml-medium.bin for 8-16GB RAM (~900MB)
-#   ghcr.io/guiyumin/vget:large   - ggml-large-v3-turbo for GPU users (~1.7GB)
+#   ghcr.io/guiyumin/vget:latest      - No models, downloads on first use (~200MB)
+#   ghcr.io/guiyumin/vget:full-small  - Parakeet V3 + Whisper Small for NAS <8GB RAM (~1.0GB)
+#   ghcr.io/guiyumin/vget:full-medium - Parakeet V3 + Whisper Medium for 8-16GB RAM (~1.5GB)
+#   ghcr.io/guiyumin/vget:full-large  - Parakeet V3 + Whisper Large Turbo for GPU/32GB+ RAM (~2.3GB)
+#
+# Model selection:
+#   - Parakeet V3: Fast, CPU-optimized, 25 European languages
+#   - Whisper: Slower but supports 99 languages including Chinese
 #
 # Configure via .env file or environment variables:
 #   VGET_PORT=8080              # Web UI port
@@ -20,7 +24,7 @@
 
 services:
   vget:
-    # Change to :small, :medium, or :large based on your RAM/GPU
+    # Change to :full-small, :full-medium, or :full-large based on your RAM/GPU
     image: ghcr.io/guiyumin/vget:latest
     container_name: vget
     restart: unless-stopped

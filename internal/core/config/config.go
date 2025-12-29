@@ -126,16 +126,22 @@ type AIServiceConfig struct {
 	BaseURL string `yaml:"base_url,omitempty"`
 }
 
-// LocalASRConfig holds settings for local speech-to-text using whisper.cpp.
+// LocalASRConfig holds settings for local speech-to-text using sherpa-onnx.
 type LocalASRConfig struct {
 	// Enabled determines if local ASR is active (vs cloud API)
 	Enabled bool `yaml:"enabled,omitempty"`
 
-	// Model is the whisper model to use: "tiny", "small", "medium", "large-v3-turbo"
-	// Default: "small" (good balance of speed and accuracy)
+	// Engine is the ASR engine to use: "parakeet" or "whisper"
+	// Default: "parakeet" (faster, better for European languages)
+	// Use "whisper" for Chinese and other non-European languages
+	Engine string `yaml:"engine,omitempty"`
+
+	// Model is the model to use:
+	// - "parakeet-v3" (default, 25 EU languages)
+	// - "whisper-small", "whisper-medium", "whisper-large-turbo" (99 languages)
 	Model string `yaml:"model,omitempty"`
 
-	// ModelsDir is a custom directory for storing whisper models
+	// ModelsDir is a custom directory for storing models
 	// Default: ~/.config/vget/models/
 	ModelsDir string `yaml:"models_dir,omitempty"`
 
