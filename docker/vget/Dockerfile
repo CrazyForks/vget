@@ -9,7 +9,12 @@ RUN npm run build
 # Build stage for Go binary
 # Uses pre-built base image with sherpa-onnx + whisper.cpp already installed
 # Base image is built by .github/workflows/build-base-image.yml
-FROM ghcr.io/guiyumin/vget-base:latest AS go-builder
+ARG ENABLE_CUDA=false
+FROM ghcr.io/guiyumin/vget-base:latest AS go-builder-cpu
+FROM ghcr.io/guiyumin/vget-base:cuda AS go-builder-cuda
+
+# Select builder based on CUDA
+FROM go-builder-${ENABLE_CUDA} AS go-builder
 WORKDIR /app
 
 # Copy go mod files first for caching
@@ -22,18 +27,25 @@ COPY . .
 # Copy built UI into embed location
 COPY --from=ui-builder /app/ui/dist ./internal/server/dist
 
-# Build the server binary with CGO enabled for sherpa-onnx
+# Build the server binary with CGO enabled
 RUN go build -ldflags="-s -w" -o /vget-server ./cmd/vget-server
 
-# Final runtime stage
-FROM debian:bookworm-slim
+# Final runtime stage - use CUDA runtime for GPU support
+ARG ENABLE_CUDA=false
+FROM debian:bookworm-slim AS runtime-cpu
+FROM nvidia/cuda:12.6.3-runtime-ubuntu24.04 AS runtime-cuda
+
+FROM runtime-${ENABLE_CUDA} AS runtime
+
+# Re-declare args after FROM
+ARG ENABLE_CUDA=false
+ARG MODEL_VARIANT=none
 
 # Model variant to bundle (none, small, medium, large)
 # - none: No models, user downloads on first use (~200MB image)
 # - small: Parakeet V3 + Whisper Small for NAS <8GB RAM (~1.0GB image)
 # - medium: Parakeet V3 + Whisper Medium for 8-16GB RAM (~1.5GB image)
 # - large: Parakeet V3 + Whisper Large Turbo for GPU or 32GB+ RAM (~2.3GB image)
-ARG MODEL_VARIANT=none
 
 # Install runtime dependencies
 # - ca-certificates: for HTTPS requests
@@ -106,7 +118,11 @@ COPY --from=go-builder /vget-server /usr/local/bin/vget-server
 
 # Tell rod to use system chromium instead of downloading
 ENV ROD_BROWSER=/usr/bin/chromium
-ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH=/usr/local/lib
+
+# For CUDA: set NVIDIA visible devices
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
 # Copy entrypoint script
 COPY docker/vget/entrypoint.sh /usr/local/bin/
