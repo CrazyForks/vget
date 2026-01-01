@@ -1,3 +1,6 @@
+# ARG must be declared before first FROM to be available in FROM lines
+ARG ENABLE_CUDA=false
+
 # Build stage for UI
 FROM node:22-slim AS ui-builder
 WORKDIR /app/ui
@@ -9,7 +12,6 @@ RUN npm run build
 # Build stage for Go binary
 # Uses pre-built base image with sherpa-onnx + whisper.cpp already installed
 # Base image is built by .github/workflows/build-base-image.yml
-ARG ENABLE_CUDA=false
 FROM ghcr.io/guiyumin/vget-base:latest AS go-builder-false
 FROM ghcr.io/guiyumin/vget-base:cuda AS go-builder-true
 
@@ -31,7 +33,6 @@ COPY --from=ui-builder /app/ui/dist ./internal/server/dist
 RUN go build -ldflags="-s -w" -o /vget-server ./cmd/vget-server
 
 # Final runtime stage - use CUDA runtime for GPU support
-ARG ENABLE_CUDA=false
 FROM debian:bookworm-slim AS runtime-false
 FROM nvidia/cuda:12.6.3-runtime-ubuntu24.04 AS runtime-true
 
