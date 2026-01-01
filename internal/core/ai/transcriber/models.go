@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/guiyumin/vget/internal/core/config"
+	"github.com/guiyumin/vget/internal/core/downloader"
 )
 
 // ASRModel represents a speech recognition model.
@@ -27,24 +27,33 @@ type ASRModel struct {
 
 // ASRModels lists available models.
 var ASRModels = []ASRModel{
-	// Parakeet V3 via sherpa-onnx - best for European languages
+	// Whisper models via whisper.cpp (ggml format)
 	{
-		Name:        "parakeet-v3",
-		Engine:      "parakeet",
-		DirName:     "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8",
-		Size:        "640MB",
-		Description: "Best for European languages (25 supported), fastest on CPU",
-		URL:         "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
-		Languages:   25,
-		IsFile:      false,
+		Name:        "whisper-tiny",
+		Engine:      "whisper",
+		DirName:     "whisper-tiny.bin",
+		Size:        "78MB",
+		Description: "Fastest, basic quality",
+		URL:         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
+		Languages:   99,
+		IsFile:      true,
 	},
-	// Whisper models via whisper.cpp (ggml format) - for Chinese and other languages
+	{
+		Name:        "whisper-base",
+		Engine:      "whisper",
+		DirName:     "whisper-base.bin",
+		Size:        "148MB",
+		Description: "Good for quick drafts",
+		URL:         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
+		Languages:   99,
+		IsFile:      true,
+	},
 	{
 		Name:        "whisper-small",
 		Engine:      "whisper",
-		DirName:     "ggml-small.bin",
-		Size:        "466MB",
-		Description: "Fast, good accuracy, supports Chinese (whisper.cpp)",
+		DirName:     "whisper-small.bin",
+		Size:        "488MB",
+		Description: "Balanced for most uses",
 		URL:         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
 		Languages:   99,
 		IsFile:      true,
@@ -52,19 +61,29 @@ var ASRModels = []ASRModel{
 	{
 		Name:        "whisper-medium",
 		Engine:      "whisper",
-		DirName:     "ggml-medium.bin",
+		DirName:     "whisper-medium.bin",
 		Size:        "1.5GB",
-		Description: "Balanced speed and accuracy (whisper.cpp)",
+		Description: "Higher accuracy",
 		URL:         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin",
 		Languages:   99,
 		IsFile:      true,
 	},
 	{
-		Name:        "whisper-turbo",
+		Name:        "whisper-large-v3",
 		Engine:      "whisper",
-		DirName:     "ggml-large-v3-turbo.bin",
+		DirName:     "whisper-large-v3.bin",
+		Size:        "3.1GB",
+		Description: "Highest accuracy, slowest",
+		URL:         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin",
+		Languages:   99,
+		IsFile:      true,
+	},
+	{
+		Name:        "whisper-large-v3-turbo",
+		Engine:      "whisper",
+		DirName:     "whisper-large-v3-turbo.bin",
 		Size:        "1.6GB",
-		Description: "Best accuracy, 8x faster than large (whisper.cpp)",
+		Description: "Best quality + fast (recommended)",
 		URL:         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin",
 		Languages:   99,
 		IsFile:      true,
@@ -72,10 +91,10 @@ var ASRModels = []ASRModel{
 }
 
 // DefaultModel is the recommended model for most users.
-const DefaultModel = "parakeet-v3"
+const DefaultModel = "whisper-large-v3-turbo"
 
-// DefaultWhisperModel is the recommended Whisper model for Chinese users.
-const DefaultWhisperModel = "whisper-small"
+// DefaultWhisperModel is the recommended Whisper model.
+const DefaultWhisperModel = "whisper-large-v3-turbo"
 
 // ModelManager handles model downloads and caching.
 type ModelManager struct {
@@ -115,14 +134,7 @@ func GetModel(name string) *ASRModel {
 
 // GetModelByEngine returns the default model for an engine.
 func GetModelByEngine(engine string) *ASRModel {
-	switch engine {
-	case "parakeet":
-		return GetModel("parakeet-v3")
-	case "whisper":
-		return GetModel("whisper-small")
-	default:
-		return GetModel(DefaultModel)
-	}
+	return GetModel(DefaultModel)
 }
 
 // ModelPath returns the path to a model directory.
@@ -169,6 +181,147 @@ func (m *ModelManager) EnsureModel(modelName string) (string, error) {
 	}
 
 	return path, nil
+}
+
+// DownloadFromURL downloads a model from a custom URL.
+func (m *ModelManager) DownloadFromURL(modelName, url string) (string, error) {
+	model := GetModel(modelName)
+	if model == nil {
+		return "", fmt.Errorf("unknown model: %s", modelName)
+	}
+
+	// Create a copy with custom URL
+	customModel := *model
+	customModel.URL = url
+
+	if err := m.downloadModel(&customModel); err != nil {
+		return "", err
+	}
+
+	return m.ModelPath(modelName), nil
+}
+
+// DownloadModelWithProgress downloads a model with progress display.
+func (m *ModelManager) DownloadModelWithProgress(modelName, url, lang string) (string, error) {
+	model := GetModel(modelName)
+	if model == nil {
+		return "", fmt.Errorf("unknown model: %s", modelName)
+	}
+
+	// Ensure models directory exists
+	if err := os.MkdirAll(m.modelsDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create models directory: %w", err)
+	}
+
+	// Only single-file models (ggml) support progress bar
+	if !model.IsFile {
+		// Fall back to regular download for archives
+		if err := m.downloadModel(model); err != nil {
+			return "", err
+		}
+		return m.ModelPath(modelName), nil
+	}
+
+	// Download URL
+	downloadURL := url
+	if downloadURL == "" {
+		downloadURL = model.URL
+	}
+
+	// Target path
+	target := filepath.Join(m.modelsDir, model.DirName)
+
+	// Try TUI progress bar first, fall back to simple progress if TTY not available
+	err := downloader.RunDownloadTUI(downloadURL, target, modelName, lang, nil)
+	if err != nil && isNoTTYError(err) {
+		// Fall back to simple progress display
+		fmt.Printf("URL: %s\n\n", downloadURL)
+		if err := m.downloadModelWithSimpleProgress(model, downloadURL); err != nil {
+			return "", err
+		}
+		return target, nil
+	}
+	if err != nil {
+		return "", err
+	}
+
+	return target, nil
+}
+
+// isNoTTYError checks if error is due to missing TTY
+func isNoTTYError(err error) bool {
+	return err != nil && (
+		// Common TTY-related errors
+		err.Error() == "could not open a new TTY: open /dev/tty: device not configured" ||
+		err.Error() == "could not open a new TTY: open /dev/tty: no such device or address")
+}
+
+// downloadModelWithSimpleProgress downloads with simple console progress
+func (m *ModelManager) downloadModelWithSimpleProgress(model *ASRModel, url string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return fmt.Errorf("failed to download model: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to download model: HTTP %d", resp.StatusCode)
+	}
+
+	target := filepath.Join(m.modelsDir, model.DirName)
+	file, err := os.Create(target)
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+	defer file.Close()
+
+	total := resp.ContentLength
+	var current int64
+	buf := make([]byte, 32*1024)
+	lastPercent := -1
+
+	for {
+		n, err := resp.Body.Read(buf)
+		if n > 0 {
+			_, writeErr := file.Write(buf[:n])
+			if writeErr != nil {
+				return fmt.Errorf("failed to write file: %w", writeErr)
+			}
+			current += int64(n)
+
+			// Print progress every 5%
+			if total > 0 {
+				percent := int(float64(current) / float64(total) * 100)
+				if percent/5 > lastPercent/5 {
+					fmt.Printf("\r  Progress: %d%% (%s / %s)", percent, formatBytes(current), formatBytes(total))
+					lastPercent = percent
+				}
+			}
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("download failed: %w", err)
+		}
+	}
+	fmt.Println()
+
+	return nil
+}
+
+// formatBytes formats bytes to human readable string
+func formatBytes(b int64) string {
+	const unit = 1024
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
 }
 
 // downloadModel downloads a model (file or archive) from URL.
@@ -291,26 +444,11 @@ type ASRModelInfo struct {
 
 // RecommendModel recommends a model based on language.
 func RecommendModel(language string) string {
-	// Languages that require Whisper (not supported by Parakeet)
-	whisperOnlyLangs := map[string]bool{
-		"zh": true, "ja": true, "ko": true, "ar": true, "he": true,
-		"hi": true, "th": true, "vi": true, "id": true, "ms": true,
-	}
-
-	language = strings.ToLower(language)
-	if whisperOnlyLangs[language] {
-		return DefaultWhisperModel
-	}
-
+	// All languages use the default whisper model
 	return DefaultModel
 }
 
 // RecommendEngine recommends an engine based on language.
 func RecommendEngine(language string) string {
-	model := RecommendModel(language)
-	m := GetModel(model)
-	if m != nil {
-		return m.Engine
-	}
-	return "parakeet"
+	return "whisper"
 }
