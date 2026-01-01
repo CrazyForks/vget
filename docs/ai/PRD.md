@@ -1,220 +1,124 @@
-# PRD: AI Transcription & Summarization MVP
+# PRD: AI Transcription & Summarization
 
 ## Overview
 
-Add `vget ai` command for local audio transcription and summarization.
+AI-powered audio/video transcription and summarization, accessible via Docker web UI.
 
-**MVP Scope:** Local MP3 → Chunk → Transcribe → Summarize
+**Scope:** Audio/Video → Chunk → Transcribe → Translate → Summarize
 
-## User Story
+## User Flow (Web UI)
 
-```bash
-# User has a downloaded podcast
-vget ai transcribe podcast.mp3
-vget ai summarize podcast.transcript.md
+1. User opens web UI at `http://localhost:8080`
+2. Selects audio/video file from downloads or uploads new file
+3. Configures AI account (provider, API key, model)
+4. Selects processing options (transcribe, translate, summarize)
+5. Monitors progress via real-time stepper UI
+6. Downloads or views outputs (transcript, translation, SRT, summary)
 
-# Or with slicing for large files:
-vget ai slice podcast.mp3
-vget ai transcribe ./podcast.chunks/
-vget ai summarize ./podcast.chunks/
-
-# Output:
-# → podcast.transcript.md (full transcript with timestamps)
-# → podcast.summary.md (LLM-generated summary)
-```
-
-## MVP Constraints
+## Constraints
 
 | Constraint | Decision |
 |------------|----------|
-| Input | Local audio files only (no URL download) |
-| Transcription | OpenAI Whisper API only (cloud, simple) |
-| Summarization | OpenAI GPT-4o only (cloud, simple) |
+| Deployment | Docker only (no standalone CLI) |
+| Input | Local audio/video files via web UI |
+| Transcription | **Local-first** (Parakeet V3, Whisper.cpp), cloud as fallback |
+| Translation | LLM-based (local or cloud) |
+| Summarization | LLM-based (local or cloud) |
 | Chunking | Fixed 10-min chunks with 10s overlap |
-| Output | Markdown files only (no SRT for MVP) |
-| Config | TUI wizard (`vget ai config`) + `vget config set` |
+| Output | Markdown, SRT subtitle files |
 
-## CLI Interface
+---
 
-```bash
-# Configure via TUI wizard (recommended)
-vget ai config       # Creates account with encrypted API key
-vget config ai       # Alias (same wizard)
+## Transcription: Local-First Approach
 
-# Slice audio into chunks (no API key needed)
-vget ai slice podcast.mp3
-vget ai slice podcast.mp3 --chunk-duration 5m --overlap 5s
+**Why local-first?** Free, private, works offline.
 
-# Transcribe (with password prompt)
-vget ai transcribe podcast.mp3
-# Enter PIN: ****
-
-# Transcribe with password flag (for scripting)
-vget ai transcribe podcast.mp3 --password 1234
-
-# Transcribe from chunks directory
-vget ai transcribe ./podcast.chunks/ --password 1234
-
-# Summarize
-vget ai summarize transcript.md --password 1234
-vget ai summarize ./podcast.chunks/ --password 1234
-
-# Use specific account (if multiple configured)
-vget ai transcribe podcast.mp3 --account work --password 1234
-
-# List configured accounts
-vget ai accounts
-```
-
-## Security: Encrypted API Keys
-
-**API keys are NEVER stored in plain text.** They are encrypted using AES-256-GCM with a key derived from a 4-digit PIN.
-
-### Why 4-digit PIN?
-
-| Approach | Pros | Cons |
-|----------|------|------|
-| No encryption | Simple | Keys exposed in plain text |
-| Full password | Most secure | Inconvenient for frequent use |
-| **4-digit PIN** | **Balance of security + UX** | **Limited entropy (10k combinations)** |
-
-The 4-digit PIN provides:
-- Protection against casual file access
-- Quick to type for frequent operations
-- Not meant to protect against determined attackers with file access
-
-### Encryption Flow
+### Dual Engine Architecture
 
 ```
-User enters: API key + 4-digit PIN
-     ↓
-Derive key: PBKDF2(PIN, salt, 100000 iterations) → AES key
-     ↓
-Encrypt: AES-256-GCM(API key, AES key) → ciphertext
-     ↓
-Store: base64(salt + nonce + ciphertext) in config.yml
+┌─────────────────────────────────────────────────────────┐
+│                 vget transcriber                         │
+├─────────────────────────────────────────────────────────┤
+│  Parakeet V3 (sherpa-onnx)  │  Whisper (whisper.cpp)    │
+│  - 25 European languages    │  - 99 languages           │
+│  - Fastest                  │  - Chinese/Japanese/Korean│
+│  - Default engine           │  - GPU accelerated        │
+├─────────────────────────────────────────────────────────┤
+│  CGO: sherpa-onnx-go        │  CGO: go-whisper          │
+├─────────────────────────────────────────────────────────┤
+│  libsherpa-onnx-core.so     │  libwhisper.so            │
+│  + ONNX Runtime             │  + Metal/CUDA/AVX2        │
+└─────────────────────────────────────────────────────────┘
 ```
 
-### Runtime Flow
+### Engine Selection Logic
 
 ```
-User runs: vget ai podcast.mp3 --transcribe --password 1234
-     ↓
-Load: encrypted API key from config
-     ↓
-Derive key: PBKDF2(PIN, salt, 100000) → AES key
-     ↓
-Decrypt: AES-256-GCM(ciphertext, AES key) → API key
-     ↓
-Use: API key for OpenAI request
-     ↓
-Clear: API key from memory after use
+if language == "zh" or detected_language == "zh":
+    use Whisper (whisper.cpp) — default for Chinese
+elif language in [ja, ko] or detected_language in [ja, ko]:
+    use Whisper (whisper.cpp)
+else:
+    use Parakeet V3 (default for non-CJK)
 ```
 
-## Multi-Account Support
+**Note:** User can always override the default in settings.
 
-Users can configure multiple AI accounts with aliases:
+### Model Options
 
-```bash
-# Add accounts via wizard
-vget ai config
-# → Creates account with alias (e.g., "personal", "work")
+| Model | Engine | Size | Languages | Best For |
+|-------|--------|------|-----------|----------|
+| Parakeet V3 INT8 | sherpa-onnx | ~640MB | 25 EU | Default, fast |
+| Whisper Small | whisper.cpp | ~466MB | 99 | Quick CJK |
+| Whisper Medium | whisper.cpp | ~1.5GB | 99 | Balanced |
+| Whisper Large V3 Turbo | whisper.cpp | ~1.6GB | 99 | Best accuracy |
 
-# List accounts
-vget ai accounts
-# personal (openai) - default
-# work (openai)
+### Cloud Fallback (Optional)
 
-# Use specific account
-vget ai podcast.mp3 --transcribe --account work --password 1234
+Only used when:
+- User explicitly selects cloud provider
+- Local models not available
+- Requires OpenAI API key
 
-# Set default account
-vget ai accounts default work
-```
+---
 
-## TUI Wizard (`vget ai config`)
-
-Multi-step wizard for creating/editing AI accounts:
+## Processing Pipeline
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                                                             │
-│  ██╗   ██╗ ██████╗ ███████╗████████╗     █████╗ ██╗        │
-│  ██║   ██║██╔════╝ ██╔════╝╚══██╔══╝    ██╔══██╗██║        │
-│  ██║   ██║██║  ███╗█████╗     ██║       ███████║██║        │
-│  ╚██╗ ██╔╝██║   ██║██╔══╝     ██║       ██╔══██║██║        │
-│   ╚████╔╝ ╚██████╔╝███████╗   ██║       ██║  ██║██║        │
-│    ╚═══╝   ╚═════╝ ╚══════╝   ╚═╝       ╚═╝  ╚═╝╚═╝        │
-│                                                             │
-│  Step 1/6                                                   │
-│                                                             │
-│  Account Name                                               │
-│  Enter a name for this AI account (e.g., personal, work)    │
-│                                                             │
-│  > personal_                                                │
-│                                                             │
-│  ← Back • → Next • enter Confirm • esc Quit                 │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐
+│   Upload    │ → │   Chunk     │ → │ Transcribe  │ → │  Translate  │ → │  Summarize  │
+│  (Web UI)   │   │  (ffmpeg)   │   │  (Whisper)  │   │   (LLM)     │   │   (LLM)     │
+└─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘   └─────────────┘
+                         │                 │                 │                 │
+                         ▼                 ▼                 ▼                 ▼
+                  .chunks/ dir      .transcript.md    .{lang}.transcript.md  .summary.md
+                                                      .{lang}.srt
 ```
 
-### Wizard Steps
+### Processing Steps
 
-| Step | Title | Type | Description |
-|------|-------|------|-------------|
-| 1 | Account Name | Input | Alias for this account (e.g., "personal") |
-| 2 | Provider | Select | OpenAI, Skip |
-| 3 | Transcription API Key | Input | API key for Whisper |
-| 4 | Summarization API Key | Input | Same key or different |
-| 5 | 4-Digit PIN | Input | PIN to encrypt API keys |
-| 6 | Review & Save | Confirm | Yes/No |
+| Step Key | Name | Description |
+|----------|------|-------------|
+| `extract_audio` | Extract Audio | Extract audio track from video files |
+| `compress_audio` | Compress Audio | Compress for API upload (< 25MB) |
+| `chunk_audio` | Chunk Audio | Split large files into 10-min segments |
+| `transcribe` | Transcribe | Speech-to-text (Whisper API or Local ASR) |
+| `merge` | Merge Chunks | Combine chunk transcripts with deduplication |
+| `translate` | Translate | Translate to target language(s) |
+| `generate_srt` | Generate SRT | Convert to SRT subtitle format |
+| `summarize` | Summarize | Generate summary with key points |
 
-### Wizard Flow
-
-```
-Step 1: Account Name
-  └─> Enter alias (e.g., "personal")
-
-Step 2: Provider
-  ├─> OpenAI → Step 3
-  └─> Skip → Exit (no account created)
-
-Step 3: Transcription API Key
-  └─> Enter API key (masked input)
-
-Step 4: Summarization API Key
-  ├─> "Use same key" → Step 5
-  └─> Enter different key → Step 5
-
-Step 5: 4-Digit PIN
-  └─> Enter PIN (masked, e.g., ****) + confirm
-
-Step 6: Review & Save
-  ├─> Yes → Encrypt keys, save to config.yml
-  └─> No → Cancel
-```
-
-### PIN Requirements
-
-- Exactly 4 digits (0-9)
-- Must confirm by entering twice
-- Used to encrypt/decrypt ALL API keys in this account
-- Required every time you run AI commands
+---
 
 ## Output Files
 
 ```
-vget ai slice podcast.mp3
-  → podcast.chunks/
-    ├── manifest.json
-    ├── chunk_001.mp3
-    ├── chunk_002.mp3
-    └── ...
-
-vget ai transcribe podcast.mp3
-  → podcast.transcript.md
-
-vget ai summarize podcast.transcript.md
-  → podcast.summary.md
+podcast.mp3
+  → podcast.transcript.md       (original language transcript)
+  → podcast.en.transcript.md    (translated to English)
+  → podcast.en.srt              (English subtitles)
+  → podcast.summary.md          (summary in original language)
+  → podcast.en.summary.md       (summary in English)
 ```
 
 ### Transcript Format (podcast.transcript.md)
@@ -233,6 +137,22 @@ vget ai summarize podcast.transcript.md
 [00:00:15] The main topic is about building reliable systems...
 
 [00:05:30] Let me give you an example of how this works in practice...
+```
+
+### SRT Format (podcast.en.srt)
+
+```srt
+1
+00:00:00,000 --> 00:00:15,000
+Welcome to today's episode. We're going to discuss...
+
+2
+00:00:15,000 --> 00:05:30,000
+The main topic is about building reliable systems...
+
+3
+00:05:30,000 --> 00:10:45,000
+Let me give you an example of how this works in practice...
 ```
 
 ### Summary Format (podcast.summary.md)
@@ -257,89 +177,44 @@ vget ai summarize podcast.transcript.md
 [2-3 paragraph summary of the content]
 ```
 
+---
+
 ## Technical Architecture
 
 ### Package Structure
 
 ```
 internal/core/ai/
-├── ai.go                 # Main entry point, orchestrator
+├── ai.go                 # Main orchestrator
 ├── chunker.go            # Audio chunking with ffmpeg
 ├── transcriber/
-│   ├── transcriber.go    # Interface
-│   └── openai.go         # OpenAI Whisper implementation
+│   ├── transcriber.go    # Interface and factory
+│   ├── sherpa.go         # Parakeet V3 (sherpa-onnx) - default
+│   ├── whisper.go        # Whisper (whisper.cpp) - CJK languages
+│   ├── openai.go         # OpenAI Whisper API - cloud fallback
+│   └── models.go         # Model definitions and management
+├── translator/
+│   ├── translator.go     # Interface
+│   └── openai.go         # LLM-based translation
 ├── summarizer/
 │   ├── summarizer.go     # Interface
-│   └── openai.go         # OpenAI GPT implementation
+│   └── openai.go         # LLM implementation
+├── srt/
+│   └── generator.go      # SRT file generation
 └── output/
     └── markdown.go       # Markdown file generation
 ```
 
-### Config Schema
+### Core Interfaces
 
 ```go
-// Add to internal/core/config/config.go
-type AIConfig struct {
-    // Multiple accounts with aliases
-    Accounts       map[string]AIAccount `yaml:"accounts,omitempty"`
-    DefaultAccount string               `yaml:"default_account,omitempty"`
+// Transcriber
+type Transcriber interface {
+    Transcribe(ctx context.Context, audioPath string) (*Result, error)
 }
 
-type AIAccount struct {
-    // Provider for this account (openai, anthropic, etc.)
-    Provider string `yaml:"provider,omitempty"`
-
-    // Transcription settings
-    Transcription AIServiceConfig `yaml:"transcription,omitempty"`
-
-    // Summarization settings
-    Summarization AIServiceConfig `yaml:"summarization,omitempty"`
-}
-
-type AIServiceConfig struct {
-    // Model to use (e.g., "whisper-1", "gpt-4o")
-    Model string `yaml:"model,omitempty"`
-
-    // Encrypted API key (base64 encoded: salt + nonce + ciphertext)
-    // NEVER store plain text API keys
-    APIKeyEncrypted string `yaml:"api_key_encrypted,omitempty"`
-
-    // Optional custom base URL
-    BaseURL string `yaml:"base_url,omitempty"`
-}
-```
-
-### Config File Example
-
-```yaml
-# ~/.config/vget/config.yml
-ai:
-  default_account: personal
-  accounts:
-    personal:
-      provider: openai
-      transcription:
-        model: whisper-1
-        api_key_encrypted: "YWJjZGVm..."  # AES-256-GCM encrypted
-      summarization:
-        model: gpt-4o
-        api_key_encrypted: "YWJjZGVm..."  # Can be same or different key
-    work:
-      provider: openai
-      transcription:
-        model: whisper-1
-        api_key_encrypted: "eHl6MTIz..."
-      summarization:
-        model: gpt-4o-mini
-        api_key_encrypted: "eHl6MTIz..."
-```
-
-### Interfaces
-
-```go
-// internal/core/ai/transcriber/transcriber.go
-type TranscriptionResult struct {
-    Text     string
+type Result struct {
+    RawText  string
     Segments []Segment
     Language string
     Duration time.Duration
@@ -351,228 +226,332 @@ type Segment struct {
     Text  string
 }
 
-type Transcriber interface {
-    Transcribe(ctx context.Context, audioPath string) (*TranscriptionResult, error)
+// Translator
+type Translator interface {
+    Translate(ctx context.Context, text string, targetLang string) (*TranslationResult, error)
+    TranslateSegments(ctx context.Context, segments []Segment, targetLang string) ([]TranslatedSegment, error)
 }
 
-// internal/core/ai/summarizer/summarizer.go
+type TranslationResult struct {
+    SourceLanguage string
+    TargetLanguage string
+    OriginalText   string
+    TranslatedText string
+    Segments       []TranslatedSegment
+}
+
+// Summarizer
+type Summarizer interface {
+    Summarize(ctx context.Context, text string) (*SummarizationResult, error)
+}
+
 type SummarizationResult struct {
     Summary   string
     KeyPoints []string
 }
-
-type Summarizer interface {
-    Summarize(ctx context.Context, text string) (*SummarizationResult, error)
-}
 ```
 
-## Processing Pipeline
-
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  Load MP3   │ ──▶ │   Slice     │ ──▶ │ Transcribe  │ ──▶ │  Summarize  │
-│             │     │  (ffmpeg)   │     │  (Whisper)  │     │  (GPT-4o)   │
-└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
-                           │                   │                   │
-                           ▼                   ▼                   ▼
-                    .chunks/ dir        .transcript.md       .summary.md
-
-Commands:
-  vget ai slice podcast.mp3           # Optional: manual slicing
-  vget ai transcribe podcast.mp3      # Auto-slices if needed
-  vget ai summarize transcript.md     # Summarize text
-```
-
-### Step 1: Chunking
-
-- Check if file exceeds Whisper's 25MB limit
-- If yes: split into 10-minute chunks with 10s overlap using ffmpeg
-- Save chunks to `{filename}.chunks/` directory
-- Generate `manifest.json` for resumability
+### Pipeline Options
 
 ```go
-// internal/core/ai/chunker.go
-type Chunker struct {
-    MaxChunkDuration time.Duration // 10 minutes
-    OverlapDuration  time.Duration // 10 seconds
-}
-
-func (c *Chunker) NeedsChunking(filePath string) (bool, error)
-func (c *Chunker) Split(filePath string) ([]ChunkInfo, error)
-
-type ChunkInfo struct {
-    Index    int
-    FilePath string
-    Start    time.Duration
-    End      time.Duration
+type Options struct {
+    Transcribe    bool
+    Summarize     bool
+    TranslateTo   []string  // Target languages: ["en", "zh", "jp"]
+    OutputFormat  string    // "text" or "srt"
+    SummarizeLang string    // Language for summary output
 }
 ```
 
-### Step 2: Transcription
+---
 
-- Send each chunk to OpenAI Whisper API
-- Collect segments with timestamps
-- Merge chunks with fuzzy deduplication (handle overlaps)
-- Write `{filename}.transcript.md`
+## API Endpoints
 
-### Step 3: Summarization
+### AI Job Management
 
-- Read transcript text
-- Send to OpenAI GPT-4o with summarization prompt
-- Write `{filename}.summary.md`
+```
+POST   /api/ai/jobs              # Start new AI job
+GET    /api/ai/jobs              # List all jobs
+GET    /api/ai/jobs/:id          # Get job status and progress
+DELETE /api/ai/jobs/:id          # Cancel job
+GET    /api/ai/jobs/:id/result   # Get job outputs
+```
+
+### Request/Response
+
+```typescript
+// POST /api/ai/jobs
+interface StartJobRequest {
+  file_path: string;
+  account: string;
+  model?: string;
+  options: {
+    transcribe: boolean;
+    summarize: boolean;
+    translate_to?: string[];      // ["en", "zh"]
+    output_format?: "text" | "srt";
+    summarize_language?: string;
+  };
+  pin?: string;  // For encrypted API keys
+}
+
+// GET /api/ai/jobs/:id
+interface JobStatus {
+  id: string;
+  file_path: string;
+  file_name: string;
+  status: "queued" | "processing" | "completed" | "failed" | "cancelled";
+  current_step: StepKey;
+  steps: ProcessingStep[];
+  overall_progress: number;
+  result?: JobResult;
+  error?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ProcessingStep {
+  key: StepKey;
+  name: string;
+  status: "pending" | "in_progress" | "completed" | "skipped" | "failed";
+  progress: number;
+  detail?: string;
+}
+
+interface JobResult {
+  transcript_path?: string;
+  translated_paths?: Record<string, string>;  // { "en": "...", "zh": "..." }
+  srt_paths?: Record<string, string>;
+  summary_path?: string;
+}
+```
+
+---
+
+## Web UI Components
+
+### Processing Configuration
+
+```typescript
+interface ProcessingConfig {
+  account: string;
+  model: string;
+  transcribe: boolean;
+  summarize: boolean;
+  translateTo: string[];        // ["en", "zh", "jp"]
+  outputFormat: "text" | "srt";
+  summarizeInLanguage?: string;
+}
+```
+
+### Step Display (ProcessingStepper)
+
+```typescript
+type StepKey =
+  | "extract_audio"
+  | "compress_audio"
+  | "chunk_audio"
+  | "transcribe"
+  | "merge"
+  | "translate"
+  | "generate_srt"
+  | "summarize";
+```
+
+### UI Translations
+
+```typescript
+// AI step names
+ai_step_extract_audio: "Extract Audio",
+ai_step_compress_audio: "Compress Audio",
+ai_step_chunk_audio: "Chunk Audio",
+ai_step_transcribe: "Transcribe",
+ai_step_merge: "Merge Chunks",
+ai_step_translate: "Translate",
+ai_step_generate_srt: "Generate Subtitles",
+ai_step_summarize: "Generate Summary",
+
+// Translation options
+ai_translate_to: "Translate to",
+ai_output_format: "Output Format",
+ai_format_text: "Text (Markdown)",
+ai_format_srt: "Subtitles (SRT)",
+```
+
+---
+
+## Translation Feature
+
+### Use Cases
+
+1. **Transcript → Translate → Text**
+   - Translate transcript to target language(s)
+   - Output: `.{lang}.transcript.md`
+
+2. **Transcript → Translate → SRT**
+   - Translate with timestamp preservation
+   - Output: `.{lang}.srt`
+
+3. **Transcript → Summarize in Target Language**
+   - Summarize directly in target language
+   - Output: `.{lang}.summary.md`
+
+### Translation Strategy
+
+1. **Segment-based translation** (for SRT):
+   - Translate each segment individually
+   - Preserve timestamp information
+   - Batch segments to reduce API calls (50 per request)
+
+2. **Full-text translation** (for readability):
+   - Translate entire transcript as one unit
+   - Better flow and context
+   - Used for `.transcript.md` output
+
+### Multi-language Support
+
+- Support multiple target languages in single job
+- Parallel translation for multiple languages
+- Language codes: ISO 639-1 (en, zh, ja, ko, es, fr, de, pt, ru, ar, etc.)
+
+---
 
 ## Error Handling
 
 | Error | Behavior |
 |-------|----------|
-| No API key configured | Show helpful error with config command |
+| No API key configured | Show error in UI, prompt to add account |
 | API rate limit | Retry with exponential backoff (3 attempts) |
-| Chunk transcription fails | Mark chunk as failed, continue, warn at end |
-| File not found | Clear error message |
-| Unsupported format | List supported formats (mp3, m4a, wav, mp4) |
+| Chunk transcription fails | Mark chunk as failed, continue, show warning |
+| Invalid language code | Show supported language list |
+| Translation API error | Retry with backoff, fallback to partial |
+| SRT timestamp mismatch | Warn user, use approximation |
 
-## Progress Display
+---
+
+## Docker Configuration
+
+### Multi-Image Architecture
 
 ```
-# vget ai slice podcast.mp3
-Slicing podcast.mp3...
-  Chunk duration: 10m0s, Overlap: 10s
-  Created 5 chunks in: ./podcast.chunks
-  Manifest: ./podcast.chunks/manifest.json
-
-Chunks:
-  [1] chunk_001.mp3 (0s - 600s)
-  [2] chunk_002.mp3 (590s - 1200s)
-  [3] chunk_003.mp3 (1190s - 1800s)
-  [4] chunk_004.mp3 (1790s - 2400s)
-  [5] chunk_005.mp3 (2390s - 2700s)
-
-Complete!
-  Chunks directory: ./podcast.chunks
-  Ready for transcription with: vget ai transcribe ./podcast.chunks/
-
-# vget ai transcribe podcast.mp3
-Transcribing podcast.mp3...
-  File exceeds size limit, splitting into chunks...
-  Created 5 chunks
-  [1/5] Transcribing chunk... done (23s)
-  [2/5] Transcribing chunk... done (21s)
-  [3/5] Transcribing chunk... done (24s)
-  [4/5] Transcribing chunk... done (22s)
-  [5/5] Transcribing chunk... done (18s)
-  Merging transcripts... done
-  Written: podcast.transcript.md
-
-Complete!
-
-# vget ai summarize podcast.transcript.md
-Summarizing...
-  Written: podcast.summary.md
-
-Complete!
+┌─────────────────────────────────────────────────────────────┐
+│  vget-base (build base)                                     │
+│  ├── :latest  - CPU (golang:1.25-bookworm)                  │
+│  └── :cuda    - CUDA 12.6 (nvidia/cuda:12.6.3-devel)        │
+│                                                             │
+│  Contains: Go 1.25, sherpa-onnx libs, whisper.cpp libs      │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│  vget (application)                                         │
+│                                                             │
+│  CPU variants:                                              │
+│  ├── :latest       - No models (~500MB)                     │
+│  ├── :full-small   - Parakeet + Whisper Small (~1.2GB)      │
+│  ├── :full-medium  - Parakeet + Whisper Medium (~2.0GB)     │
+│  └── :full-large   - Parakeet + Whisper Large Turbo (~2.3GB)│
+│                                                             │
+│  CUDA variants:                                             │
+│  ├── :cuda         - No models + CUDA runtime               │
+│  ├── :cuda-small   - Parakeet + Whisper Small + CUDA        │
+│  ├── :cuda-medium  - Parakeet + Whisper Medium + CUDA       │
+│  └── :cuda-large   - Parakeet + Whisper Large Turbo + CUDA  │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Implementation Steps
+### Image Variants
 
-### Phase 1: Foundation
+| Tag | Models | Size | Best For |
+|-----|--------|------|----------|
+| `:latest` | None | ~500MB | Download models on first use |
+| `:full-small` | Parakeet V3 + Whisper Small | ~1.2GB | NAS <8GB RAM |
+| `:full-medium` | Parakeet V3 + Whisper Medium | ~2.0GB | 8-16GB RAM |
+| `:full-large` | Parakeet V3 + Whisper Large Turbo | ~2.3GB | Best accuracy |
+| `:cuda-*` | Same as above + CUDA | +2GB | NVIDIA GPU |
 
-1. `internal/core/config/config.go` - Add AIConfig structs
-2. `internal/cli/config.go` - Add `ai.*` key handling
-
-### Phase 2: TUI Wizard
-
-3. `internal/core/config/ai_wizard.go` - AI config TUI wizard (Bubbletea)
-4. `internal/cli/ai.go` - `vget ai` command with `config` subcommand
-5. `internal/cli/config.go` - Add `vget config ai` alias
-
-### Phase 3: Core AI Pipeline
-
-6. `internal/core/ai/ai.go` - Main orchestrator
-7. `internal/core/ai/chunker.go` - ffmpeg-based audio chunking
-
-### Phase 4: Transcription
-
-8. `internal/core/ai/transcriber/transcriber.go` - Interface
-9. `internal/core/ai/transcriber/openai.go` - Whisper API client
-10. `internal/core/ai/output/markdown.go` - Transcript formatter
-
-### Phase 5: Summarization
-
-11. `internal/core/ai/summarizer/summarizer.go` - Interface
-12. `internal/core/ai/summarizer/openai.go` - GPT-4o client
-
-## Dependencies
-
-```go
-// go.mod additions
-github.com/sashabaranov/go-openai  // OpenAI API client
-```
-
-## ffmpeg Requirement
-
-MVP requires ffmpeg for chunking large files:
-
-```bash
-# macOS
-brew install ffmpeg
-
-# Ubuntu/Debian
-apt install ffmpeg
-
-# If ffmpeg not found + file needs chunking
-# → Error: "Large files require ffmpeg. Install: brew install ffmpeg"
-```
-
-## i18n Translations
-
-Add AI-related translations to all 7 locales:
+### Basic Usage (CPU)
 
 ```yaml
-# internal/core/i18n/locales/en.yml
-ai:
-  wizard:
-    title: "AI Configuration"
-    transcription_provider: "Transcription Provider"
-    transcription_provider_desc: "Choose an AI provider for speech-to-text"
-    transcription_api_key: "Transcription API Key"
-    transcription_api_key_desc: "Enter your OpenAI API key"
-    summarization_provider: "Summarization Provider"
-    summarization_provider_desc: "Choose an AI provider for text summarization"
-    summarization_api_key: "Summarization API Key"
-    summarization_api_key_desc: "Enter your API key"
-    reuse_api_key: "Use same API key as transcription?"
-    skip: "Skip"
-    openai_whisper: "OpenAI Whisper"
-    openai_gpt: "OpenAI GPT"
-  progress:
-    checking_file: "Checking file size..."
-    splitting_chunks: "Splitting into chunks..."
-    transcribing_chunk: "Transcribing chunk %d/%d..."
-    merging_transcripts: "Merging transcripts..."
-    summarizing: "Generating summary..."
-    writing_file: "Writing %s..."
-    complete: "Complete!"
-  errors:
-    no_api_key: "No API key configured. Run: vget ai config"
-    file_not_found: "File not found: %s"
-    ffmpeg_required: "Large files require ffmpeg. Install: brew install ffmpeg"
+# docker-compose.yml
+services:
+  vget:
+    image: ghcr.io/guiyumin/vget:full-medium
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config:/home/vget/.config/vget
+      - ./downloads:/home/vget/downloads
 ```
 
-## Future Extensions (Not MVP)
+### GPU Usage (NVIDIA CUDA)
 
-- [ ] Local transcription (Ollama + whisper.cpp)
-- [ ] Additional providers (Anthropic, Qwen)
-- [ ] URL input (download then process)
-- [ ] SRT output format
+```yaml
+services:
+  vget:
+    image: ghcr.io/guiyumin/vget:cuda-large
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config:/home/vget/.config/vget
+      - ./downloads:/home/vget/downloads
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+```
+
+### Build Args
+
+| Arg | Values | Description |
+|-----|--------|-------------|
+| `ENABLE_CUDA` | `true`/`false` | Enable CUDA support |
+| `MODEL_VARIANT` | `none`/`small`/`medium`/`large` | Bundle models |
+
+---
+
+## Implementation Phases
+
+### Phase 1: Core Pipeline ✅
+
+1. Audio chunking with ffmpeg
+2. Local transcription (Parakeet V3 + Whisper.cpp)
+3. Transcript merging with deduplication
+4. Cloud summarization (GPT-4o)
+5. Web UI with progress stepper
+
+### Phase 2: Translation & SRT 🚧
+
+1. Translator interface (LLM-based)
+2. SRT generator with timestamp preservation
+3. Multi-language support
+4. UI language selector and format options
+
+### Phase 3: Local LLM
+
+1. Local translation (Ollama, llama.cpp)
+2. Local summarization
+3. Fully offline pipeline
+
+### Future
+
+- [ ] Additional cloud providers (Anthropic, Qwen)
 - [ ] Speaker diarization
 - [ ] Resume interrupted processing
-- [ ] Chinese cloud providers
+- [ ] Batch processing multiple files
+
+---
 
 ## Success Criteria
 
-1. `vget ai config` wizard configures AI providers correctly
-2. `vget ai podcast.mp3 --transcribe` produces accurate transcript
-3. `vget ai podcast.mp3 --transcribe --summarize` produces transcript + summary
-4. Large files (>25MB) are automatically chunked
-5. Progress is visible during processing
-6. Errors are clear and actionable
+1. Web UI allows file selection and AI processing
+2. Progress is visible in real-time via stepper
+3. Transcripts are accurate with timestamps
+4. Translation preserves meaning and timestamps
+5. SRT files are valid and sync with audio
+6. Summaries capture key points
+7. Large files (>25MB) are automatically chunked
+8. Errors are clear and actionable in UI
