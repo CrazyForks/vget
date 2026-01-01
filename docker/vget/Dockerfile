@@ -77,9 +77,10 @@ RUN pip3 install --no-cache-dir --break-system-packages \
     youtube-dl
 
 # Create non-root user
+# Models go in /home/vget/models (separate from config to avoid bind mount conflicts)
 RUN groupadd -g 1000 vget && \
     useradd -u 1000 -g vget -m -d /home/vget vget && \
-    mkdir -p /home/vget/downloads /home/vget/.config/vget/models && \
+    mkdir -p /home/vget/downloads /home/vget/.config/vget /home/vget/models && \
     chown -R vget:vget /home/vget
 
 # Copy sherpa-onnx shared libraries from builder (for Parakeet)
@@ -94,23 +95,23 @@ RUN ldconfig
 # Download models based on variant
 RUN if [ "$MODEL_VARIANT" = "small" ] || [ "$MODEL_VARIANT" = "medium" ] || [ "$MODEL_VARIANT" = "large" ]; then \
         echo "Downloading Parakeet V3 INT8 model (~640MB)..." && \
-        curl -L https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2 | tar -xjf - -C /home/vget/.config/vget/models/ && \
-        chown -R vget:vget /home/vget/.config/vget/models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8; \
+        curl -L https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2 | tar -xjf - -C /home/vget/models/ && \
+        chown -R vget:vget /home/vget/models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8; \
     fi
 
 # Download Whisper ggml models for whisper.cpp
 RUN if [ "$MODEL_VARIANT" = "small" ]; then \
         echo "Downloading Whisper Small ggml model (~466MB)..." && \
-        curl -L -o /home/vget/.config/vget/models/ggml-small.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin && \
-        chown vget:vget /home/vget/.config/vget/models/ggml-small.bin; \
+        curl -L -o /home/vget/models/ggml-small.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin && \
+        chown vget:vget /home/vget/models/ggml-small.bin; \
     elif [ "$MODEL_VARIANT" = "medium" ]; then \
         echo "Downloading Whisper Medium ggml model (~1.5GB)..." && \
-        curl -L -o /home/vget/.config/vget/models/ggml-medium.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin && \
-        chown vget:vget /home/vget/.config/vget/models/ggml-medium.bin; \
+        curl -L -o /home/vget/models/ggml-medium.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin && \
+        chown vget:vget /home/vget/models/ggml-medium.bin; \
     elif [ "$MODEL_VARIANT" = "large" ]; then \
         echo "Downloading Whisper Large V3 Turbo ggml model (~1.6GB)..." && \
-        curl -L -o /home/vget/.config/vget/models/ggml-large-v3-turbo.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin && \
-        chown vget:vget /home/vget/.config/vget/models/ggml-large-v3-turbo.bin; \
+        curl -L -o /home/vget/models/ggml-large-v3-turbo.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin && \
+        chown vget:vget /home/vget/models/ggml-large-v3-turbo.bin; \
     else \
         echo "No Whisper models bundled (MODEL_VARIANT=$MODEL_VARIANT)"; \
     fi

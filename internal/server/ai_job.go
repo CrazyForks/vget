@@ -101,6 +101,7 @@ type AIJob struct {
 	summarizationModel  string             `json:"-"`
 	pin                 string             `json:"-"`
 	includeSummary      bool               `json:"-"`
+	useLocalASR         bool               `json:"-"`
 }
 
 // AIJobRequest is the request to start an AI processing job
@@ -111,6 +112,7 @@ type AIJobRequest struct {
 	SummarizationModel string `json:"summarization_model"`
 	PIN                string `json:"pin"`
 	IncludeSummary     bool   `json:"include_summary"`
+	UseLocalASR        bool   `json:"use_local_asr"`
 }
 
 // AIJobQueue manages AI processing jobs with a worker pool
@@ -224,6 +226,7 @@ func (q *AIJobQueue) AddJob(req AIJobRequest) (*AIJob, error) {
 		summarizationModel: req.SummarizationModel,
 		pin:                req.PIN,
 		includeSummary:     req.IncludeSummary,
+		useLocalASR:        req.UseLocalASR,
 	}
 
 	// Calculate initial overall progress (for resume capability)
@@ -376,20 +379,36 @@ func (q *AIJobQueue) processJob(job *AIJob) {
 	// Reload config to get fresh AI accounts
 	cfg := config.LoadOrDefault()
 
-	// Get the AI account
-	account := cfg.AI.GetAccount(job.account)
-	if account == nil {
-		q.failJob(job.ID, fmt.Sprintf("AI account '%s' not found", job.account))
-		return
-	}
-
 	// Create progress callback
 	progressFn := func(stepKey StepKey, progress float64, detail string) {
 		q.updateStepProgress(job.ID, stepKey, progress, detail)
 	}
 
-	// Create pipeline with progress support
-	pipeline, err := ai.NewPipelineWithAccount(account, job.transcriptionModel, job.summarizationModel, job.pin)
+	var pipeline *ai.Pipeline
+	var err error
+
+	if job.useLocalASR {
+		// Use local transcription (sherpa-onnx/whisper.cpp)
+		// For summarization, we can optionally use a cloud account
+		var summarizationAccount *config.AIAccount
+		if job.includeSummary && job.account != "" {
+			summarizationAccount = cfg.AI.GetAccount(job.account)
+			if summarizationAccount == nil {
+				q.failJob(job.ID, fmt.Sprintf("AI account '%s' not found for summarization", job.account))
+				return
+			}
+		}
+		pipeline, err = ai.NewLocalPipeline(cfg.AI.LocalASR, summarizationAccount, job.summarizationModel, job.pin)
+	} else {
+		// Use cloud transcription (OpenAI Whisper API)
+		account := cfg.AI.GetAccount(job.account)
+		if account == nil {
+			q.failJob(job.ID, fmt.Sprintf("AI account '%s' not found", job.account))
+			return
+		}
+		pipeline, err = ai.NewPipelineWithAccount(account, job.transcriptionModel, job.summarizationModel, job.pin)
+	}
+
 	if err != nil {
 		q.failJob(job.ID, fmt.Sprintf("Failed to create pipeline: %v", err))
 		return

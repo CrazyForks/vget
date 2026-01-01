@@ -193,15 +193,14 @@ export function LocalASRSettings({ isConnected }: LocalASRSettingsProps) {
             className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded bg-zinc-100 dark:bg-zinc-950 text-zinc-900 dark:text-white text-sm focus:outline-none focus:border-blue-500 disabled:opacity-50 cursor-pointer"
           >
             {capabilities.models.map((model) => (
-              <option key={model.id} value={model.id}>
-                {model.name}
-                {model.recommended_gpu && !gpuAvailable ? " (GPU recommended)" : ""}
+              <option key={model.name} value={model.name}>
+                {model.name} ({model.size}){model.downloaded ? " ✓" : ""}
               </option>
             ))}
           </select>
           {selectedModel && capabilities.models && (
             <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-              {capabilities.models.find((m) => m.id === selectedModel)?.description}
+              {capabilities.models.find((m) => m.name === selectedModel)?.description}
             </p>
           )}
         </div>

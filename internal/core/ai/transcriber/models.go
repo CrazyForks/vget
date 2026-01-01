@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/guiyumin/vget/internal/core/config"
 )
 
 // ASRModel represents a speech recognition model.
@@ -86,7 +88,14 @@ func NewModelManager(modelsDir string) *ModelManager {
 }
 
 // DefaultModelsDir returns the default models directory.
+// In Docker, models are stored in /home/vget/models to avoid bind mount conflicts.
+// On host systems, models are stored in ~/.config/vget/models.
 func DefaultModelsDir() (string, error) {
+	// Docker: use separate directory from config to avoid bind mount overwriting models
+	if config.IsRunningInDocker() {
+		return "/home/vget/models", nil
+	}
+
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err

@@ -6,9 +6,11 @@ import {
   fetchAIModels,
   fetchAudioFiles,
   uploadAudioFile,
+  fetchLocalASRCapabilities,
   type AIConfigData,
   type AIModelsData,
   type AudioFile,
+  type LocalASRCapabilities,
 } from "../utils/apis";
 import {
   FaSpinner,
@@ -43,11 +45,13 @@ export function PodcastNotesPage() {
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null);
 
-  // Account and model selection
-  const [account, setAccount] = useState("");
-  const [transcriptionModel, setTranscriptionModel] = useState("");
-  const [summarizationModel, setSummarizationModel] = useState("");
+  // Model selection - unified format: "local:model" or "cloud:account:model"
+  const [transcriptionSelection, setTranscriptionSelection] = useState("");
+  const [summarizationSelection, setSummarizationSelection] = useState("");
   const [includeSummary, setIncludeSummary] = useState(true);
+
+  // Local ASR capabilities
+  const [localASRCapabilities, setLocalASRCapabilities] = useState<LocalASRCapabilities | null>(null);
 
   // PIN handling
   const [pin, setPIN] = useState("");
@@ -66,10 +70,11 @@ export function PodcastNotesPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const [aiRes, modelsRes, filesRes] = await Promise.all([
+      const [aiRes, modelsRes, filesRes, localASRRes] = await Promise.all([
         fetchAIConfig(),
         fetchAIModels(),
         fetchAudioFiles(),
+        fetchLocalASRCapabilities(),
       ]);
 
       let models: AIModelsData | null = null;
@@ -78,27 +83,40 @@ export function PodcastNotesPage() {
         setAIModels(models);
       }
 
+      let localCaps: LocalASRCapabilities | null = null;
+      if (localASRRes.code === 200 && localASRRes.data) {
+        localCaps = localASRRes.data;
+        setLocalASRCapabilities(localCaps);
+      }
+
       if (aiRes.code === 200) {
         setAIConfig(aiRes.data);
-        const defaultAcc = aiRes.data.default_account || "";
-        if (defaultAcc) {
-          setAccount(defaultAcc);
+
+        // Set default transcription selection
+        // Prefer local if available and enabled
+        if (localCaps?.available && localCaps?.enabled && localCaps.current_model) {
+          setTranscriptionSelection(`local:${localCaps.current_model}`);
+        } else {
+          // Fall back to cloud
+          const defaultAcc = aiRes.data.default_account || aiRes.data.accounts[0]?.label || "";
+          if (defaultAcc && models) {
+            const acc = aiRes.data.accounts.find((a) => a.label === defaultAcc);
+            const provider = acc?.provider || "openai";
+            const transcriptionModels = models.transcription[provider as keyof typeof models.transcription] || [];
+            if (transcriptionModels.length > 0) {
+              setTranscriptionSelection(`cloud:${defaultAcc}:${transcriptionModels[0]}`);
+            }
+          }
+        }
+
+        // Set default summarization selection
+        const defaultAcc = aiRes.data.default_account || aiRes.data.accounts[0]?.label || "";
+        if (defaultAcc && models) {
           const acc = aiRes.data.accounts.find((a) => a.label === defaultAcc);
           const provider = acc?.provider || "openai";
-          if (models) {
-            // Set default transcription model
-            const transcriptionModels =
-              models.transcription[
-                provider as keyof typeof models.transcription
-              ] || [];
-            setTranscriptionModel(transcriptionModels[0] || "whisper-1");
-
-            // Set default summarization model
-            const summaryProvider = provider as "openai" | "anthropic" | "qwen";
-            const summaryModels = models.summarization[summaryProvider];
-            setSummarizationModel(
-              summaryModels?.[0]?.id || models.summarization.default
-            );
+          const summaryModels = models.summarization[provider as "openai" | "anthropic" | "qwen"] || [];
+          if (summaryModels.length > 0) {
+            setSummarizationSelection(`${defaultAcc}:${summaryModels[0].id}`);
           }
         }
       }
@@ -133,45 +151,78 @@ export function PodcastNotesPage() {
   }, [isError, processingState.error, showToast]);
 
   const hasAIAccount = aiConfig && aiConfig.accounts.length > 0;
+  const hasLocalASR = localASRCapabilities?.available && localASRCapabilities?.enabled;
+  const canProcess = hasAIAccount || hasLocalASR;
 
-  const getAccount = (label: string) => {
-    return aiConfig?.accounts.find((acc) => acc.label === label);
+  // Parse transcription selection: "local:model" or "cloud:account:model"
+  const parseTranscriptionSelection = (sel: string) => {
+    if (sel.startsWith("local:")) {
+      return { type: "local" as const, model: sel.slice(6), account: "" };
+    } else if (sel.startsWith("cloud:")) {
+      const parts = sel.slice(6).split(":");
+      return { type: "cloud" as const, account: parts[0], model: parts[1] || "" };
+    }
+    return { type: "cloud" as const, account: "", model: "" };
+  };
+
+  // Parse summarization selection: "account:model"
+  const parseSummarizationSelection = (sel: string) => {
+    const parts = sel.split(":");
+    return { account: parts[0] || "", model: parts[1] || "" };
   };
 
   const getAccountEncrypted = (label: string) => {
-    return getAccount(label)?.is_encrypted ?? true;
+    const acc = aiConfig?.accounts.find((a) => a.label === label);
+    return acc?.is_encrypted ?? true;
   };
 
-  const getAccountProvider = (label: string) => {
-    return getAccount(label)?.provider || "openai";
+  // Build transcription options: local models + cloud models from all accounts
+  const getTranscriptionOptions = () => {
+    const options: { value: string; label: string }[] = [];
+
+    // Local models - show all models, mark downloaded ones with ✓
+    if (localASRCapabilities?.models) {
+      for (const m of localASRCapabilities.models) {
+        options.push({
+          value: `local:${m.name}`,
+          label: `Local - ${m.name}${m.downloaded ? " ✓" : ""}`,
+        });
+      }
+    }
+
+    // Cloud models from all accounts
+    if (aiConfig?.accounts && aiModels?.transcription) {
+      for (const acc of aiConfig.accounts) {
+        const models = aiModels.transcription[acc.provider as keyof typeof aiModels.transcription] || [];
+        for (const model of models) {
+          options.push({
+            value: `cloud:${acc.label}:${model}`,
+            label: `Cloud - ${acc.label} - ${model}`,
+          });
+        }
+      }
+    }
+
+    return options;
   };
 
-  const getTranscriptionModels = (provider: string) => {
-    return (
-      aiModels?.transcription[
-        provider as keyof typeof aiModels.transcription
-      ] || []
-    );
-  };
+  // Build summarization options: models from all accounts
+  const getSummarizationOptions = () => {
+    const options: { value: string; label: string }[] = [];
 
-  const getSummarizationModels = (provider: string) => {
-    const p = provider as "openai" | "anthropic" | "qwen";
-    return aiModels?.summarization[p] || [];
-  };
+    if (aiConfig?.accounts && aiModels?.summarization) {
+      for (const acc of aiConfig.accounts) {
+        const models = aiModels.summarization[acc.provider as "openai" | "anthropic" | "qwen"] || [];
+        for (const model of models) {
+          options.push({
+            value: `${acc.label}:${model.id}`,
+            label: `${acc.label} - ${model.name}`,
+          });
+        }
+      }
+    }
 
-  const handleAccountChange = (accountName: string) => {
-    setAccount(accountName);
-    const provider = getAccountProvider(accountName);
-
-    // Update transcription model
-    const transcriptionModels = getTranscriptionModels(provider);
-    setTranscriptionModel(transcriptionModels[0] || "whisper-1");
-
-    // Update summarization model
-    const summaryModels = getSummarizationModels(provider);
-    setSummarizationModel(
-      summaryModels[0]?.id || aiModels?.summarization.default || ""
-    );
+    return options;
   };
 
   const handleSelectFile = (file: AudioFile) => {
@@ -212,8 +263,25 @@ export function PodcastNotesPage() {
   const handleStartProcessing = async (pinToUse?: string) => {
     if (!selectedFile) return;
 
-    const isEncrypted = getAccountEncrypted(account);
-    if (isEncrypted && !pinToUse) {
+    const transcription = parseTranscriptionSelection(transcriptionSelection);
+    const summarization = parseSummarizationSelection(summarizationSelection);
+    const useLocalASR = transcription.type === "local";
+
+    // Determine which accounts need PIN
+    const accountsNeedingPin = new Set<string>();
+    if (!useLocalASR && transcription.account) {
+      if (getAccountEncrypted(transcription.account)) {
+        accountsNeedingPin.add(transcription.account);
+      }
+    }
+    if (includeSummary && summarization.account) {
+      if (getAccountEncrypted(summarization.account)) {
+        accountsNeedingPin.add(summarization.account);
+      }
+    }
+
+    const needsPin = accountsNeedingPin.size > 0;
+    if (needsPin && !pinToUse) {
       setShowPINInput(true);
       setPIN("");
       return;
@@ -221,13 +289,17 @@ export function PodcastNotesPage() {
 
     setShowPINInput(false);
 
+    // For summarization, use the summarization account
+    const summaryAccount = includeSummary ? summarization.account : "";
+
     const result = await startProcessing(
       selectedFile.path,
-      account,
-      transcriptionModel,
-      summarizationModel,
+      useLocalASR ? summaryAccount : transcription.account,
+      transcription.model,
+      summarization.model,
       includeSummary,
-      pinToUse
+      pinToUse,
+      useLocalASR
     );
 
     if (!result.success) {
@@ -255,7 +327,7 @@ export function PodcastNotesPage() {
     );
   }
 
-  if (!hasAIAccount) {
+  if (!canProcess) {
     return (
       <div className="max-w-4xl mx-auto flex flex-col gap-4">
         <h1 className="text-xl font-medium text-zinc-900 dark:text-white">
@@ -264,11 +336,11 @@ export function PodcastNotesPage() {
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 flex flex-col gap-3">
           <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
             <FaGear />
-            <span className="font-medium">AI Account Required</span>
+            <span className="font-medium">Setup Required</span>
           </div>
           <p className="text-yellow-700 dark:text-yellow-300 text-sm">
-            Configure an AI account in Settings to use transcription and
-            summarization features.
+            Enable Local ASR or configure an AI account in Settings to use
+            transcription features.
           </p>
           <Link
             to="/ai/settings"
@@ -352,66 +424,43 @@ export function PodcastNotesPage() {
         </h3>
 
         <div className="grid grid-cols-2 gap-4">
-          {/* Left: Account & Models */}
+          {/* Left: Models */}
           <div className="space-y-3">
-            {/* Account Selection */}
-            <div className="flex items-center gap-2">
-              <label className="text-sm text-zinc-600 dark:text-zinc-400 w-28">
-                {t.ai_account_name}:
-              </label>
-              <select
-                value={account}
-                onChange={(e) => handleAccountChange(e.target.value)}
-                className={`${selectClass} flex-1`}
-                disabled={isProcessing}
-              >
-                {aiConfig?.accounts.map((acc) => (
-                  <option key={acc.label} value={acc.label}>
-                    {acc.label} - {acc.provider}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Transcription Model */}
+            {/* Transcription Model - unified dropdown */}
             <div className="flex items-center gap-2">
               <label className="text-sm text-zinc-600 dark:text-zinc-400 w-28">
                 {t.ai_transcription_model}:
               </label>
               <select
-                value={transcriptionModel}
-                onChange={(e) => setTranscriptionModel(e.target.value)}
+                value={transcriptionSelection}
+                onChange={(e) => setTranscriptionSelection(e.target.value)}
                 className={`${selectClass} flex-1`}
                 disabled={isProcessing}
               >
-                {getTranscriptionModels(getAccountProvider(account)).map(
-                  (m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  )
-                )}
+                {getTranscriptionOptions().map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
               </select>
             </div>
 
-            {/* Summarization Model with toggle */}
+            {/* Summarization Model - unified dropdown */}
             <div className="flex items-center gap-2">
               <label className="text-sm text-zinc-600 dark:text-zinc-400 w-28">
                 {t.ai_summary_model}:
               </label>
               <select
-                value={summarizationModel}
-                onChange={(e) => setSummarizationModel(e.target.value)}
+                value={summarizationSelection}
+                onChange={(e) => setSummarizationSelection(e.target.value)}
                 className={clsx(selectClass, "flex-1", !includeSummary && "opacity-50")}
                 disabled={isProcessing || !includeSummary}
               >
-                {getSummarizationModels(getAccountProvider(account)).map(
-                  (m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  )
-                )}
+                {getSummarizationOptions().map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
               </select>
               <input
                 type="checkbox"
@@ -424,7 +473,7 @@ export function PodcastNotesPage() {
           </div>
         </div>
 
-        {/* Start/Cancel Button - separate row */}
+        {/* Start/Cancel Button */}
         <div className="flex gap-2 mt-4">
           {isProcessing ? (
             <button
@@ -437,7 +486,7 @@ export function PodcastNotesPage() {
           ) : (
             <button
               onClick={() => handleStartProcessing()}
-              disabled={!selectedFile}
+              disabled={!selectedFile || !transcriptionSelection}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <FaPlay />

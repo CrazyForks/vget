@@ -535,11 +535,12 @@ export interface AIJob {
 // AI Processing Job API Functions
 export async function startAIProcessing(params: {
   file_path: string;
-  account: string;
+  account?: string;
   transcription_model?: string;
   summarization_model?: string;
   pin?: string;
   include_summary: boolean;
+  use_local_asr?: boolean;
 }): Promise<ApiResponse<{ job_id: string; status: AIJobStatus }>> {
   const res = await fetch("/api/ai/process", {
     method: "POST",
@@ -580,12 +581,12 @@ export async function clearAIJobs(): Promise<
 // Local ASR APIs
 
 export interface LocalASRModel {
-  id: string;
   name: string;
-  status: "ready" | "not_loaded" | "loading" | "error";
-  requires_gpu: boolean;
-  recommended_gpu: boolean;
+  engine: string;
+  size: string;
   description: string;
+  languages: number;
+  downloaded: boolean;
 }
 
 export interface LocalASRCapabilities {

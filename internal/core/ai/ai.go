@@ -136,6 +136,50 @@ func NewPipelineWithAccount(account *config.AIAccount, transcriptionModel, summa
 	return p, nil
 }
 
+// NewLocalPipeline creates a pipeline that uses local transcription (sherpa-onnx/whisper.cpp).
+// For summarization, it requires a cloud account (local transcription + cloud summarization).
+// If summarizationAccount is nil, summarization will not be available.
+func NewLocalPipeline(localASRCfg config.LocalASRConfig, summarizationAccount *config.AIAccount, summarizationModel, pin string) (*Pipeline, error) {
+	p := &Pipeline{
+		chunker: NewChunker(),
+	}
+
+	// Initialize local transcriber
+	t, err := transcriber.NewLocal(localASRCfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create local transcriber: %w", err)
+	}
+	p.transcriber = t
+
+	// Initialize summarizer if account provided
+	if summarizationAccount != nil {
+		// Decrypt API key
+		var apiKey string
+		if strings.HasPrefix(summarizationAccount.APIKey, "plain:") {
+			apiKey = strings.TrimPrefix(summarizationAccount.APIKey, "plain:")
+		} else {
+			if err := crypto.ValidatePIN(pin); err != nil {
+				return nil, fmt.Errorf("PIN required to decrypt API key: %w", err)
+			}
+			apiKey, err = crypto.Decrypt(summarizationAccount.APIKey, pin)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decrypt API key: %w", err)
+			}
+		}
+
+		summarizationCfg := config.AIServiceConfig{
+			Model: summarizationModel,
+		}
+		s, err := summarizer.New(summarizationAccount.Provider, summarizationCfg, apiKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create summarizer: %w", err)
+		}
+		p.summarizer = s
+	}
+
+	return p, nil
+}
+
 // Process runs the AI pipeline on the given file.
 func (p *Pipeline) Process(ctx context.Context, filePath string, opts Options) (*Result, error) {
 	return p.ProcessWithProgress(ctx, filePath, opts, nil)
