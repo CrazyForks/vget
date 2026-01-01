@@ -368,7 +368,7 @@ func (p *Pipeline) transcribeWithProgress(ctx context.Context, filePath string, 
 	progressFn(ProgressStepChunk, 100, fmt.Sprintf("Created %d chunks", len(chunks)))
 	fmt.Printf("  Created %d chunks in: %s\n", len(chunks), manifest.ChunksDir)
 
-	// Transcribe each chunk
+	// Transcribe each chunk (save each to disk for resumability)
 	var results []*transcriber.Result
 	for i, chunk := range chunks {
 		progress := float64(i) / float64(len(chunks)) * 100
@@ -376,10 +376,28 @@ func (p *Pipeline) transcribeWithProgress(ctx context.Context, filePath string, 
 		progressFn(ProgressStepTranscribe, progress, detail)
 		fmt.Printf("  [%d/%d] Transcribing chunk...\n", i+1, len(chunks))
 
+		// Check if chunk was already transcribed (for resumability)
+		chunkTranscriptPath := strings.TrimSuffix(chunk.FilePath, filepath.Ext(chunk.FilePath)) + ".txt"
+		if manifest.Chunks[i].Status == "transcribed" {
+			if data, err := os.ReadFile(chunkTranscriptPath); err == nil {
+				fmt.Printf("  [%d/%d] Using cached transcript\n", i+1, len(chunks))
+				results = append(results, &transcriber.Result{RawText: string(data)})
+				continue
+			}
+		}
+
 		result, err := p.transcriber.Transcribe(ctx, chunk.FilePath)
 		if err != nil {
 			return nil, manifest.ChunksDir, fmt.Errorf("failed to transcribe chunk %d: %w", i+1, err)
 		}
+
+		// Save chunk transcript to disk immediately
+		if err := os.WriteFile(chunkTranscriptPath, []byte(result.RawText), 0644); err != nil {
+			fmt.Printf("  Warning: failed to save chunk transcript: %v\n", err)
+		} else {
+			fmt.Printf("  [%d/%d] Saved: %s\n", i+1, len(chunks), filepath.Base(chunkTranscriptPath))
+		}
+
 		results = append(results, result)
 
 		// Update chunk status in manifest
