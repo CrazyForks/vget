@@ -3,6 +3,7 @@ module github.com/guiyumin/vget
 go 1.25.4
 
 require (
+	codeberg.org/gruf/go-ffmpreg v0.6.16
 	github.com/anthropics/anthropic-sdk-go v1.19.0
 	github.com/charmbracelet/bubbles v0.21.0
 	github.com/charmbracelet/bubbletea v1.3.6
@@ -16,12 +17,15 @@ require (
 	github.com/go-rod/rod v0.116.2
 	github.com/go-rod/stealth v0.4.9
 	github.com/gotd/td v0.136.0
+	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/k2-fsa/sherpa-onnx-go v1.12.20
 	github.com/mattn/go-runewidth v0.0.16
+	github.com/mewkiz/flac v1.0.13
 	github.com/nsf/termbox-go v1.1.1
 	github.com/openai/openai-go v1.12.0
 	github.com/sashabaranov/go-openai v1.41.2
 	github.com/spf13/cobra v1.10.1
+	github.com/tetratelabs/wazero v1.10.1
 	github.com/yeqown/go-qrcode/v2 v2.2.5
 	golang.org/x/crypto v0.45.0
 	golang.org/x/term v0.37.0
@@ -70,6 +74,7 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.8 // indirect
 	github.com/hashicorp/go-version v1.7.0 // indirect
+	github.com/icza/bitio v1.1.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/k2-fsa/sherpa-onnx-go-linux v1.12.20 // indirect
@@ -82,6 +87,8 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
+	github.com/mewkiz/pkg v0.0.0-20250417130911-3f050ff8c56d // indirect
+	github.com/mewpkg/term v0.0.0-20241026122259-37a80af23985 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421 // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect

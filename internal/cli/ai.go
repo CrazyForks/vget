@@ -39,13 +39,30 @@ var aiTranscribeCmd = &cobra.Command{
 
 The transcript is saved as <filename>.transcript.md
 
+Language is required. Common language codes:
+  zh - Chinese    en - English    ja - Japanese
+  ko - Korean     es - Spanish    fr - French
+  de - German     ru - Russian    pt - Portuguese
+
 Examples:
-  vget ai transcribe podcast.mp3
-  vget ai transcribe video.mp4 --model whisper-small
-  vget ai transcribe audio.m4a --language zh`,
+  vget ai transcribe podcast.mp3 --language zh
+  vget ai transcribe video.mp4 --language en
+  vget ai transcribe audio.m4a --language ja --model whisper-small`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		filePath := args[0]
+
+		// Validate language is provided
+		if aiLanguage == "" {
+			fmt.Fprintf(os.Stderr, "Error: --language is required\n\n")
+			fmt.Fprintln(os.Stderr, "Common language codes:")
+			fmt.Fprintln(os.Stderr, "  zh - Chinese    en - English    ja - Japanese")
+			fmt.Fprintln(os.Stderr, "  ko - Korean     es - Spanish    fr - French")
+			fmt.Fprintln(os.Stderr, "  de - German     ru - Russian    pt - Portuguese")
+			fmt.Fprintln(os.Stderr, "\nExample:")
+			fmt.Fprintf(os.Stderr, "  vget ai transcribe %s --language zh\n", filePath)
+			os.Exit(1)
+		}
 
 		// Validate file exists
 		if _, err := os.Stat(filePath); os.IsNotExist(err) {

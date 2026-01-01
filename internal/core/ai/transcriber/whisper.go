@@ -5,16 +5,21 @@ package transcriber
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
+	"codeberg.org/gruf/go-ffmpreg/ffmpreg"
+	"codeberg.org/gruf/go-ffmpreg/wasm"
 	"github.com/ggerganov/whisper.cpp/bindings/go/pkg/whisper"
 	"github.com/go-audio/wav"
 	"github.com/guiyumin/vget/internal/core/config"
+	"github.com/hajimehoshi/go-mp3"
+	"github.com/mewkiz/flac"
+	"github.com/tetratelabs/wazero"
 )
 
 // WhisperTranscriber implements Transcriber using whisper.cpp.
@@ -44,23 +49,22 @@ func NewWhisperTranscriber(modelPath, language string) (*WhisperTranscriber, err
 
 // NewWhisperTranscriberFromConfig creates a WhisperTranscriber from config.
 func NewWhisperTranscriberFromConfig(cfg config.LocalASRConfig, modelsDir string) (*WhisperTranscriber, error) {
-	model := cfg.Model
-	if model == "" {
-		model = "whisper-small"
+	modelName := cfg.Model
+	if modelName == "" {
+		modelName = DefaultModel
 	}
 
-	// Map model name to ggml file
+	// Look up model in registry to get the correct filename
+	model := GetModel(modelName)
 	var modelFile string
-	switch model {
-	case "whisper-small":
-		modelFile = "ggml-small.bin"
-	case "whisper-medium":
-		modelFile = "ggml-medium.bin"
-	case "whisper-turbo":
-		modelFile = "ggml-large-v3-turbo.bin"
-	default:
+	if model != nil {
+		modelFile = model.DirName
+	} else {
 		// Assume it's a direct path or filename
-		modelFile = model
+		modelFile = modelName
+		if !strings.HasSuffix(modelFile, ".bin") {
+			modelFile = modelFile + ".bin"
+		}
 	}
 
 	modelPath := filepath.Join(modelsDir, modelFile)
@@ -87,17 +91,8 @@ func (w *WhisperTranscriber) Transcribe(ctx context.Context, filePath string) (*
 	default:
 	}
 
-	// Convert audio to WAV format if needed
-	wavPath, cleanup, err := w.ensureWAV(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare audio: %w", err)
-	}
-	if cleanup != nil {
-		defer cleanup()
-	}
-
-	// Read audio samples
-	samples, sampleRate, err := w.readAudioSamples(wavPath)
+	// Read audio samples (supports WAV, MP3 natively; other formats via ffmpeg)
+	samples, sampleRate, err := w.readAudioSamples(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read audio: %w", err)
 	}
@@ -130,15 +125,13 @@ func (w *WhisperTranscriber) Transcribe(ctx context.Context, filePath string) (*
 	wctx.SetTokenTimestamps(false)
 	fmt.Println("  TokenTimestamps: false (sentence-level output)")
 
-	// Set language if specified
-	if w.language != "" && w.language != "auto" {
+	// Set language (required)
+	if w.language != "" {
 		if err := wctx.SetLanguage(w.language); err != nil {
 			fmt.Printf("  Warning: failed to set language %s: %v\n", w.language, err)
 		} else {
 			fmt.Printf("  Language: %s\n", w.language)
 		}
-	} else {
-		fmt.Println("  Language: auto-detect")
 	}
 	fmt.Println("  ========================================")
 
@@ -182,18 +175,10 @@ func (w *WhisperTranscriber) Transcribe(ctx context.Context, filePath string) (*
 	// Calculate duration
 	duration := time.Duration(float64(len(samples))/float64(sampleRate)) * time.Second
 
-	// Detect language (whisper reports this)
-	detectedLang := w.language
-	if w.model.IsMultilingual() && w.language == "auto" {
-		// Try to get detected language from context if available
-		// For now, default to "auto"
-		detectedLang = "auto"
-	}
-
 	return &Result{
 		RawText:  strings.TrimSpace(fullText.String()),
 		Segments: segments,
-		Language: detectedLang,
+		Language: w.language,
 		Duration: duration,
 	}, nil
 }
@@ -206,48 +191,28 @@ func (w *WhisperTranscriber) Close() error {
 	return nil
 }
 
-// ensureWAV converts audio to WAV format if needed.
-func (w *WhisperTranscriber) ensureWAV(filePath string) (string, func(), error) {
+// readAudioSamples reads audio samples from various formats.
+// Supports WAV, MP3, FLAC natively (pure Go, no external dependencies).
+// For other formats (M4A, AAC, OGG, etc.), uses embedded ffmpeg WASM.
+func (w *WhisperTranscriber) readAudioSamples(filePath string) ([]float32, int, error) {
 	ext := strings.ToLower(filepath.Ext(filePath))
 
-	// If already WAV, use as-is
-	if ext == ".wav" {
-		return filePath, nil, nil
+	switch ext {
+	case ".wav":
+		return w.readWAVSamples(filePath)
+	case ".mp3":
+		return w.readMP3Samples(filePath)
+	case ".flac":
+		return w.readFLACSamples(filePath)
+	default:
+		// Use embedded ffmpeg WASM for other formats (m4a, aac, ogg, etc.)
+		return w.readWithEmbeddedFFmpeg(filePath)
 	}
-
-	// Convert to WAV using ffmpeg
-	tmpFile, err := os.CreateTemp("", "whisper-*.wav")
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to create temp file: %w", err)
-	}
-	tmpPath := tmpFile.Name()
-	tmpFile.Close()
-
-	// ffmpeg command to convert to 16kHz mono WAV
-	cmd := exec.Command("ffmpeg",
-		"-i", filePath,
-		"-ar", "16000",
-		"-ac", "1",
-		"-c:a", "pcm_s16le",
-		"-y",
-		tmpPath,
-	)
-
-	if output, err := cmd.CombinedOutput(); err != nil {
-		os.Remove(tmpPath)
-		return "", nil, fmt.Errorf("ffmpeg conversion failed: %w\n%s", err, string(output))
-	}
-
-	cleanup := func() {
-		os.Remove(tmpPath)
-	}
-
-	return tmpPath, cleanup, nil
 }
 
-// readAudioSamples reads a WAV file and returns float32 samples.
-func (w *WhisperTranscriber) readAudioSamples(wavPath string) ([]float32, int, error) {
-	file, err := os.Open(wavPath)
+// readWAVSamples reads a WAV file and returns float32 samples.
+func (w *WhisperTranscriber) readWAVSamples(filePath string) ([]float32, int, error) {
+	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to open WAV file: %w", err)
 	}
@@ -271,10 +236,203 @@ func (w *WhisperTranscriber) readAudioSamples(wavPath string) ([]float32, int, e
 	}
 
 	sampleRate := int(decoder.SampleRate)
+
+	// Resample to 16kHz if needed (whisper expects 16kHz)
+	if sampleRate != 16000 {
+		samples = resampleTo16kHz(samples, sampleRate)
+		sampleRate = 16000
+	}
+
 	return samples, sampleRate, nil
+}
+
+// readMP3Samples reads an MP3 file and returns float32 samples at 16kHz.
+func (w *WhisperTranscriber) readMP3Samples(filePath string) ([]float32, int, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to open MP3 file: %w", err)
+	}
+	defer file.Close()
+
+	decoder, err := mp3.NewDecoder(file)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to decode MP3: %w", err)
+	}
+
+	// Read all samples (MP3 decoder outputs 16-bit stereo PCM at original sample rate)
+	sampleRate := decoder.SampleRate()
+
+	// Read all bytes
+	data, err := io.ReadAll(decoder)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to read MP3 data: %w", err)
+	}
+
+	// Convert bytes to float32 samples
+	// go-mp3 outputs 16-bit stereo PCM (4 bytes per sample pair: L16 + R16)
+	numSamples := len(data) / 4 // stereo 16-bit = 4 bytes per sample pair
+	samples := make([]float32, numSamples)
+
+	const maxInt16 = 32768.0
+	for i := 0; i < numSamples; i++ {
+		// Read left channel (16-bit little-endian), ignore right channel (mono mix)
+		left := int16(data[i*4]) | int16(data[i*4+1])<<8
+		right := int16(data[i*4+2]) | int16(data[i*4+3])<<8
+		// Mix to mono
+		mono := (int32(left) + int32(right)) / 2
+		samples[i] = float32(mono) / maxInt16
+	}
+
+	// Resample to 16kHz (whisper expects 16kHz)
+	if sampleRate != 16000 {
+		samples = resampleTo16kHz(samples, sampleRate)
+	}
+
+	return samples, 16000, nil
+}
+
+// readFLACSamples reads a FLAC file and returns float32 samples at 16kHz.
+func (w *WhisperTranscriber) readFLACSamples(filePath string) ([]float32, int, error) {
+	// Open and decode FLAC file
+	stream, err := flac.Open(filePath)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to open FLAC file: %w", err)
+	}
+	defer stream.Close()
+
+	sampleRate := int(stream.Info.SampleRate)
+	nChannels := int(stream.Info.NChannels)
+	bitsPerSample := int(stream.Info.BitsPerSample)
+
+	// Read all frames
+	var samples []float32
+	maxVal := float32(int64(1) << (bitsPerSample - 1))
+
+	for {
+		frame, err := stream.ParseNext()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to parse FLAC frame: %w", err)
+		}
+
+		// Convert samples to float32 mono
+		nSamples := len(frame.Subframes[0].Samples)
+		for i := 0; i < nSamples; i++ {
+			var mono int64
+			for ch := 0; ch < nChannels; ch++ {
+				mono += int64(frame.Subframes[ch].Samples[i])
+			}
+			mono /= int64(nChannels)
+			samples = append(samples, float32(mono)/maxVal)
+		}
+	}
+
+	// Resample to 16kHz if needed
+	if sampleRate != 16000 {
+		samples = resampleTo16kHz(samples, sampleRate)
+	}
+
+	return samples, 16000, nil
+}
+
+// readWithEmbeddedFFmpeg uses embedded ffmpeg WASM to convert audio formats.
+// No external ffmpeg installation required.
+func (w *WhisperTranscriber) readWithEmbeddedFFmpeg(filePath string) ([]float32, int, error) {
+	ext := strings.ToLower(filepath.Ext(filePath))
+	fmt.Printf("  Converting %s using embedded ffmpeg...\n", ext)
+
+	// Create temp WAV file for output
+	tmpFile, err := os.CreateTemp("", "whisper-*.wav")
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	tmpFile.Close()
+	defer os.Remove(tmpPath)
+
+	// Get absolute paths (required for WASM filesystem)
+	absInput, err := filepath.Abs(filePath)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get absolute path: %w", err)
+	}
+	absOutput, err := filepath.Abs(tmpPath)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get absolute path: %w", err)
+	}
+
+	// Get directories for mounting
+	inputDir := filepath.Dir(absInput)
+	outputDir := filepath.Dir(absOutput)
+
+	// Run embedded ffmpeg to convert to 16kHz mono WAV
+	ctx := context.Background()
+	args := wasm.Args{
+		Stderr: io.Discard,
+		Stdout: io.Discard,
+		Args: []string{
+			"-i", absInput,
+			"-ar", "16000",
+			"-ac", "1",
+			"-c:a", "pcm_s16le",
+			"-y",
+			absOutput,
+		},
+		// Mount filesystem directories for WASM access
+		Config: func(cfg wazero.ModuleConfig) wazero.ModuleConfig {
+			cfg = cfg.WithFSConfig(wazero.NewFSConfig().
+				WithDirMount(inputDir, inputDir).
+				WithDirMount(outputDir, outputDir))
+			return cfg
+		},
+	}
+
+	rc, err := ffmpreg.Ffmpeg(ctx, args)
+	if err != nil {
+		return nil, 0, fmt.Errorf("ffmpeg WASM failed: %w", err)
+	}
+	if rc != 0 {
+		return nil, 0, fmt.Errorf("ffmpeg WASM exited with code %d", rc)
+	}
+
+	// Read the converted WAV
+	return w.readWAVSamples(tmpPath)
+}
+
+// resampleTo16kHz resamples audio to 16kHz using linear interpolation.
+// This is a simple resampler - good enough for speech recognition.
+func resampleTo16kHz(samples []float32, srcRate int) []float32 {
+	if srcRate == 16000 {
+		return samples
+	}
+
+	ratio := float64(srcRate) / 16000.0
+	newLen := int(float64(len(samples)) / ratio)
+	resampled := make([]float32, newLen)
+
+	for i := 0; i < newLen; i++ {
+		srcPos := float64(i) * ratio
+		srcIdx := int(srcPos)
+		frac := float32(srcPos - float64(srcIdx))
+
+		if srcIdx+1 < len(samples) {
+			// Linear interpolation
+			resampled[i] = samples[srcIdx]*(1-frac) + samples[srcIdx+1]*frac
+		} else if srcIdx < len(samples) {
+			resampled[i] = samples[srcIdx]
+		}
+	}
+
+	return resampled
 }
 
 // SupportsLanguage returns true - Whisper supports 99+ languages.
 func (w *WhisperTranscriber) SupportsLanguage(lang string) bool {
 	return true
+}
+
+// MaxFileSize returns 0 - local whisper.cpp has no file size limit.
+func (w *WhisperTranscriber) MaxFileSize() int64 {
+	return 0
 }

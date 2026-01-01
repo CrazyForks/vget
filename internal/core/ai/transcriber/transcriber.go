@@ -53,6 +53,10 @@ type Transcriber interface {
 
 	// Name returns the provider name.
 	Name() string
+
+	// MaxFileSize returns the maximum file size in bytes that this transcriber can handle.
+	// Returns 0 if there is no limit (e.g., local whisper.cpp).
+	MaxFileSize() int64
 }
 
 // New creates a new Transcriber based on configuration.

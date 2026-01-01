@@ -84,3 +84,8 @@ func (o *OpenAI) Transcribe(ctx context.Context, filePath string) (*Result, erro
 
 	return result, nil
 }
+
+// MaxFileSize returns 25MB - OpenAI Whisper API file size limit.
+func (o *OpenAI) MaxFileSize() int64 {
+	return 25 * 1024 * 1024 // 25MB
+}

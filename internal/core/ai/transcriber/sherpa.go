@@ -251,3 +251,8 @@ func (s *SherpaTranscriber) SupportsLanguage(lang string) bool {
 
 	return parakeetLangs[lang]
 }
+
+// MaxFileSize returns 0 - local sherpa-onnx has no file size limit.
+func (s *SherpaTranscriber) MaxFileSize() int64 {
+	return 0
+}

@@ -327,11 +327,27 @@ func (p *Pipeline) transcribeWithProgress(ctx context.Context, filePath string, 
 		progressFn = func(step ProgressStep, progress float64, detail string) {}
 	}
 
-	// Check if file needs chunking
-	needsChunking, err := p.chunker.NeedsChunking(filePath)
-	if err != nil {
-		return nil, "", err
+	// Check if transcriber has a file size limit (0 = no limit, e.g. local whisper.cpp)
+	maxSize := p.transcriber.MaxFileSize()
+	if maxSize == 0 {
+		// No file size limit - transcribe directly without chunking
+		progressFn(ProgressStepTranscribe, 0, "Transcribing...")
+
+		result, err := p.transcriber.Transcribe(ctx, filePath)
+		if err != nil {
+			return nil, "", err
+		}
+
+		progressFn(ProgressStepTranscribe, 100, "Transcription complete")
+		return result, "", nil
 	}
+
+	// Cloud API with file size limit - check if chunking is needed
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to stat file: %w", err)
+	}
+	needsChunking := info.Size() > maxSize
 
 	if !needsChunking {
 		// Direct transcription - no chunking needed
