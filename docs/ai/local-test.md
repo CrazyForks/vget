@@ -1,5 +1,11 @@
 ## Build Docker Image
 
+### Build vget base image
+
+```shell
+ocker build --no-cache -f docker/vget-base/Dockerfile -t ghcr.io/guiyumin/vget-base:latest .
+```
+
 ### CPU version (no models bundled - downloads on first use)
 
 ```shell
