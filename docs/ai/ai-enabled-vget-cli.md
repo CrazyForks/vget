@@ -12,6 +12,7 @@ This document outlines the plan for local AI capabilities in vget, enabling offl
 **vget ships as a single binary.** When AI features are used without a downloaded model, the CLI exits gracefully with a helpful message guiding the user to download the required model.
 
 This approach provides:
+
 - Simple distribution (one binary per platform)
 - Small download size for users who don't need AI features
 - Clear guidance when AI features are needed
@@ -32,15 +33,15 @@ docker run -v ~/Downloads:/downloads ghcr.io/guiyumin/vget-server
 
 ### Whisper.cpp Models
 
-| Model | Disk Size | RAM | Speed (M4 Max) | Quality | Notes |
-|-------|-----------|-----|----------------|---------|-------|
-| tiny | 78 MB | ~400 MB | ~60x real-time | Basic | Fastest, English-focused |
-| base | 148 MB | ~500 MB | ~50x real-time | Fair | Good for quick drafts |
-| small | 488 MB | ~1 GB | ~30x real-time | Good | Balanced for most uses |
-| medium | 1.5 GB | ~3 GB | ~15x real-time | Better | Higher accuracy |
-| large-v3 | 3.1 GB | ~6 GB | ~8x real-time | Best | Highest accuracy, slowest |
-| **large-v3-turbo** | **1.6 GB** | **~3 GB** | **~20x real-time** | **Best** | **✅ Default** |
-| distil-large-v3 | 756 MB | ~2 GB | ~40x real-time | Very Good | 5x faster than large-v3 |
+| Model              | Disk Size  | RAM       | Speed (M4 Max)     | Quality   | Notes                     |
+| ------------------ | ---------- | --------- | ------------------ | --------- | ------------------------- |
+| tiny               | 78 MB      | ~400 MB   | ~60x real-time     | Basic     | Fastest, English-focused  |
+| base               | 148 MB     | ~500 MB   | ~50x real-time     | Fair      | Good for quick drafts     |
+| small              | 488 MB     | ~1 GB     | ~30x real-time     | Good      | Balanced for most uses    |
+| medium             | 1.5 GB     | ~3 GB     | ~15x real-time     | Better    | Higher accuracy           |
+| large-v3           | 3.1 GB     | ~6 GB     | ~8x real-time      | Best      | Highest accuracy, slowest |
+| **large-v3-turbo** | **1.6 GB** | **~3 GB** | **~20x real-time** | **Best**  | **✅ Default**            |
+| distil-large-v3    | 756 MB     | ~2 GB     | ~40x real-time     | Very Good | 5x faster than large-v3   |
 
 **Quantized Variants** (smaller file size, slight quality trade-off):
 | Model | Full Size | Q5_0 | Q8_0 |
@@ -50,6 +51,7 @@ docker run -v ~/Downloads:/downloads ghcr.io/guiyumin/vget-server
 | large-v3-turbo | 1.6 GB | 574 MB | 874 MB |
 
 **Why large-v3-turbo is the default:**
+
 - Based on large-v3 (best quality)
 - 8x faster than large-v3
 - Same size as medium but better quality and faster
@@ -57,11 +59,11 @@ docker run -v ~/Downloads:/downloads ghcr.io/guiyumin/vget-server
 
 ### Future: NVIDIA Parakeet (CUDA Required)
 
-| Model | Params | Speed | Quality | Notes |
-|-------|--------|-------|---------|-------|
-| parakeet-tdt-0.6b-v2 | 600M | RTFx 3386 | #1 on HF leaderboard | English only, requires NVIDIA GPU |
-| parakeet-tdt-0.6b-v3 | 600M | RTFx 3000+ | Excellent | 25 European languages |
-| parakeet-1.1b | 1.1B | RTFx 2000+ | Best | Fastest on Open ASR benchmark |
+| Model                | Params | Speed      | Quality              | Notes                             |
+| -------------------- | ------ | ---------- | -------------------- | --------------------------------- |
+| parakeet-tdt-0.6b-v2 | 600M   | RTFx 3386  | #1 on HF leaderboard | English only, requires NVIDIA GPU |
+| parakeet-tdt-0.6b-v3 | 600M   | RTFx 3000+ | Excellent            | 25 European languages             |
+| parakeet-1.1b        | 1.1B   | RTFx 2000+ | Best                 | Fastest on Open ASR benchmark     |
 
 > **Note:** Parakeet models require NVIDIA GPU with CUDA. They use NeMo framework (not whisper.cpp).
 > Parakeet can transcribe 60 minutes of audio in ~1 second on A100 GPU.
@@ -69,34 +71,40 @@ docker run -v ~/Downloads:/downloads ghcr.io/guiyumin/vget-server
 
 ## CLI Interface
 
+All AI features live under the `vget ai` command:
+
 ```bash
 # Transcribe audio file
-vget transcribe audio.mp3
+vget ai transcribe audio.mp3
 
 # If model not found, exits with helpful message:
 # "Whisper model not found. Download it with:
-#   vget transcribe --download-model turbo
+#   vget ai download whisper-large-v3-turbo
 #
 # Available models:
-#   tiny     (78 MB)  - Fastest, basic quality
-#   base    (148 MB)  - Quick drafts
-#   small   (488 MB)  - Good for most uses
-#   medium  (1.5 GB)  - Higher accuracy
-#   large   (3.1 GB)  - Best accuracy, slowest
-#   turbo   (1.6 GB)  - Best quality + fast (recommended)
-#   distil  (756 MB)  - Fast, very good quality"
+#   whisper-tiny            (78 MB)  - Fastest, basic quality
+#   whisper-base           (148 MB)  - Quick drafts
+#   whisper-small          (488 MB)  - Good for most uses
+#   whisper-medium         (1.5 GB)  - Higher accuracy
+#   whisper-large-v3       (3.1 GB)  - Best accuracy, slowest
+#   whisper-large-v3-turbo (1.6 GB)  - Best quality + fast (recommended)
+#   whisper-distil-large-v3 (756 MB) - Fast, very good quality"
 
 # Download a model
-vget transcribe --download-model turbo
+vget ai download whisper-large-v3-turbo
 
 # Transcribe with specific model
-vget transcribe audio.mp3 --model medium
+vget ai transcribe audio.mp3 --model whisper-medium
 
 # Transcribe with language hint
-vget transcribe audio.mp3 --language zh
+vget ai transcribe audio.mp3 --language zh
 
 # List available/downloaded models
-vget transcribe --list-models
+vget ai models
+
+# Future: Text-to-speech
+vget ai speak "Hello world" --voice alloy
+vget ai speak transcript.txt -o output.mp3
 ```
 
 ## Model Storage
@@ -107,33 +115,21 @@ Models are stored in the user's config directory:
 ~/.config/vget/
 ├── config.yml
 └── models/
-    └── ggml-large-v3-turbo.bin  (1.5 GB)
+    └── whisper-large-v3-turbo.bin  (1.6 GB)
 ```
 
 ## Model Download URLs
 
-Models are downloaded from Hugging Face:
+Models are hosted on our own CDN (Cloudflare R2):
 
 ```bash
-# Base URL
-BASE=https://huggingface.co/ggerganov/whisper.cpp/resolve/main
+BASE=https://models.vget.app
 
-# Full precision models
-$BASE/ggml-tiny.bin              # 78 MB
-$BASE/ggml-base.bin              # 148 MB
-$BASE/ggml-small.bin             # 488 MB
-$BASE/ggml-medium.bin            # 1.5 GB
-$BASE/ggml-large-v3.bin          # 3.1 GB
-$BASE/ggml-large-v3-turbo.bin    # 1.6 GB (default)
-
-# Quantized models (smaller, slightly lower quality)
-$BASE/ggml-medium-q5_0.bin       # 539 MB
-$BASE/ggml-large-v3-q5_0.bin     # 1.08 GB
-$BASE/ggml-large-v3-turbo-q5_0.bin  # 574 MB
-
-# Distil model (different repo)
-https://huggingface.co/distil-whisper/distil-large-v3-ggml/resolve/main/ggml-distil-large-v3.bin
+$BASE/whisper-large-v3-turbo.bin    # 1.6 GB (default)
+$BASE/whisper-small.bin             # 488 MB
 ```
+
+This ensures reliable downloads for all users regardless of region.
 
 ## Build Configuration
 
@@ -189,31 +185,40 @@ jobs:
 
 ## Implementation Plan
 
-### Phase 1: CLI Transcribe Command
-1. Add `vget transcribe` command
-2. Check for model in `~/.config/vget/models/`
-3. If model missing: exit 0 with download instructions
-4. If model exists: run transcription
+### Phase 1: `vget ai` Command Structure
+
+1. Add `vget ai` parent command
+2. Add `vget ai transcribe` subcommand
+3. Check for model in `~/.config/vget/models/`
+4. If model missing: exit 0 with download instructions
+5. If model exists: run transcription
 
 ### Phase 2: Model Management
-1. Implement `--download-model <name>` with progress bar
-2. Implement `--list-models` to show available/downloaded models
-3. Support `--model` flag to select model
+
+1. Add `vget ai download <model>` with progress bar
+2. Add `vget ai models` to list available/downloaded models
+3. Support `--model` flag for transcribe
 4. Support `--language` flag for language hint
 
 ### Phase 3: Server Integration
+
 1. vget-server continues to use Docker with whisper.cpp
 2. Add option for server to use downloaded models from `~/.config/vget/models/`
+
+### Phase 4: Text-to-Speech (Future)
+
+1. Add `vget ai speak` subcommand
+2. Support multiple TTS backends (local models, API)
 
 ## Performance Expectations
 
 For 90 minutes of audio (with Metal acceleration):
 
-| Platform | Model | Expected Time |
-|----------|-------|---------------|
-| M4 Max (Metal) | turbo | 4-8 min |
-| M4 Max (Metal) | medium | 5-10 min |
-| M1 (Metal) | turbo | 8-12 min |
+| Platform       | Model  | Expected Time |
+| -------------- | ------ | ------------- |
+| M4 Max (Metal) | turbo  | 4-8 min       |
+| M4 Max (Metal) | medium | 5-10 min      |
+| M1 (Metal)     | turbo  | 8-12 min      |
 
 Note: CPU-only transcription is significantly slower (10-20x slower than Metal).
 
