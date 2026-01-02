@@ -19,56 +19,57 @@ See [ai-powered-vget-prd.md](./ai-powered-vget-prd.md) for shared concepts.
 
 ---
 
-## Multi-Image Architecture
+## Runtime Detection Strategy
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  vget-base (build base)                                         │
-│  ├── :latest  - CPU (golang:1.23-bookworm)                      │
-│  └── :cuda    - CUDA 12.6 (nvidia/cuda:12.6.3-devel)            │
+│                    vget Docker Image                            │
 │                                                                 │
-│  Contains: Go 1.23, sherpa-onnx libs, whisper.cpp libs          │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  vget (application)                                             │
-│                                                                 │
-│  CPU variants:                                                  │
-│  ├── :latest       - No models (~500MB)                         │
-│  ├── :small        - Parakeet + Whisper Small (~1.2GB)          │
-│  ├── :medium       - Parakeet + Whisper Medium (~2.0GB)         │
-│  └── :large        - Parakeet + Whisper Large Turbo (~2.3GB)    │
-│                                                                 │
-│  CUDA variants:                                                 │
-│  ├── :cuda         - No models + CUDA runtime                   │
-│  ├── :cuda-small   - Parakeet + Whisper Small + CUDA            │
-│  ├── :cuda-medium  - Parakeet + Whisper Medium + CUDA           │
-│  └── :cuda-large   - Parakeet + Whisper Large Turbo + CUDA      │
+│  On startup:                                                    │
+│  ├── Detect NVIDIA GPU (nvidia-smi)                             │
+│  │   ├── GPU found → Enable local transcription                 │
+│  │   │               • whisper.cpp (CUDA) - 99 languages        │
+│  │   │               • sherpa-onnx Parakeet (CUDA) - fast EU    │
+│  │   │                                                          │
+│  │   └── No GPU → API mode only                                 │
+│  │                (OpenAI Whisper API, Groq, etc.)              │
+│  │                                                              │
+│  └── Show capability status in Web UI                           │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+### Why No CPU-Only Local Transcription?
+
+Local CPU transcription is **impractically slow**:
+- 1-hour audio → ~2-4 hours on typical NAS CPU
+- Memory intensive (requires 4-8GB RAM for large models)
+- Poor user experience
+
+API-based transcription is **fast and cost-effective**:
+- 1-hour audio → ~2-3 minutes via API
+- OpenAI Whisper API: ~$0.36/hour of audio
+- Groq: Free tier available
 
 ### Image Variants
 
-| Tag | Models | Size | Best For |
-|-----|--------|------|----------|
-| `:latest` | None | ~500MB | Download models on first use |
-| `:small` | Parakeet V3 + Whisper Small | ~1.2GB | NAS <8GB RAM |
-| `:medium` | Parakeet V3 + Whisper Medium | ~2.0GB | 8-16GB RAM |
-| `:large` | Parakeet V3 + Whisper Large Turbo | ~2.3GB | Best accuracy |
-| `:cuda-*` | Same as above + CUDA | +2GB | NVIDIA GPU |
+| Tag | Description | Size | Best For |
+|-----|-------------|------|----------|
+| `:latest` | API mode + GPU auto-detect | ~300MB | Most users (NAS) |
+| `:cuda` | Whisper + Parakeet + CUDA | ~2.8GB | NVIDIA GPU users |
 
 ---
 
 ## Docker Usage
 
-### Basic Usage (CPU)
+### Standard Usage (API Mode)
+
+For most users without NVIDIA GPU (typical NAS):
 
 ```yaml
 # compose.yml
 services:
   vget:
-    image: ghcr.io/guiyumin/vget:medium
+    image: ghcr.io/guiyumin/vget:latest
     ports:
       - "8080:8080"
     volumes:
@@ -76,12 +77,19 @@ services:
       - ./downloads:/home/vget/downloads
 ```
 
+Configure AI API in Web UI Settings:
+- OpenAI Whisper API (recommended)
+- Groq (free tier)
+- Other compatible APIs
+
 ### GPU Usage (NVIDIA CUDA)
+
+For users with NVIDIA GPU:
 
 ```yaml
 services:
   vget:
-    image: ghcr.io/guiyumin/vget:cuda-large
+    image: ghcr.io/guiyumin/vget:cuda
     ports:
       - "8080:8080"
     volumes:
@@ -95,6 +103,8 @@ services:
               count: 1
               capabilities: [gpu]
 ```
+
+GPU is auto-detected. If available, local models are used. If not, falls back to API mode.
 
 ### Environment Variables
 
@@ -302,68 +312,27 @@ Let me give you an example of how this works in practice...
 
 ## Dockerfile
 
-### Base Image
-
-```dockerfile
-# Dockerfile.base
-FROM golang:1.23-bookworm AS base
-
-# Install build dependencies
-RUN apt-get update && apt-get install -y \
-    cmake \
-    libopenblas-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Build sherpa-onnx
-RUN git clone --depth 1 https://github.com/k2-fsa/sherpa-onnx && \
-    cd sherpa-onnx && \
-    cmake -B build -DCMAKE_BUILD_TYPE=Release && \
-    cmake --build build && \
-    cmake --install build
-
-# Build whisper.cpp
-RUN git clone --depth 1 https://github.com/ggerganov/whisper.cpp && \
-    cd whisper.cpp && \
-    cmake -B build -DCMAKE_BUILD_TYPE=Release && \
-    cmake --build build && \
-    cmake --install build
-```
-
-### Application Image
+### Standard Image (API Mode)
 
 ```dockerfile
 # Dockerfile
-ARG BASE_IMAGE=ghcr.io/guiyumin/vget-base:latest
-ARG MODEL_VARIANT=none
-
-FROM ${BASE_IMAGE} AS builder
+FROM golang:1.23-bookworm AS builder
 
 WORKDIR /app
 COPY . .
 
-RUN go build -o vget ./cmd/vget
+# Build without CGO (no local ASR libraries needed for API mode)
+RUN CGO_ENABLED=0 go build -o vget ./cmd/vget
 
-# Final image
+# Final image - minimal
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y \
     ffmpeg \
-    libopenblas0 \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/vget /usr/local/bin/vget
-COPY --from=builder /usr/local/lib/lib*.so* /usr/local/lib/
-
-# Download models based on variant
-ARG MODEL_VARIANT
-RUN if [ "$MODEL_VARIANT" != "none" ]; then \
-      vget ai download parakeet-v3-int8; \
-      case "$MODEL_VARIANT" in \
-        small) vget ai download whisper-small ;; \
-        medium) vget ai download whisper-medium ;; \
-        large) vget ai download whisper-large-v3-turbo ;; \
-      esac; \
-    fi
 
 # Create non-root user
 RUN useradd -m -u 1000 vget
@@ -374,12 +343,47 @@ EXPOSE 8080
 CMD ["vget", "server"]
 ```
 
-### Build Args
+### CUDA Image (Local Transcription)
 
-| Arg | Values | Description |
-|-----|--------|-------------|
-| `BASE_IMAGE` | vget-base:latest, vget-base:cuda | Base image |
-| `MODEL_VARIANT` | none, small, medium, large | Bundle models |
+```dockerfile
+# Dockerfile.cuda
+FROM nvidia/cuda:12.6.3-runtime-ubuntu22.04 AS base
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy pre-built vget with CUDA support
+COPY --from=builder /app/vget /usr/local/bin/vget
+
+# Bundle both engines
+RUN vget ai download whisper-large-v3-turbo && \
+    vget ai download parakeet-v3
+
+# Create non-root user
+RUN useradd -m -u 1000 vget
+USER vget
+WORKDIR /home/vget
+
+EXPOSE 8080
+CMD ["vget", "server"]
+```
+
+### GPU Detection at Runtime
+
+```go
+// internal/core/ai/gpu.go
+func DetectGPU() bool {
+    // Check for NVIDIA GPU
+    cmd := exec.Command("nvidia-smi", "--query-gpu=name", "--format=csv,noheader")
+    if err := cmd.Run(); err == nil {
+        return true
+    }
+    return false
+}
+```
 
 ---
 
@@ -387,46 +391,44 @@ CMD ["vget", "server"]
 
 | Error | Behavior |
 |-------|----------|
-| No models installed | Show install prompt in UI |
-| Transcription fails | Mark step failed, show error in UI |
+| No API key configured | Show setup prompt in UI, link to Settings |
+| No GPU + no API key | Show clear message: "Configure API key or use NVIDIA GPU" |
+| Transcription API error | Retry with backoff, show error details |
 | Chunk fails | Skip chunk, warn user, continue |
 | Translation API error | Retry with backoff, fallback to partial |
 | Disk space low | Check before job, warn user |
-| GPU not available | Fallback to CPU, warn user |
 
 ---
 
 ## Implementation Phases
 
 ### Phase 1: Core Docker Setup
-- [ ] Base image with runtime libraries
-- [ ] Application image with model variants
+- [ ] Standard image (API mode, CGO_ENABLED=0)
+- [ ] CUDA image with bundled models
 - [ ] GitHub Actions for image builds
 
 ### Phase 2: Web UI
-- [ ] File browser integration
+- [ ] AI capability status indicator (GPU/API)
+- [ ] API key configuration in Settings
 - [ ] Processing configuration UI
 - [ ] Real-time progress stepper
 - [ ] Result viewer
 
-### Phase 3: API
-- [ ] Job management endpoints
-- [ ] Model management endpoints
-- [ ] WebSocket for progress updates
-
-### Phase 4: GPU Support
-- [ ] CUDA base image
-- [ ] GPU detection and fallback
-- [ ] Performance optimization
+### Phase 3: Runtime Detection
+- [ ] GPU detection on startup
+- [ ] Automatic mode selection (local vs API)
+- [ ] Clear messaging in UI about current mode
 
 ---
 
 ## Success Criteria
 
 1. `docker compose up` starts working web UI
-2. File selection and processing works
-3. Progress is visible in real-time
-4. Transcripts are accurate with timestamps
-5. GPU acceleration works when available
-6. Errors are clear and actionable
-7. Image sizes are reasonable (<2.5GB with models)
+2. UI clearly shows AI mode (GPU local / API)
+3. API configuration is intuitive in Settings
+4. File selection and processing works
+5. Progress is visible in real-time
+6. Transcripts are accurate with timestamps
+7. GPU auto-detection works correctly
+8. Errors are clear and actionable
+9. Standard image is small (~300MB)
