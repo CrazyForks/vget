@@ -86,3 +86,32 @@ func (q *Qwen) Summarize(ctx context.Context, text string) (*Result, error) {
 	// Parse response
 	return parseResponse(content), nil
 }
+
+// Translate translates the text to the target language using Qwen.
+func (q *Qwen) Translate(ctx context.Context, text string, targetLang string) (string, error) {
+	// Truncate text if too long
+	maxChars := 100000
+	if len(text) > maxChars {
+		text = text[:maxChars] + "\n\n[Text truncated due to length...]"
+	}
+
+	prompt := fmt.Sprintf("Translate the following text to %s. Preserve the original formatting, structure, and any timestamps. Only output the translated text, no explanations.\n\n%s", targetLang, text)
+
+	resp, err := q.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Model: openai.ChatModel(q.model),
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.UserMessage(prompt),
+		},
+		MaxTokens:   openai.Int(8000),
+		Temperature: openai.Float(0.3),
+	})
+	if err != nil {
+		return "", fmt.Errorf("translation API error: %w", err)
+	}
+
+	if len(resp.Choices) == 0 {
+		return "", fmt.Errorf("no response from API")
+	}
+
+	return resp.Choices[0].Message.Content, nil
+}

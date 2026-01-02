@@ -320,6 +320,21 @@ func (p *Pipeline) SummarizeText(ctx context.Context, text string, originalFileP
 	}, nil
 }
 
+// TranslateText translates text to the target language using the summarizer/LLM.
+func (p *Pipeline) TranslateText(ctx context.Context, text string, targetLang string) (string, error) {
+	if p.summarizer == nil {
+		return "", fmt.Errorf("translation requires an AI account\nRun: vget ai config")
+	}
+
+	// Use the summarizer's Translate method
+	translated, err := p.summarizer.Translate(ctx, text, targetLang)
+	if err != nil {
+		return "", fmt.Errorf("translation failed: %w", err)
+	}
+
+	return translated, nil
+}
+
 // transcribeWithProgress handles transcription with progress reporting.
 func (p *Pipeline) transcribeWithProgress(ctx context.Context, filePath string, progressFn ProgressCallback) (*transcriber.Result, string, error) {
 	// No-op progress function if not provided

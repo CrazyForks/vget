@@ -194,12 +194,17 @@ ui:
   ai_select_file_for_outputs: "파일을 선택하여 출력을 확인하세요."
   ai_language: "언어"
   ai_select_language: "언어 선택"
+  ai_output_format: "출력 형식"
+  ai_translate_to: "번역 대상"
+  ai_no_translation: "번역 안 함"
+  ai_translation_requires_account: "번역에는 AI 계정이 필요합니다"
   # AI 단계 이름
   ai_step_extract_audio: "오디오 추출"
   ai_step_compress_audio: "오디오 압축"
   ai_step_chunk_audio: "오디오 분할"
   ai_step_transcribe: "전사"
   ai_step_merge: "청크 병합"
+  ai_step_translate: "번역"
   ai_step_summarize: "요약 생성"
   # AI 단계 상세
   ai_detail_already_audio: "이미 오디오"

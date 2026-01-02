@@ -156,7 +156,9 @@ export function useProcessing() {
       summarizationModel: string,
       includeSummary: boolean,
       pin?: string,
-      language?: string
+      language?: string,
+      outputFormat?: string,
+      translateTo?: string
     ) => {
       try {
         const res = await startAIProcessing({
@@ -167,6 +169,8 @@ export function useProcessing() {
           pin,
           include_summary: includeSummary,
           language: language,
+          output_format: outputFormat,
+          translate_to: translateTo,
         });
 
         if (res.code === 200 && res.data?.job_id) {

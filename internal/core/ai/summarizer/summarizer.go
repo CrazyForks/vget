@@ -19,6 +19,9 @@ type Summarizer interface {
 	// Summarize generates a summary from the given text.
 	Summarize(ctx context.Context, text string) (*Result, error)
 
+	// Translate translates the text to the target language.
+	Translate(ctx context.Context, text string, targetLang string) (string, error)
+
 	// Name returns the provider name.
 	Name() string
 }

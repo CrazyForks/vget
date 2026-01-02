@@ -47,7 +47,7 @@ export function Sidebar({ lang }: SidebarProps) {
     {
       icon: <FaWandMagicSparkles />,
       label: t.ai,
-      show: false, // Hidden until CLI AI features are stable
+      show: true,
       children: [
         {
           to: "/ai/speech-to-text",

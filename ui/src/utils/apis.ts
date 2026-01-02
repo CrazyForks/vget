@@ -541,6 +541,8 @@ export async function startAIProcessing(params: {
   pin?: string;
   include_summary: boolean;
   language?: string; // Language code for transcription (e.g., "zh", "en", "auto")
+  output_format?: string; // Output format: "md", "srt", "vtt", "txt"
+  translate_to?: string; // Target language for translation (e.g., "en", "zh")
 }): Promise<ApiResponse<{ job_id: string; status: AIJobStatus }>> {
   const res = await fetch("/api/ai/process", {
     method: "POST",

@@ -81,6 +81,33 @@ func (o *OpenAI) Summarize(ctx context.Context, text string) (*Result, error) {
 	return parseResponse(content), nil
 }
 
+// Translate translates the text to the target language using OpenAI GPT.
+func (o *OpenAI) Translate(ctx context.Context, text string, targetLang string) (string, error) {
+	// Truncate text if too long
+	maxChars := 100000
+	if len(text) > maxChars {
+		text = text[:maxChars] + "\n\n[Text truncated due to length...]"
+	}
+
+	prompt := fmt.Sprintf("Translate the following text to %s. Preserve the original formatting, structure, and any timestamps. Only output the translated text, no explanations.\n\n%s", targetLang, text)
+
+	resp, err := o.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Model: o.model,
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.UserMessage(prompt),
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("translation API error: %w", err)
+	}
+
+	if len(resp.Choices) == 0 {
+		return "", fmt.Errorf("no response from API")
+	}
+
+	return strings.TrimSpace(resp.Choices[0].Message.Content), nil
+}
+
 // parseResponse extracts summary and key points from the response.
 func parseResponse(content string) *Result {
 	trimmed := strings.TrimSpace(content)

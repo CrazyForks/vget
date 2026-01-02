@@ -83,3 +83,39 @@ func (a *Anthropic) Summarize(ctx context.Context, text string) (*Result, error)
 	// Parse response
 	return parseResponse(content), nil
 }
+
+// Translate translates the text to the target language using Anthropic Claude.
+func (a *Anthropic) Translate(ctx context.Context, text string, targetLang string) (string, error) {
+	// Truncate text if too long
+	maxChars := 150000
+	if len(text) > maxChars {
+		text = text[:maxChars] + "\n\n[Text truncated due to length...]"
+	}
+
+	prompt := fmt.Sprintf("Translate the following text to %s. Preserve the original formatting, structure, and any timestamps. Only output the translated text, no explanations.\n\n%s", targetLang, text)
+
+	message, err := a.client.Messages.New(ctx, anthropic.MessageNewParams{
+		Model:     anthropic.Model(a.model),
+		MaxTokens: 8000,
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock(prompt)),
+		},
+	})
+	if err != nil {
+		return "", fmt.Errorf("translation API error: %w", err)
+	}
+
+	// Extract text from response
+	var content string
+	for _, block := range message.Content {
+		if block.Type == "text" {
+			content += block.Text
+		}
+	}
+
+	if content == "" {
+		return "", fmt.Errorf("no response from API")
+	}
+
+	return content, nil
+}

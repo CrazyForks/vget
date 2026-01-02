@@ -206,12 +206,17 @@ ui:
   ai_select_file_for_outputs: "Select a file to see available outputs."
   ai_language: "Language"
   ai_select_language: "Select Language"
+  ai_output_format: "Output Format"
+  ai_translate_to: "Translate To"
+  ai_no_translation: "No Translation"
+  ai_translation_requires_account: "Translation requires an AI account"
   # AI step names
   ai_step_extract_audio: "Extract Audio"
   ai_step_compress_audio: "Compress Audio"
   ai_step_chunk_audio: "Chunk Audio"
   ai_step_transcribe: "Transcribe"
   ai_step_merge: "Merge Chunks"
+  ai_step_translate: "Translate"
   ai_step_summarize: "Generate Summary"
   # AI step details
   ai_detail_already_audio: "Already audio"

@@ -242,6 +242,7 @@ type UITranslations struct {
 	AIStepChunkAudio    string `yaml:"ai_step_chunk_audio" json:"ai_step_chunk_audio"`
 	AIStepTranscribe    string `yaml:"ai_step_transcribe" json:"ai_step_transcribe"`
 	AIStepMerge         string `yaml:"ai_step_merge" json:"ai_step_merge"`
+	AIStepTranslate     string `yaml:"ai_step_translate" json:"ai_step_translate"`
 	AIStepSummarize     string `yaml:"ai_step_summarize" json:"ai_step_summarize"`
 	// AI step details
 	AIDetailAlreadyAudio          string `yaml:"ai_detail_already_audio" json:"ai_detail_already_audio"`

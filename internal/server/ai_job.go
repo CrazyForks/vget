@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/guiyumin/vget/internal/core/ai"
+	"github.com/guiyumin/vget/internal/core/ai/output"
 	"github.com/guiyumin/vget/internal/core/config"
 	"github.com/guiyumin/vget/internal/core/i18n"
 )
@@ -47,6 +48,7 @@ const (
 	StepChunk        StepKey = "chunk_audio"
 	StepTranscribe   StepKey = "transcribe"
 	StepMerge        StepKey = "merge"
+	StepTranslate    StepKey = "translate"
 	StepSummarize    StepKey = "summarize"
 )
 
@@ -55,9 +57,10 @@ var stepWeights = map[StepKey]float64{
 	StepExtractAudio: 0.05,
 	StepCompress:     0.10,
 	StepChunk:        0.05,
-	StepTranscribe:   0.55,
+	StepTranscribe:   0.50,
 	StepMerge:        0.10,
-	StepSummarize:    0.15,
+	StepTranslate:    0.10,
+	StepSummarize:    0.10,
 }
 
 // AIJobStep represents a single processing step
@@ -103,6 +106,8 @@ type AIJob struct {
 	includeSummary      bool               `json:"-"`
 	useLocalASR         bool               `json:"-"`
 	language            string             `json:"-"`
+	outputFormat        string             `json:"-"` // md, srt, vtt, txt
+	translateTo         string             `json:"-"` // Target language for translation
 }
 
 // AIJobRequest is the request to start an AI processing job
@@ -113,7 +118,9 @@ type AIJobRequest struct {
 	SummarizationModel string `json:"summarization_model"`
 	PIN                string `json:"pin"`
 	IncludeSummary     bool   `json:"include_summary"`
-	Language           string `json:"language"` // Language code for transcription (e.g., "zh", "en", "auto")
+	Language           string `json:"language"`      // Language code for transcription (e.g., "zh", "en", "auto")
+	OutputFormat       string `json:"output_format"` // Output format: "md", "srt", "vtt", "txt" (default: "md")
+	TranslateTo        string `json:"translate_to"`  // Target language for translation (e.g., "en", "zh")
 }
 
 // isLocalModel returns true if the model is a local ASR model (whisper.cpp or sherpa-onnx)
@@ -225,7 +232,13 @@ func (q *AIJobQueue) AddJob(req AIJobRequest) (*AIJob, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Initialize steps based on file type and options
-	steps := q.initializeSteps(req.FilePath, req.IncludeSummary)
+	steps := q.initializeSteps(req.FilePath, req.IncludeSummary, req.TranslateTo)
+
+	// Default output format to markdown
+	outputFormat := req.OutputFormat
+	if outputFormat == "" {
+		outputFormat = "md"
+	}
 
 	job := &AIJob{
 		ID:                 id,
@@ -245,6 +258,8 @@ func (q *AIJobQueue) AddJob(req AIJobRequest) (*AIJob, error) {
 		includeSummary:     req.IncludeSummary,
 		useLocalASR:        isLocalModel(req.TranscriptionModel),
 		language:           req.Language,
+		outputFormat:       outputFormat,
+		translateTo:        req.TranslateTo,
 	}
 
 	// Calculate initial overall progress (for resume capability)
@@ -268,7 +283,7 @@ func (q *AIJobQueue) AddJob(req AIJobRequest) (*AIJob, error) {
 }
 
 // initializeSteps creates the step list based on options and existing artifacts
-func (q *AIJobQueue) initializeSteps(filePath string, includeSummary bool) []AIJobStep {
+func (q *AIJobQueue) initializeSteps(filePath string, includeSummary bool, translateTo string) []AIJobStep {
 	// Check for existing artifacts to enable resume capability
 	basePath := strings.TrimSuffix(filePath, filepath.Ext(filePath))
 	transcriptPath := basePath + ".transcript.md"
@@ -294,6 +309,16 @@ func (q *AIJobQueue) initializeSteps(filePath string, includeSummary bool) []AIJ
 			steps[i].Status = StepStatusCompleted
 			steps[i].Progress = 100
 		}
+	}
+
+	// Add translation step if requested
+	if translateTo != "" {
+		steps = append(steps, AIJobStep{
+			Key:      StepTranslate,
+			Name:     t.UI.AIStepTranslate,
+			Status:   StepStatusPending,
+			Progress: 0,
+		})
 	}
 
 	if includeSummary {
@@ -581,6 +606,45 @@ func (q *AIJobQueue) executeWithProgress(ctx context.Context, pipeline *ai.Pipel
 		if pipelineResult.Transcript != nil {
 			result.RawText = pipelineResult.Transcript.RawText
 			transcriptText = pipelineResult.Transcript.RawText
+
+			// Write transcript in requested output format (if not md)
+			if job.outputFormat != "" && job.outputFormat != "md" {
+				outputPath, err := output.WriteTranscriptWithFormat(basePath, job.FilePath, job.outputFormat, pipelineResult.Transcript)
+				if err != nil {
+					return nil, fmt.Errorf("failed to write transcript in %s format: %w", job.outputFormat, err)
+				}
+				result.TranscriptPath = outputPath
+			}
+		}
+	}
+
+	// Check for cancellation before translation
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	// Translation step (if requested)
+	if job.translateTo != "" && transcriptText != "" {
+		q.startStep(job.ID, StepTranslate)
+		progressFn(StepTranslate, 0, "")
+
+		// Translate using the summarizer/LLM
+		translatedText, err := pipeline.TranslateText(ctx, transcriptText, job.translateTo)
+		if err != nil {
+			return nil, fmt.Errorf("translation failed: %w", err)
+		}
+
+		progressFn(StepTranslate, 100, "")
+		q.completeStep(job.ID, StepTranslate)
+
+		// Update transcript text for summarization
+		transcriptText = translatedText
+		result.RawText = translatedText
+
+		// Write translated transcript
+		translatedPath := basePath + ".translated." + job.translateTo + ".txt"
+		if err := os.WriteFile(translatedPath, []byte(translatedText), 0644); err != nil {
+			return nil, fmt.Errorf("failed to write translated transcript: %w", err)
 		}
 	}
 
@@ -589,7 +653,7 @@ func (q *AIJobQueue) executeWithProgress(ctx context.Context, pipeline *ai.Pipel
 		return nil, ctx.Err()
 	}
 
-	// Step 6: Summary (with resume support)
+	// Summary step (with resume support)
 	if job.includeSummary {
 		summaryDone := q.isStepCompleted(job.ID, StepSummarize)
 

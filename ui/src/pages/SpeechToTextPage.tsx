@@ -50,6 +50,8 @@ export function SpeechToTextPage() {
   const [summarizationSelection, setSummarizationSelection] = useState("");
   const [includeSummary, setIncludeSummary] = useState(true);
   const [language, setLanguage] = useState("auto"); // Language for transcription
+  const [outputFormat, setOutputFormat] = useState("md"); // Output format: md, srt, vtt, txt
+  const [translateTo, setTranslateTo] = useState(""); // Target language for translation (empty = no translation)
 
   // Local ASR capabilities
   const [localASRCapabilities, setLocalASRCapabilities] =
@@ -326,7 +328,9 @@ export function SpeechToTextPage() {
       summarization.model,
       includeSummary,
       pinToUse,
-      language
+      language,
+      outputFormat,
+      translateTo || undefined
     );
 
     if (!result.success) {
@@ -529,6 +533,55 @@ export function SpeechToTextPage() {
                 className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500 cursor-pointer"
               />
             </div>
+          </div>
+
+          {/* Right: Output Options */}
+          <div className="space-y-3">
+            {/* Output Format */}
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-sm text-zinc-600 dark:text-zinc-400 w-fit">
+                {t.ai_output_format || "Output Format"}:
+              </label>
+              <select
+                value={outputFormat}
+                onChange={(e) => setOutputFormat(e.target.value)}
+                className={clsx(selectClass, "flex-1")}
+                disabled={isProcessing}
+              >
+                <option value="md">Markdown (.md)</option>
+                <option value="srt">SRT Subtitles (.srt)</option>
+                <option value="vtt">WebVTT (.vtt)</option>
+                <option value="txt">Plain Text (.txt)</option>
+              </select>
+            </div>
+
+            {/* Translate To */}
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-sm text-zinc-600 dark:text-zinc-400 w-fit">
+                {t.ai_translate_to || "Translate To"}:
+              </label>
+              <select
+                value={translateTo}
+                onChange={(e) => setTranslateTo(e.target.value)}
+                className={clsx(selectClass, "flex-1")}
+                disabled={isProcessing || !hasAIAccount}
+                title={!hasAIAccount ? "Requires AI account for translation" : ""}
+              >
+                <option value="">{t.ai_no_translation || "No Translation"}</option>
+                <option value="en">English</option>
+                <option value="zh">Chinese (中文)</option>
+                <option value="ja">Japanese (日本語)</option>
+                <option value="ko">Korean (한국어)</option>
+                <option value="es">Spanish (Español)</option>
+                <option value="fr">French (Français)</option>
+                <option value="de">German (Deutsch)</option>
+              </select>
+            </div>
+            {!hasAIAccount && translateTo === "" && (
+              <p className="text-xs text-zinc-400">
+                {t.ai_translation_requires_account || "Translation requires an AI account"}
+              </p>
+            )}
           </div>
         </div>
 
