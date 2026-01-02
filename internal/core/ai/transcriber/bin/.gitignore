@@ -1,5 +1,11 @@
-# Whisper binaries are built by GitHub Actions and embedded during release.
+# AI binaries are built by GitHub Actions and embedded during release.
 # These placeholder files allow local development.
-# AI features only available on: macOS ARM64 (Metal), Windows AMD64 (CUDA)
+# AI features only available on: macOS ARM64 (Metal/CoreML), Windows AMD64 (CUDA)
+
+# whisper.cpp binaries
 whisper-darwin-arm64
 whisper-windows-amd64.exe
+
+# sherpa-onnx binaries
+sherpa-darwin-arm64
+sherpa-windows-amd64.exe

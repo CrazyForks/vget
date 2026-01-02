@@ -27,6 +27,27 @@ type ASRModel struct {
 
 // ASRModels lists available models.
 var ASRModels = []ASRModel{
+	// Parakeet models via sherpa-onnx (ONNX format, 25 EU languages)
+	{
+		Name:        "parakeet-v3",
+		Engine:      "sherpa",
+		DirName:     "sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8",
+		Size:        "630MB",
+		Description: "25 European languages, fast",
+		URL:         "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2",
+		Languages:   25,
+		IsFile:      false, // Directory-based model
+	},
+	{
+		Name:        "parakeet-v2",
+		Engine:      "sherpa",
+		DirName:     "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8",
+		Size:        "630MB",
+		Description: "English only, fast",
+		URL:         "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8.tar.bz2",
+		Languages:   1,
+		IsFile:      false, // Directory-based model
+	},
 	// Whisper models via whisper.cpp (ggml format)
 	{
 		Name:        "whisper-tiny",
@@ -442,13 +463,28 @@ type ASRModelInfo struct {
 	Downloaded  bool   `json:"downloaded"`
 }
 
+// Parakeet supported languages (25 European languages)
+var parakeetLangs = map[string]bool{
+	"bg": true, "hr": true, "cs": true, "da": true, "nl": true,
+	"en": true, "et": true, "fi": true, "fr": true, "de": true,
+	"el": true, "hu": true, "it": true, "lv": true, "lt": true,
+	"mt": true, "pl": true, "pt": true, "ro": true, "sk": true,
+	"sl": true, "es": true, "sv": true, "ru": true, "uk": true,
+}
+
 // RecommendModel recommends a model based on language.
+// For EU languages, parakeet-v3 is faster; for others, use whisper.
 func RecommendModel(language string) string {
-	// All languages use the default whisper model
+	if parakeetLangs[language] {
+		return "parakeet-v3"
+	}
 	return DefaultModel
 }
 
 // RecommendEngine recommends an engine based on language.
 func RecommendEngine(language string) string {
+	if parakeetLangs[language] {
+		return "sherpa"
+	}
 	return "whisper"
 }

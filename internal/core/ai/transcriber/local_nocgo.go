@@ -9,8 +9,10 @@ import (
 	"github.com/guiyumin/vget/internal/core/config"
 )
 
-// NewLocal creates a local transcriber using embedded whisper.cpp binary.
-// This works without CGO by using exec.Command to run the embedded whisper binary.
+// NewLocal creates a local transcriber using embedded binaries.
+// This works without CGO by using exec.Command to run embedded binaries:
+// - whisper-* models → whisper.cpp (Metal on macOS, CUDA on Windows)
+// - parakeet-* models → sherpa-onnx (CoreML on macOS, CUDA on Windows)
 func NewLocal(cfg config.LocalASRConfig) (Transcriber, error) {
 	modelsDir := cfg.ModelsDir
 	if modelsDir == "" {
@@ -31,13 +33,16 @@ func NewLocal(cfg config.LocalASRConfig) (Transcriber, error) {
 	fmt.Printf("  Using Model: %q\n", model)
 	fmt.Printf("  Models Dir: %s\n", modelsDir)
 
-	// Only whisper models are supported in non-CGO builds
-	if !strings.HasPrefix(model, "whisper") {
-		return nil, fmt.Errorf("only whisper models are supported in CGO_ENABLED=0 builds (got %q)", model)
+	// Route to appropriate engine based on model name
+	if strings.HasPrefix(model, "whisper") {
+		fmt.Printf("  Using Engine: whisper.cpp (embedded binary)\n")
+		fmt.Printf("=========================================\n")
+		return NewWhisperRunnerFromConfig(cfg, modelsDir)
+	} else if strings.HasPrefix(model, "parakeet") {
+		fmt.Printf("  Using Engine: sherpa-onnx (embedded binary)\n")
+		fmt.Printf("=========================================\n")
+		return NewSherpaRunnerFromConfig(cfg, modelsDir)
 	}
 
-	fmt.Printf("  Using Engine: whisper.cpp (embedded binary)\n")
-	fmt.Printf("=========================================\n")
-
-	return NewWhisperRunnerFromConfig(cfg, modelsDir)
+	return nil, fmt.Errorf("unsupported model: %q (supported: whisper-*, parakeet-*)", model)
 }

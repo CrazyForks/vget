@@ -57,10 +57,75 @@ jobs:
           name: whisper-windows-amd64
           path: internal/core/ai/transcriber/bin/whisper-windows-amd64.exe
 
+  # Build sherpa-onnx for Parakeet models
+  # macOS ARM64: CPU (onnxruntime has CoreML via ANE)
+  # Windows AMD64: CUDA GPU acceleration
+  build-sherpa-darwin-arm64:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build sherpa-onnx
+        run: |
+          git clone --depth 1 https://github.com/k2-fsa/sherpa-onnx
+          cd sherpa-onnx
+          cmake -B build -DCMAKE_BUILD_TYPE=Release \
+            -DSHERPA_ONNX_ENABLE_TTS=OFF \
+            -DSHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION=OFF \
+            -DSHERPA_ONNX_ENABLE_BINARY=ON \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DSHERPA_ONNX_ENABLE_PORTAUDIO=OFF \
+            -DSHERPA_ONNX_ENABLE_WEBSOCKET=OFF
+          cmake --build build --config Release -j$(sysctl -n hw.ncpu)
+          mkdir -p ../internal/core/ai/transcriber/bin
+          cp build/bin/sherpa-onnx-offline ../internal/core/ai/transcriber/bin/sherpa-darwin-arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sherpa-darwin-arm64
+          path: internal/core/ai/transcriber/bin/sherpa-darwin-arm64
+
+  build-sherpa-windows-amd64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install CUDA Toolkit
+        uses: Jimver/cuda-toolkit@v0.2.19
+        with:
+          cuda: '12.6.3'
+          method: 'network'
+      - name: Build sherpa-onnx with CUDA
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/k2-fsa/sherpa-onnx
+          cd sherpa-onnx
+          # Download onnxruntime GPU for CUDA 12.x
+          curl -SL -O https://github.com/microsoft/onnxruntime/releases/download/v1.22.0/onnxruntime-win-x64-gpu-1.22.0.zip
+          unzip onnxruntime-win-x64-gpu-1.22.0.zip
+          export SHERPA_ONNXRUNTIME_LIB_DIR=$PWD/onnxruntime-win-x64-gpu-1.22.0/lib
+          export SHERPA_ONNXRUNTIME_INCLUDE_DIR=$PWD/onnxruntime-win-x64-gpu-1.22.0/include
+          cmake -B build -DCMAKE_BUILD_TYPE=Release \
+            -DSHERPA_ONNX_ENABLE_GPU=ON \
+            -DSHERPA_ONNX_ENABLE_TTS=OFF \
+            -DSHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION=OFF \
+            -DSHERPA_ONNX_ENABLE_BINARY=ON \
+            -DBUILD_SHARED_LIBS=ON \
+            -DSHERPA_ONNX_ENABLE_PORTAUDIO=OFF \
+            -DSHERPA_ONNX_ENABLE_WEBSOCKET=OFF
+          cmake --build build --config Release -j
+          mkdir -p ../internal/core/ai/transcriber/bin
+          cp build/bin/Release/sherpa-onnx-offline.exe ../internal/core/ai/transcriber/bin/sherpa-windows-amd64.exe
+          # Copy onnxruntime DLLs for CUDA
+          cp onnxruntime-win-x64-gpu-1.22.0/lib/*.dll ../internal/core/ai/transcriber/bin/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sherpa-windows-amd64
+          path: internal/core/ai/transcriber/bin/
+
   release:
     needs:
       - build-whisper-darwin-arm64
       - build-whisper-windows-amd64
+      - build-sherpa-darwin-arm64
+      - build-sherpa-windows-amd64
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -68,7 +133,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download whisper binaries
+      - name: Download AI binaries (whisper + sherpa-onnx)
         uses: actions/download-artifact@v4
         with:
           path: internal/core/ai/transcriber/bin/
