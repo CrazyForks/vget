@@ -24,25 +24,35 @@ import (
 	"github.com/tetratelabs/wazero"
 )
 
-// WhisperRunner transcribes audio using embedded whisper.cpp binary.
+// WhisperRunner transcribes audio using whisper.cpp CLI binary.
 // This is used when CGO is disabled (CGO_ENABLED=0).
+// The whisper.cpp binary is downloaded on first use from GitHub releases.
 type WhisperRunner struct {
 	binaryPath string
 	modelPath  string
 	language   string
 }
 
-// NewWhisperRunner creates a new whisper runner with extracted binary.
+// NewWhisperRunner creates a new whisper runner.
+// Downloads whisper.cpp binary on first use if not already installed.
 func NewWhisperRunner(modelPath, language string) (*WhisperRunner, error) {
 	// Validate model exists
 	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("whisper model not found: %s", modelPath)
 	}
 
-	// Extract binary if needed
-	binaryPath, err := extractWhisperBinary()
+	// Get runtime manager
+	binDir, err := DefaultBinDir()
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract whisper binary: %w", err)
+		return nil, fmt.Errorf("failed to get bin directory: %w", err)
+	}
+
+	rtManager := NewRuntimeManager(binDir)
+
+	// Download whisper.cpp if needed
+	binaryPath, err := rtManager.EnsureWhisper()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get whisper binary: %w", err)
 	}
 
 	return &WhisperRunner{
@@ -83,7 +93,7 @@ func NewWhisperRunnerFromConfig(cfg config.LocalASRConfig, modelsDir string) (*W
 
 // Name returns the provider name.
 func (w *WhisperRunner) Name() string {
-	return "whisper.cpp (embedded)"
+	return "whisper.cpp"
 }
 
 // Transcribe converts an audio file to text using whisper.cpp CLI.
@@ -133,9 +143,8 @@ func (w *WhisperRunner) Transcribe(ctx context.Context, filePath string) (*Resul
 	}
 	args = append(args, "-t", fmt.Sprintf("%d", numThreads))
 
-	fmt.Printf("  Running whisper.cpp CLI...\n")
-	fmt.Printf("  Binary: %s\n", w.binaryPath)
-	fmt.Printf("  Model: %s\n", w.modelPath)
+	fmt.Printf("  Running whisper.cpp...\n")
+	fmt.Printf("  Model: %s\n", filepath.Base(w.modelPath))
 	fmt.Printf("  Threads: %d\n", numThreads)
 
 	// Run whisper.cpp
