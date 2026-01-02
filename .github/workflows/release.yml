@@ -10,13 +10,124 @@ permissions:
   packages: write
 
 jobs:
+  # Build whisper.cpp binaries for each platform (embedded in CLI)
+  build-whisper-darwin-arm64:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build whisper.cpp
+        run: |
+          git clone --depth 1 --branch v1.8.2 https://github.com/ggerganov/whisper.cpp
+          cd whisper.cpp
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DWHISPER_METAL=ON
+          cmake --build build --config Release -j$(sysctl -n hw.ncpu)
+          mkdir -p ../internal/core/ai/transcriber/bin
+          cp build/bin/whisper-cli ../internal/core/ai/transcriber/bin/whisper-darwin-arm64 || \
+          cp build/bin/whisper ../internal/core/ai/transcriber/bin/whisper-darwin-arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: whisper-darwin-arm64
+          path: internal/core/ai/transcriber/bin/whisper-darwin-arm64
+
+  build-whisper-darwin-amd64:
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build whisper.cpp
+        run: |
+          git clone --depth 1 --branch v1.8.2 https://github.com/ggerganov/whisper.cpp
+          cd whisper.cpp
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DWHISPER_ACCELERATE=ON
+          cmake --build build --config Release -j$(sysctl -n hw.ncpu)
+          mkdir -p ../internal/core/ai/transcriber/bin
+          cp build/bin/whisper-cli ../internal/core/ai/transcriber/bin/whisper-darwin-amd64 || \
+          cp build/bin/whisper ../internal/core/ai/transcriber/bin/whisper-darwin-amd64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: whisper-darwin-amd64
+          path: internal/core/ai/transcriber/bin/whisper-darwin-amd64
+
+  build-whisper-linux-amd64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake libopenblas-dev
+      - name: Build whisper.cpp
+        run: |
+          git clone --depth 1 --branch v1.8.2 https://github.com/ggerganov/whisper.cpp
+          cd whisper.cpp
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DWHISPER_OPENBLAS=ON
+          cmake --build build --config Release -j$(nproc)
+          mkdir -p ../internal/core/ai/transcriber/bin
+          cp build/bin/whisper-cli ../internal/core/ai/transcriber/bin/whisper-linux-amd64 || \
+          cp build/bin/whisper ../internal/core/ai/transcriber/bin/whisper-linux-amd64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: whisper-linux-amd64
+          path: internal/core/ai/transcriber/bin/whisper-linux-amd64
+
+  build-whisper-linux-arm64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake libopenblas-dev
+      - name: Build whisper.cpp
+        run: |
+          git clone --depth 1 --branch v1.8.2 https://github.com/ggerganov/whisper.cpp
+          cd whisper.cpp
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DWHISPER_OPENBLAS=ON
+          cmake --build build --config Release -j$(nproc)
+          mkdir -p ../internal/core/ai/transcriber/bin
+          cp build/bin/whisper-cli ../internal/core/ai/transcriber/bin/whisper-linux-arm64 || \
+          cp build/bin/whisper ../internal/core/ai/transcriber/bin/whisper-linux-arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: whisper-linux-arm64
+          path: internal/core/ai/transcriber/bin/whisper-linux-arm64
+
+  build-whisper-windows-amd64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build whisper.cpp
+        shell: bash
+        run: |
+          git clone --depth 1 --branch v1.8.2 https://github.com/ggerganov/whisper.cpp
+          cd whisper.cpp
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release -j
+          mkdir -p ../internal/core/ai/transcriber/bin
+          cp build/bin/Release/whisper-cli.exe ../internal/core/ai/transcriber/bin/whisper-windows-amd64.exe || \
+          cp build/bin/Release/whisper.exe ../internal/core/ai/transcriber/bin/whisper-windows-amd64.exe || \
+          cp build/bin/whisper-cli.exe ../internal/core/ai/transcriber/bin/whisper-windows-amd64.exe || \
+          cp build/bin/whisper.exe ../internal/core/ai/transcriber/bin/whisper-windows-amd64.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: whisper-windows-amd64
+          path: internal/core/ai/transcriber/bin/whisper-windows-amd64.exe
+
   release:
+    needs:
+      - build-whisper-darwin-arm64
+      - build-whisper-darwin-amd64
+      - build-whisper-linux-amd64
+      - build-whisper-linux-arm64
+      - build-whisper-windows-amd64
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
+      # Download all whisper binaries for embedding
+      - name: Download whisper binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: internal/core/ai/transcriber/bin/
+          merge-multiple: true
 
       - name: Set up Go
         uses: actions/setup-go@v5

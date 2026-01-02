@@ -1,0 +1,6 @@
+# Whisper binaries are built in GitHub Actions and embedded at release time
+# These are not committed to the repository
+whisper-*
+
+# Keep the stub file for local development
+!.gitkeep
