@@ -20,7 +20,6 @@ var (
 	aiFrom     string
 	aiRemote   bool
 	aiOutput   string
-	aiToFormat string
 )
 
 // aiCmd is the parent command for all AI features
@@ -33,18 +32,24 @@ Models are downloaded on first use and stored in ~/.config/vget/models/
 
 Examples:
   vget ai transcribe audio.mp3 --language zh
+  vget ai transcribe audio.mp3 -l zh -o output.srt
   vget ai models
-  vget ai models download whisper-large-v3-turbo
-  vget ai convert transcript.md --to srt`,
+  vget ai models download whisper-large-v3-turbo`,
 }
 
 // aiTranscribeCmd transcribes audio/video files
 var aiTranscribeCmd = &cobra.Command{
 	Use:   "transcribe <file>",
 	Short: "Transcribe audio/video to markdown",
-	Long: `Transcribe audio or video files to markdown with timestamps.
+	Long: `Transcribe audio or video files with timestamps.
 
-The transcript is saved as <filename>.transcript.md
+The transcript is saved as <filename>.transcript.md by default.
+
+Output format is detected from -o extension:
+  .md  - Markdown with timestamps (default)
+  .srt - SubRip subtitle format
+  .vtt - WebVTT subtitle format
+  .txt - Plain text (no timestamps)
 
 Language is required. Common language codes:
   zh - Chinese    en - English    ja - Japanese
@@ -53,30 +58,11 @@ Language is required. Common language codes:
 
 Examples:
   vget ai transcribe podcast.mp3 --language zh
-  vget ai transcribe video.mp4 --language en
-  vget ai transcribe audio.m4a --language ja --model whisper-small
-  vget ai transcribe podcast.mp3 --language zh -o my-transcript.md`,
+  vget ai transcribe podcast.mp3 -l zh -o subtitles.srt
+  vget ai transcribe podcast.mp3 -l zh -o captions.vtt
+  vget ai transcribe podcast.mp3 -l en --model whisper-small`,
 	Args: cobra.ExactArgs(1),
 	Run:  runTranscribe,
-}
-
-// aiConvertCmd converts transcript to other formats
-var aiConvertCmd = &cobra.Command{
-	Use:   "convert <transcript.md>",
-	Short: "Convert transcript to SRT/VTT/TXT",
-	Long: `Convert a markdown transcript to subtitle or text formats.
-
-Supported output formats:
-  srt - SubRip subtitle format
-  vtt - WebVTT subtitle format
-  txt - Plain text (no timestamps)
-
-Examples:
-  vget ai convert podcast.transcript.md --to srt
-  vget ai convert podcast.transcript.md --to vtt
-  vget ai convert podcast.transcript.md --to txt -o subtitles.txt`,
-	Args: cobra.ExactArgs(1),
-	Run:  runConvert,
 }
 
 // aiModelsCmd is the parent command for model management
@@ -226,13 +212,31 @@ func runTranscribe(cmd *cobra.Command, args []string) {
 	// Handle custom output path
 	outputPath := result.TranscriptPath
 	if aiOutput != "" {
-		// Copy to custom output path
-		data, err := os.ReadFile(result.TranscriptPath)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading transcript: %v\n", err)
-			os.Exit(1)
+		ext := strings.ToLower(filepath.Ext(aiOutput))
+
+		// Convert based on extension
+		var outputContent string
+		switch ext {
+		case ".srt":
+			segments := convertSegments(result.Transcript.Segments)
+			outputContent = aioutput.ToSRT(segments)
+		case ".vtt":
+			segments := convertSegments(result.Transcript.Segments)
+			outputContent = aioutput.ToVTT(segments)
+		case ".txt":
+			segments := convertSegments(result.Transcript.Segments)
+			outputContent = aioutput.ToTXT(segments)
+		default:
+			// .md or other - copy markdown as-is
+			data, err := os.ReadFile(result.TranscriptPath)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error reading transcript: %v\n", err)
+				os.Exit(1)
+			}
+			outputContent = string(data)
 		}
-		if err := os.WriteFile(aiOutput, data, 0644); err != nil {
+
+		if err := os.WriteFile(aiOutput, []byte(outputContent), 0644); err != nil {
 			fmt.Fprintf(os.Stderr, "Error writing to %s: %v\n", aiOutput, err)
 			os.Exit(1)
 		}
@@ -240,79 +244,6 @@ func runTranscribe(cmd *cobra.Command, args []string) {
 	}
 
 	fmt.Printf("\nTranscript saved: %s\n", outputPath)
-}
-
-func runConvert(cmd *cobra.Command, args []string) {
-	inputPath := args[0]
-
-	// Validate input file exists
-	if _, err := os.Stat(inputPath); os.IsNotExist(err) {
-		fmt.Fprintf(os.Stderr, "Error: file not found: %s\n", inputPath)
-		os.Exit(1)
-	}
-
-	// Validate --to format
-	if aiToFormat == "" {
-		fmt.Fprintf(os.Stderr, "Error: --to is required\n\n")
-		fmt.Fprintln(os.Stderr, "Supported formats:")
-		fmt.Fprintln(os.Stderr, "  srt - SubRip subtitle format")
-		fmt.Fprintln(os.Stderr, "  vtt - WebVTT subtitle format")
-		fmt.Fprintln(os.Stderr, "  txt - Plain text (no timestamps)")
-		fmt.Fprintln(os.Stderr, "\nExample:")
-		fmt.Fprintf(os.Stderr, "  vget ai convert %s --to srt\n", inputPath)
-		os.Exit(1)
-	}
-
-	// Validate format
-	format := strings.ToLower(aiToFormat)
-	if format != "srt" && format != "vtt" && format != "txt" {
-		fmt.Fprintf(os.Stderr, "Error: unsupported format '%s'\n\n", aiToFormat)
-		fmt.Fprintln(os.Stderr, "Supported formats: srt, vtt, txt")
-		os.Exit(1)
-	}
-
-	// Read input transcript
-	content, err := os.ReadFile(inputPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Parse transcript
-	segments, err := aioutput.ParseTranscript(string(content))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing transcript: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Determine output path
-	outputPath := aiOutput
-	if outputPath == "" {
-		// Generate from input path
-		ext := filepath.Ext(inputPath)
-		base := strings.TrimSuffix(inputPath, ext)
-		// Remove .transcript suffix if present
-		base = strings.TrimSuffix(base, ".transcript")
-		outputPath = base + "." + format
-	}
-
-	// Convert and write
-	var outputContent string
-	switch format {
-	case "srt":
-		outputContent = aioutput.ToSRT(segments)
-	case "vtt":
-		outputContent = aioutput.ToVTT(segments)
-	case "txt":
-		outputContent = aioutput.ToTXT(segments)
-	}
-
-	if err := os.WriteFile(outputPath, []byte(outputContent), 0644); err != nil {
-		fmt.Fprintf(os.Stderr, "Error writing file: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Printf("Converted to %s: %s\n", strings.ToUpper(format), outputPath)
 }
 
 func runModels(cmd *cobra.Command, args []string) {
@@ -465,15 +396,24 @@ func runModelsRm(cmd *cobra.Command, args []string) {
 	fmt.Printf("Removed model: %s\n", modelName)
 }
 
+// convertSegments converts transcriber.Segment to output.Segment
+func convertSegments(segments []transcriber.Segment) []aioutput.Segment {
+	result := make([]aioutput.Segment, len(segments))
+	for i, seg := range segments {
+		result[i] = aioutput.Segment{
+			Start: seg.Start,
+			End:   seg.End,
+			Text:  seg.Text,
+		}
+	}
+	return result
+}
+
 func init() {
 	// Flags for transcribe command
 	aiTranscribeCmd.Flags().StringVar(&aiModel, "model", "", "model to use (default: whisper-large-v3-turbo)")
 	aiTranscribeCmd.Flags().StringVarP(&aiLanguage, "language", "l", "", "language code (required, e.g., zh, en, ja)")
-	aiTranscribeCmd.Flags().StringVarP(&aiOutput, "output", "o", "", "output file path")
-
-	// Flags for convert command
-	aiConvertCmd.Flags().StringVar(&aiToFormat, "to", "", "output format: srt, vtt, txt (required)")
-	aiConvertCmd.Flags().StringVarP(&aiOutput, "output", "o", "", "output file path")
+	aiTranscribeCmd.Flags().StringVarP(&aiOutput, "output", "o", "", "output file path (.md, .srt, .vtt, .txt)")
 
 	// Flags for models command
 	aiModelsCmd.Flags().BoolVarP(&aiRemote, "remote", "r", false, "list models available for download")
@@ -490,7 +430,6 @@ func init() {
 
 	// Add subcommands to ai
 	aiCmd.AddCommand(aiTranscribeCmd)
-	aiCmd.AddCommand(aiConvertCmd)
 	aiCmd.AddCommand(aiModelsCmd)
 	aiCmd.AddCommand(aiDownloadCmd) // Alias for models download
 

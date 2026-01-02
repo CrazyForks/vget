@@ -30,10 +30,14 @@ AI features require GPU acceleration for practical performance. CPU-only transcr
 
 | Feature | Runtime | Use Case | Status |
 |---------|---------|----------|--------|
-| Speech-to-Text (STT) | whisper.cpp | Transcription, subtitles | **Active** |
+| Speech-to-Text (STT) | whisper.cpp, sherpa-onnx | Transcription, subtitles | **Active** |
 | Text-to-Speech (TTS) | Piper | Audiobook generation, accessibility | TODO |
 | OCR | Tesseract | Image text extraction, scanned PDFs | TODO |
 | PDF Processing | pdfcpu, poppler | Text extraction, manipulation | TODO |
+
+**ASR Engines:**
+- **whisper.cpp** - 99 languages, uses Whisper models
+- **sherpa-onnx** - 25 European languages, uses Parakeet models (faster for EU)
 
 ---
 
@@ -47,8 +51,12 @@ AI features require GPU acceleration for practical performance. CPU-only transcr
 │                     (CGO_ENABLED=0)                             │
 ├─────────────────────────────────────────────────────────────────┤
 │  Embedded whisper.cpp binary (GPU-enabled)                      │
-│  ├── macOS ARM64: Metal acceleration                            │
-│  └── Windows AMD64: CUDA acceleration                           │
+│  ├── macOS ARM64: Metal acceleration (~3MB)                     │
+│  └── Windows AMD64: CUDA acceleration (~8MB)                    │
+├─────────────────────────────────────────────────────────────────┤
+│  Embedded sherpa-onnx binary (Parakeet models)                  │
+│  ├── macOS ARM64: CoreML (~23MB)                                │
+│  └── Windows AMD64: CUDA (~17MB)                                │
 ├─────────────────────────────────────────────────────────────────┤
 │  Audio Decoders (Pure Go)                                       │
 │  ├── MP3  → go-mp3                                              │
@@ -102,9 +110,20 @@ GPU-enabled whisper.cpp binary is embedded in vget:
 
 #### Output Formats
 
-- **Transcript** (`.transcript.md`) - Timestamped text in Markdown
-- **Subtitles** (`.srt`, `.vtt`) - Standard subtitle formats
-- **Raw text** (`.txt`) - Plain text without timestamps
+Output format is detected from `-o` file extension:
+
+| Extension | Format | Description |
+|-----------|--------|-------------|
+| `.md` | Markdown | Timestamped text (default) |
+| `.srt` | SubRip | Standard subtitle format |
+| `.vtt` | WebVTT | Web subtitle format |
+| `.txt` | Plain text | No timestamps |
+
+```bash
+vget ai transcribe audio.mp3 -l zh                # → audio.transcript.md
+vget ai transcribe audio.mp3 -l zh -o out.srt    # → out.srt
+vget ai transcribe audio.mp3 -l zh -o out.vtt    # → out.vtt
+```
 
 ### Text-to-Speech (TTS) - TODO
 
@@ -188,8 +207,8 @@ type Model interface {
 
 ### Phase 2: Speech-to-Text ✅
 - [x] whisper.cpp integration
-- [x] `vget ai transcribe` command
-- [x] `vget ai convert` command (SRT/VTT/TXT)
+- [x] sherpa-onnx integration (Parakeet models)
+- [x] `vget ai transcribe` command (auto-detect format from -o extension)
 - [x] `vget ai models` command
 
 ### Phase 3: Text-to-Speech - TODO

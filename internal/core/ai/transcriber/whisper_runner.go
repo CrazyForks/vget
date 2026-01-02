@@ -115,11 +115,11 @@ func (w *WhisperRunner) Transcribe(ctx context.Context, filePath string) (*Resul
 
 	outputBase := filepath.Join(tmpDir, "output")
 
-	// Build command
+	// Build command - use SRT format for timestamps
 	args := []string{
 		"-m", w.modelPath,
 		"-f", wavPath,
-		"-otxt",
+		"-osrt", // SRT format with timestamps
 		"-of", outputBase,
 		"-pp", // print progress
 	}
@@ -167,8 +167,8 @@ func (w *WhisperRunner) Transcribe(ctx context.Context, filePath string) (*Resul
 		return nil, fmt.Errorf("whisper failed: %w", err)
 	}
 
-	// Read output file
-	outputPath := outputBase + ".txt"
+	// Read output file (SRT format)
+	outputPath := outputBase + ".srt"
 	content, err := os.ReadFile(outputPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read output: %w", err)
@@ -437,49 +437,86 @@ func resampleTo16kHz(samples []float32, srcRate int) []float32 {
 	return resampled
 }
 
-// parseWhisperOutput parses whisper.cpp text output into segments.
+// parseWhisperOutput parses whisper.cpp SRT output into segments.
+// SRT format:
+//
+//	1
+//	00:00:00,000 --> 00:00:05,000
+//	Subtitle text
+//
+//	2
+//	00:00:05,000 --> 00:00:10,000
+//	More text
 func parseWhisperOutput(text string) []Segment {
-	// whisper.cpp txt format: [00:00:00.000 --> 00:00:05.000] Text here
 	var segments []Segment
 	lines := strings.Split(text, "\n")
 
+	var currentSegment *Segment
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
+
+		// Empty line ends current segment
 		if line == "" {
+			if currentSegment != nil && currentSegment.Text != "" {
+				segments = append(segments, *currentSegment)
+				currentSegment = nil
+			}
 			continue
 		}
 
-		// Try to parse timestamp format
-		if strings.HasPrefix(line, "[") {
-			endBracket := strings.Index(line, "]")
-			if endBracket > 0 {
-				timestamp := line[1:endBracket]
-				parts := strings.Split(timestamp, " --> ")
-				if len(parts) == 2 {
-					start := parseTimestamp(parts[0])
-					end := parseTimestamp(parts[1])
-					text := strings.TrimSpace(line[endBracket+1:])
-					if text != "" {
-						segments = append(segments, Segment{
-							Start: start,
-							End:   end,
-							Text:  text,
-						})
-					}
-					continue
-				}
-			}
+		// Skip sequence numbers (pure digits)
+		if isDigitsOnly(line) {
+			continue
 		}
 
-		// Plain text without timestamps
-		if len(segments) == 0 {
-			segments = append(segments, Segment{Text: line})
-		} else {
-			segments[len(segments)-1].Text += " " + line
+		// Parse timestamp line: 00:00:00,000 --> 00:00:05,000
+		if strings.Contains(line, " --> ") {
+			parts := strings.Split(line, " --> ")
+			if len(parts) == 2 {
+				start := parseSRTTimestamp(parts[0])
+				end := parseSRTTimestamp(parts[1])
+				currentSegment = &Segment{
+					Start: start,
+					End:   end,
+				}
+			}
+			continue
+		}
+
+		// Text line - append to current segment
+		if currentSegment != nil {
+			if currentSegment.Text != "" {
+				currentSegment.Text += " " + line
+			} else {
+				currentSegment.Text = line
+			}
 		}
 	}
 
+	// Don't forget last segment
+	if currentSegment != nil && currentSegment.Text != "" {
+		segments = append(segments, *currentSegment)
+	}
+
 	return segments
+}
+
+// isDigitsOnly checks if string contains only digits.
+func isDigitsOnly(s string) bool {
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return len(s) > 0
+}
+
+// parseSRTTimestamp parses SRT timestamp format: 00:00:00,000
+func parseSRTTimestamp(s string) time.Duration {
+	s = strings.TrimSpace(s)
+	// Replace comma with dot for parsing
+	s = strings.Replace(s, ",", ".", 1)
+	return parseTimestamp(s)
 }
 
 // parseTimestamp parses HH:MM:SS.mmm format.

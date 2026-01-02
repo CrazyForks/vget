@@ -55,35 +55,28 @@ vget ai models rm whisper-large-v3-turbo
 
 ```bash
 # Basic transcription (outputs markdown with timestamps)
-vget ai transcribe podcast.mp3                    # → podcast.transcript.md
+vget ai transcribe podcast.mp3 -l zh              # → podcast.transcript.md
 
-# Specify language (required)
-vget ai transcribe podcast.mp3 --language zh
-vget ai transcribe podcast.mp3 -l en
+# Output format is detected from -o extension
+vget ai transcribe podcast.mp3 -l zh -o output.md   # → Markdown
+vget ai transcribe podcast.mp3 -l zh -o output.srt  # → SRT subtitles
+vget ai transcribe podcast.mp3 -l zh -o output.vtt  # → VTT subtitles
+vget ai transcribe podcast.mp3 -l zh -o output.txt  # → Plain text
 
 # Choose model (whisper-* or parakeet-*)
 vget ai transcribe podcast.mp3 -l zh --model whisper-small
 vget ai transcribe podcast.mp3 -l de --model parakeet-v3   # 25 EU languages
-
-# Output to specific file
-vget ai transcribe podcast.mp3 -l zh -o my-transcript.md
 ```
+
+**Output Formats:**
+- `.md` - Markdown with timestamps (default)
+- `.srt` - SubRip subtitle format
+- `.vtt` - WebVTT subtitle format
+- `.txt` - Plain text (no timestamps)
 
 **Model Selection:**
 - `whisper-*` models: 99 languages, uses whisper.cpp
 - `parakeet-*` models: 25 European languages, uses sherpa-onnx (faster for EU)
-
-### Convert Transcript
-
-```bash
-# Convert markdown transcript to subtitle formats
-vget ai convert podcast.transcript.md --to srt    # → podcast.srt
-vget ai convert podcast.transcript.md --to vtt    # → podcast.vtt
-vget ai convert podcast.transcript.md --to txt    # → podcast.txt
-
-# Specify output file
-vget ai convert podcast.transcript.md --to srt -o subtitles.srt
-```
 
 ### Text-to-Speech (TODO)
 
@@ -275,9 +268,9 @@ Supported languages: bg, hr, cs, da, nl, en, et, fi, fr, de, el, hu, it, lv, lt,
 | vget core | ~20MB | ~20MB |
 | go-ffmpreg (WASM) | ~8MB | ~8MB |
 | Pure Go decoders | ~1MB | ~1MB |
-| whisper.cpp (embedded) | ~5MB | ~8MB |
-| sherpa-onnx (embedded) | ~7MB | ~17MB |
-| **Total binary** | **~41MB** | **~54MB** |
+| whisper.cpp (embedded) | ~3MB | ~8MB |
+| sherpa-onnx (embedded) | ~23MB | ~17MB |
+| **Total binary** | **~55MB** | **~54MB** |
 
 ---
 
@@ -287,8 +280,12 @@ Supported languages: bg, hr, cs, da, nl, en, et, fi, fr, de, el, hu, it, lv, lt,
 # Build for local testing
 CGO_ENABLED=0 go build -o build/vget ./cmd/vget
 
-# Test transcription with Whisper
+# Test transcription with Whisper (default markdown output)
 ./build/vget ai transcribe testdata/sample.mp3 -l en
+
+# Test transcription with different output formats
+./build/vget ai transcribe testdata/sample.mp3 -l en -o output.srt
+./build/vget ai transcribe testdata/sample.mp3 -l en -o output.vtt
 
 # Test transcription with Parakeet (EU languages)
 ./build/vget ai transcribe testdata/sample.mp3 -l de --model parakeet-v3
@@ -298,9 +295,6 @@ CGO_ENABLED=0 go build -o build/vget ./cmd/vget
 ./build/vget ai models -r
 ./build/vget ai download whisper-small
 ./build/vget ai download parakeet-v3
-
-# Test convert
-./build/vget ai convert sample.transcript.md --to srt
 ```
 
 ---
