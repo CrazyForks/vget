@@ -16,56 +16,70 @@ import (
 )
 
 // RuntimeVersion is the current version of whisper.cpp binaries.
-// This should match the version available on the download server.
-const RuntimeVersion = "v1.7.4"
+const RuntimeVersion = "v1.8.2"
+
+// CUDA version for Windows cuBLAS builds.
+const CUDAVersion = "12.6.3"
 
 // Runtime represents an AI runtime binary (e.g., whisper.cpp, piper, tesseract).
 type Runtime struct {
-	Name     string // e.g., "whisper"
-	Version  string // e.g., "v1.7.4"
-	Platform string // e.g., "darwin-arm64"
-	URL      string // Download URL
-	Size     string // Human-readable size
+	Name        string // e.g., "whisper"
+	Version     string // e.g., "v1.8.2"
+	Platform    string // e.g., "darwin-arm64"
+	URL         string // Download URL
+	Size        string // Human-readable size
+	Accelerator string // "metal", "cuda", "cpu"
 }
 
 // whisperRuntimes lists available whisper.cpp binaries for each platform.
+// These binaries include GPU acceleration where available:
+// - macOS ARM64: Metal GPU acceleration
+// - macOS x64: Accelerate framework
+// - Windows: cuBLAS (CUDA) for NVIDIA GPUs
+// - Linux: OpenBLAS CPU (CUDA requires custom build)
 var whisperRuntimes = map[string]Runtime{
 	"darwin-arm64": {
-		Name:     "whisper",
-		Version:  RuntimeVersion,
-		Platform: "darwin-arm64",
-		URL:      "https://github.com/ggerganov/whisper.cpp/releases/download/" + RuntimeVersion + "/whisper-" + RuntimeVersion + "-bin-macos-arm64.zip",
-		Size:     "~3MB",
+		Name:        "whisper",
+		Version:     RuntimeVersion,
+		Platform:    "darwin-arm64",
+		URL:         "https://github.com/ggerganov/whisper.cpp/releases/download/" + RuntimeVersion + "/whisper-" + RuntimeVersion + "-bin-macos-arm64.zip",
+		Size:        "~3MB",
+		Accelerator: "metal",
 	},
 	"darwin-amd64": {
-		Name:     "whisper",
-		Version:  RuntimeVersion,
-		Platform: "darwin-amd64",
-		URL:      "https://github.com/ggerganov/whisper.cpp/releases/download/" + RuntimeVersion + "/whisper-" + RuntimeVersion + "-bin-macos-x64.zip",
-		Size:     "~3MB",
+		Name:        "whisper",
+		Version:     RuntimeVersion,
+		Platform:    "darwin-amd64",
+		URL:         "https://github.com/ggerganov/whisper.cpp/releases/download/" + RuntimeVersion + "/whisper-" + RuntimeVersion + "-bin-macos-x64.zip",
+		Size:        "~3MB",
+		Accelerator: "accelerate",
 	},
 	"linux-amd64": {
-		Name:     "whisper",
-		Version:  RuntimeVersion,
-		Platform: "linux-amd64",
-		URL:      "https://github.com/ggerganov/whisper.cpp/releases/download/" + RuntimeVersion + "/whisper-" + RuntimeVersion + "-bin-ubuntu-x64.tar.gz",
-		Size:     "~3MB",
+		Name:        "whisper",
+		Version:     RuntimeVersion,
+		Platform:    "linux-amd64",
+		URL:         "https://github.com/ggerganov/whisper.cpp/releases/download/" + RuntimeVersion + "/whisper-" + RuntimeVersion + "-bin-ubuntu-x64.tar.gz",
+		Size:        "~3MB",
+		Accelerator: "cpu",
 	},
 	"linux-arm64": {
-		Name:     "whisper",
-		Version:  RuntimeVersion,
-		Platform: "linux-arm64",
-		// Note: whisper.cpp doesn't have official arm64 linux release, use x64 for now
-		// Users can build from source if needed
-		URL:  "https://github.com/ggerganov/whisper.cpp/releases/download/" + RuntimeVersion + "/whisper-" + RuntimeVersion + "-bin-ubuntu-x64.tar.gz",
-		Size: "~3MB",
+		Name:        "whisper",
+		Version:     RuntimeVersion,
+		Platform:    "linux-arm64",
+		// Note: No official arm64 linux release, use x64 binary
+		// For ARM64 Linux (e.g., Raspberry Pi), users should build from source
+		URL:         "https://github.com/ggerganov/whisper.cpp/releases/download/" + RuntimeVersion + "/whisper-" + RuntimeVersion + "-bin-ubuntu-x64.tar.gz",
+		Size:        "~3MB",
+		Accelerator: "cpu",
 	},
 	"windows-amd64": {
-		Name:     "whisper",
-		Version:  RuntimeVersion,
-		Platform: "windows-amd64",
-		URL:      "https://github.com/ggerganov/whisper.cpp/releases/download/" + RuntimeVersion + "/whisper-" + RuntimeVersion + "-bin-win-x64.zip",
-		Size:     "~3MB",
+		Name:        "whisper",
+		Version:     RuntimeVersion,
+		Platform:    "windows-amd64",
+		// Use cuBLAS build for NVIDIA GPU acceleration on Windows
+		URL:         "https://github.com/ggerganov/whisper.cpp/releases/download/" + RuntimeVersion + "/whisper-" + RuntimeVersion + "-bin-win-cublas-" + CUDAVersion + "-x64.zip",
+		Size:        "~50MB",
+		Accelerator: "cuda",
 	},
 }
 
@@ -136,7 +150,20 @@ func (r *RuntimeManager) EnsureWhisper() (string, error) {
 		return "", err
 	}
 
-	fmt.Printf("  Downloading whisper.cpp %s for %s...\n", rt.Version, rt.Platform)
+	// Show what acceleration will be used
+	accelInfo := ""
+	switch rt.Accelerator {
+	case "metal":
+		accelInfo = " (Metal GPU)"
+	case "cuda":
+		accelInfo = " (CUDA GPU)"
+	case "accelerate":
+		accelInfo = " (Accelerate)"
+	case "cpu":
+		accelInfo = " (CPU)"
+	}
+
+	fmt.Printf("  Downloading whisper.cpp %s for %s%s...\n", rt.Version, rt.Platform, accelInfo)
 
 	if err := r.downloadAndExtract(rt); err != nil {
 		return "", fmt.Errorf("failed to download whisper.cpp: %w", err)
@@ -238,7 +265,7 @@ func (r *RuntimeManager) extractArchive(archivePath, url string) error {
 	return fmt.Errorf("unsupported archive format: %s", url)
 }
 
-// extractZip extracts a zip archive, looking for the whisper-cli binary.
+// extractZip extracts a zip archive, looking for the whisper-cli binary and required DLLs.
 func (r *RuntimeManager) extractZip(archivePath string) error {
 	reader, err := zip.OpenReader(archivePath)
 	if err != nil {
@@ -246,15 +273,33 @@ func (r *RuntimeManager) extractZip(archivePath string) error {
 	}
 	defer reader.Close()
 
+	foundBinary := false
 	for _, file := range reader.File {
-		// Look for whisper-cli or whisper-cli.exe
 		baseName := filepath.Base(file.Name)
+
+		// Extract whisper-cli binary
 		if baseName == "whisper-cli" || baseName == "whisper-cli.exe" {
-			return r.extractSingleFile(file)
+			if err := r.extractSingleFile(file); err != nil {
+				return err
+			}
+			foundBinary = true
+			continue
+		}
+
+		// Extract required DLLs for cuBLAS builds (Windows)
+		// These include: cublas64_*.dll, cublasLt64_*.dll, cudart64_*.dll, etc.
+		if strings.HasSuffix(baseName, ".dll") {
+			if err := r.extractSingleFile(file); err != nil {
+				return err
+			}
 		}
 	}
 
-	return fmt.Errorf("whisper-cli binary not found in archive")
+	if !foundBinary {
+		return fmt.Errorf("whisper-cli binary not found in archive")
+	}
+
+	return nil
 }
 
 // extractSingleFile extracts a single file from a zip entry.

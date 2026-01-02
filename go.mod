@@ -13,6 +13,7 @@ require (
 	github.com/fatih/color v1.18.0
 	github.com/ggerganov/whisper.cpp/bindings/go v0.0.0-20251015072942-4979e04f5dca
 	github.com/gin-gonic/gin v1.11.0
+	github.com/go-audio/audio v1.0.0
 	github.com/go-audio/wav v1.1.0
 	github.com/go-rod/rod v0.116.2
 	github.com/go-rod/stealth v0.4.9
@@ -54,7 +55,6 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.8 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
-	github.com/go-audio/audio v1.0.0 // indirect
 	github.com/go-audio/riff v1.0.0 // indirect
 	github.com/go-faster/errors v0.7.1 // indirect
 	github.com/go-faster/jx v1.2.0 // indirect
