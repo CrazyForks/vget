@@ -26,7 +26,7 @@ import (
 
 // WhisperRunner transcribes audio using whisper.cpp CLI binary.
 // This is used when CGO is disabled (CGO_ENABLED=0).
-// The whisper.cpp binary is downloaded on first use from GitHub releases.
+// GPU-enabled binary is embedded: Metal on macOS ARM64, CUDA on Windows.
 type WhisperRunner struct {
 	binaryPath string
 	modelPath  string
@@ -34,29 +34,17 @@ type WhisperRunner struct {
 }
 
 // NewWhisperRunner creates a new whisper runner.
-// Uses embedded GPU-enabled binary (Metal on macOS, CUDA on Windows).
-// Falls back to download if binary not embedded.
+// Uses embedded GPU-enabled binary (Metal on macOS ARM64, CUDA on Windows).
 func NewWhisperRunner(modelPath, language string) (*WhisperRunner, error) {
 	// Validate model exists
 	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("whisper model not found: %s", modelPath)
 	}
 
-	// Try embedded binary first (GPU-enabled: Metal/CUDA)
+	// Extract embedded binary (GPU-enabled: Metal/CUDA)
 	binaryPath, err := extractWhisperBinary()
 	if err != nil {
-		// Fallback to download if not embedded
-		fmt.Printf("  Embedded binary not available, downloading...\n")
-		binDir, dirErr := DefaultBinDir()
-		if dirErr != nil {
-			return nil, fmt.Errorf("failed to get bin directory: %w", dirErr)
-		}
-
-		rtManager := NewRuntimeManager(binDir)
-		binaryPath, err = rtManager.EnsureWhisper()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get whisper binary: %w", err)
-		}
+		return nil, err
 	}
 
 	return &WhisperRunner{
