@@ -445,8 +445,8 @@ func runModelsDownload(cmd *cobra.Command, args []string) {
 
 	// Show download info
 	fmt.Println()
-	fmt.Println("    " + titleStyle.Render("📦 Downloading "+model.Name+" ("+model.Size+")"))
-	fmt.Printf("    %s %s\n", labelStyle.Render("Source:"), valueStyle.Render(source))
+	fmt.Println("  " + titleStyle.Render("📦 Downloading "+model.Name+" ("+model.Size+")"))
+	fmt.Printf("  %s %s\n", labelStyle.Render("Source:"), valueStyle.Render(source))
 
 	// Get language for i18n
 	cfg := config.LoadOrDefault()
@@ -465,8 +465,8 @@ func runModelsDownload(cmd *cobra.Command, args []string) {
 	}
 
 	fmt.Println()
-	fmt.Println("    " + successStyle.Render("✓ Download complete!"))
-	fmt.Printf("    %s %s\n", labelStyle.Render("Location:"), pathStyle.Render(modelPath))
+	fmt.Println("  " + successStyle.Render("✓ Download complete!"))
+	fmt.Printf("  %s %s\n", labelStyle.Render("Location:"), pathStyle.Render(modelPath))
 }
 
 func runModelsRm(cmd *cobra.Command, args []string) {
