@@ -11,9 +11,29 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/guiyumin/vget/internal/core/config"
 	"github.com/guiyumin/vget/internal/core/downloader"
 )
+
+// Styles for download output
+var (
+	dlLabelStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	dlURLStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("33"))
+	dlProgressStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("86"))
+	dlBarFillStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))  // green
+	dlBarEmptyStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("238")) // dark gray
+	dlExtractStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
+)
+
+// renderProgressBar creates a styled progress bar
+func renderProgressBar(percent int, width int) string {
+	filled := width * percent / 100
+	empty := width - filled
+	bar := dlBarFillStyle.Render(strings.Repeat("█", filled)) +
+		dlBarEmptyStyle.Render(strings.Repeat("░", empty))
+	return bar
+}
 
 // ASRModel represents a speech recognition model.
 type ASRModel struct {
@@ -428,7 +448,7 @@ func (m *ModelManager) downloadArchive(model *ASRModel, url string) error {
 		return fmt.Errorf("failed to create models directory: %w", err)
 	}
 
-	fmt.Printf("URL: %s\n\n", url)
+	fmt.Printf("    %s %s\n\n", dlLabelStyle.Render("URL:"), dlURLStyle.Render(url))
 
 	// Download
 	resp, err := http.Get(url)
@@ -474,8 +494,10 @@ func (m *ModelManager) extractZip(r io.Reader, size int64, targetDir string) err
 			current += int64(n)
 			if size > 0 {
 				percent := int(float64(current) / float64(size) * 100)
-				if percent/5 > lastPercent/5 {
-					fmt.Printf("\r  Downloading: %d%% (%s / %s)", percent, formatBytes(current), formatBytes(size))
+				if percent != lastPercent {
+					bar := renderProgressBar(percent, 30)
+					stats := dlProgressStyle.Render(fmt.Sprintf(" %3d%% %s / %s", percent, formatBytes(current), formatBytes(size)))
+					fmt.Printf("\r    %s%s", bar, stats)
 					lastPercent = percent
 				}
 			}
@@ -499,7 +521,7 @@ func (m *ModelManager) extractZip(r io.Reader, size int64, targetDir string) err
 	// Target directory
 	target := filepath.Join(m.modelsDir, targetDir)
 
-	fmt.Printf("  Extracting to %s...\n", targetDir)
+	fmt.Println("    " + dlExtractStyle.Render("📂 Extracting to "+targetDir+"..."))
 
 	for _, file := range zipReader.File {
 		// Replace the root directory name with our target name
@@ -556,7 +578,7 @@ func (m *ModelManager) extractTarBz2(r io.Reader, targetDir string) error {
 	target := filepath.Join(m.modelsDir, targetDir)
 	var rootDir string
 
-	fmt.Printf("  Extracting to %s...\n", targetDir)
+	fmt.Println("    " + dlExtractStyle.Render("📂 Extracting to "+targetDir+"..."))
 
 	for {
 		header, err := tarReader.Next()

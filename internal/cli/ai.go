@@ -436,9 +436,17 @@ func runModelsDownload(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
+	// Styles for download output
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("86"))   // cyan
+	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))             // gray
+	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("255"))             // white
+	successStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("42")) // green
+	pathStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("33"))               // blue
+
 	// Show download info
-	fmt.Printf("\nDownloading %s (%s)\n", model.Name, model.Size)
-	fmt.Printf("Source: %s\n", source)
+	fmt.Println()
+	fmt.Println("    " + titleStyle.Render("📦 Downloading "+model.Name+" ("+model.Size+")"))
+	fmt.Printf("    %s %s\n", labelStyle.Render("Source:"), valueStyle.Render(source))
 
 	// Get language for i18n
 	cfg := config.LoadOrDefault()
@@ -446,16 +454,19 @@ func runModelsDownload(cmd *cobra.Command, args []string) {
 	// Download with progress bar
 	modelPath, err := mm.DownloadModelWithProgress(modelName, downloadURL, cfg.Language)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "\nError: %v\n", err)
+		errStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("196"))
+		fmt.Fprintf(os.Stderr, "\n%s %v\n", errStyle.Render("Error:"), err)
 		if aiFrom != "vmirror" {
-			fmt.Fprintf(os.Stderr, "\nTip: Try vmirror if Hugging Face is slow or blocked:\n")
+			hintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
+			fmt.Fprintf(os.Stderr, "\n%s\n", hintStyle.Render("💡 Tip: Try vmirror if download is slow or blocked:"))
 			fmt.Fprintf(os.Stderr, "  vget ai models download %s --from=vmirror\n", modelName)
 		}
 		os.Exit(1)
 	}
 
-	fmt.Printf("\nDownload complete!\n")
-	fmt.Printf("Location: %s\n", modelPath)
+	fmt.Println()
+	fmt.Println("    " + successStyle.Render("✓ Download complete!"))
+	fmt.Printf("    %s %s\n", labelStyle.Render("Location:"), pathStyle.Render(modelPath))
 }
 
 func runModelsRm(cmd *cobra.Command, args []string) {
