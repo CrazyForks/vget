@@ -472,7 +472,7 @@ var parakeetLangs = map[string]bool{
 	"sl": true, "es": true, "sv": true, "ru": true, "uk": true,
 }
 
-// Whisper supported languages (99 languages)
+// Whisper supported languages (100 languages)
 var whisperLangs = map[string]bool{
 	"af": true, "am": true, "ar": true, "as": true, "az": true,
 	"ba": true, "be": true, "bg": true, "bn": true, "bo": true,
