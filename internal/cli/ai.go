@@ -87,15 +87,17 @@ Examples:
 var aiModelsDownloadCmd = &cobra.Command{
 	Use:   "download <model>",
 	Short: "Download a transcription model",
-	Long: `Download a Whisper model for local transcription.
+	Long: `Download a transcription model for local speech-to-text.
 
 Available models:
-  whisper-tiny            (78MB)  - Fastest, basic quality
-  whisper-base           (148MB)  - Good for quick drafts
-  whisper-small          (488MB)  - Balanced for most uses
-  whisper-medium         (1.5GB)  - Higher accuracy
-  whisper-large-v3       (3.1GB)  - Highest accuracy, slowest
-  whisper-large-v3-turbo (1.6GB)  - Best quality + fast (recommended)
+  parakeet-v3            (630MB) - 25 European languages, fast
+  parakeet-v2            (630MB) - English only, fast
+  whisper-tiny            (78MB) - Fastest, basic quality
+  whisper-base           (148MB) - Good for quick drafts
+  whisper-small          (488MB) - Balanced for most uses
+  whisper-medium         (1.5GB) - Higher accuracy
+  whisper-large-v3       (3.1GB) - Highest accuracy, slowest
+  whisper-large-v3-turbo (1.6GB) - Best quality + fast (recommended)
 
 Download sources:
   huggingface (default) - Official Hugging Face
@@ -103,6 +105,7 @@ Download sources:
 
 Examples:
   vget ai models download whisper-large-v3-turbo
+  vget ai models download parakeet-v3
   vget ai models download whisper-small --from=vmirror`,
 	Args: cobra.ExactArgs(1),
 	Run:  runModelsDownload,
@@ -125,12 +128,13 @@ Examples:
 var aiDownloadCmd = &cobra.Command{
 	Use:   "download <model>",
 	Short: "Download a transcription model (alias for 'models download')",
-	Long: `Download a Whisper model for local transcription.
+	Long: `Download a transcription model for local speech-to-text.
 
 This is an alias for 'vget ai models download'.
 
 Examples:
   vget ai download whisper-large-v3-turbo
+  vget ai download parakeet-v3
   vget ai download whisper-small --from=vmirror`,
 	Args: cobra.ExactArgs(1),
 	Run:  runModelsDownload,
@@ -168,6 +172,41 @@ func runTranscribe(cmd *cobra.Command, args []string) {
 	modelName := aiModel
 	if modelName == "" {
 		modelName = transcriber.DefaultModel
+	}
+
+	// Validate model exists
+	model := transcriber.GetModel(modelName)
+	if model == nil {
+		fmt.Fprintf(os.Stderr, "Error: unknown model '%s'\n\n", modelName)
+		fmt.Println("Available models:")
+		for _, m := range transcriber.ASRModels {
+			fmt.Printf("  %-24s (%s) - %s\n", m.Name, m.Size, m.Description)
+		}
+		os.Exit(1)
+	}
+
+	// Check if language is valid at all
+	if !transcriber.IsValidLanguage(aiLanguage) {
+		fmt.Fprintf(os.Stderr, "Error: unknown language code '%s'\n\n", aiLanguage)
+		fmt.Fprintln(os.Stderr, "Common language codes:")
+		fmt.Fprintln(os.Stderr, "  zh - Chinese    en - English    ja - Japanese")
+		fmt.Fprintln(os.Stderr, "  ko - Korean     es - Spanish    fr - French")
+		fmt.Fprintln(os.Stderr, "  de - German     ru - Russian    pt - Portuguese")
+		os.Exit(1)
+	}
+
+	// Check if model supports the language
+	if !transcriber.ModelSupportsLanguage(modelName, aiLanguage) {
+		fmt.Fprintf(os.Stderr, "Error: model '%s' does not support language '%s'\n\n", modelName, aiLanguage)
+		if model.Engine == "sherpa" {
+			fmt.Fprintf(os.Stderr, "%s supports 25 European languages:\n", modelName)
+			fmt.Fprintln(os.Stderr, "  bg, hr, cs, da, nl, en, et, fi, fr, de, el, hu, it,")
+			fmt.Fprintln(os.Stderr, "  lv, lt, mt, pl, pt, ro, sk, sl, es, sv, ru, uk")
+			fmt.Fprintln(os.Stderr)
+			fmt.Fprintf(os.Stderr, "For %s, use a whisper model instead:\n", aiLanguage)
+			fmt.Fprintf(os.Stderr, "  vget ai transcribe %s -l %s --model whisper-large-v3-turbo\n", filePath, aiLanguage)
+		}
+		os.Exit(1)
 	}
 
 	// Check if model is downloaded

@@ -472,6 +472,30 @@ var parakeetLangs = map[string]bool{
 	"sl": true, "es": true, "sv": true, "ru": true, "uk": true,
 }
 
+// Whisper supported languages (99 languages)
+var whisperLangs = map[string]bool{
+	"af": true, "am": true, "ar": true, "as": true, "az": true,
+	"ba": true, "be": true, "bg": true, "bn": true, "bo": true,
+	"br": true, "bs": true, "ca": true, "cs": true, "cy": true,
+	"da": true, "de": true, "el": true, "en": true, "es": true,
+	"et": true, "eu": true, "fa": true, "fi": true, "fo": true,
+	"fr": true, "gl": true, "gu": true, "ha": true, "haw": true,
+	"he": true, "hi": true, "hr": true, "ht": true, "hu": true,
+	"hy": true, "id": true, "is": true, "it": true, "ja": true,
+	"jw": true, "ka": true, "kk": true, "km": true, "kn": true,
+	"ko": true, "la": true, "lb": true, "ln": true, "lo": true,
+	"lt": true, "lv": true, "mg": true, "mi": true, "mk": true,
+	"ml": true, "mn": true, "mr": true, "ms": true, "mt": true,
+	"my": true, "ne": true, "nl": true, "nn": true, "no": true,
+	"oc": true, "pa": true, "pl": true, "ps": true, "pt": true,
+	"ro": true, "ru": true, "sa": true, "sd": true, "si": true,
+	"sk": true, "sl": true, "sn": true, "so": true, "sq": true,
+	"sr": true, "su": true, "sv": true, "sw": true, "ta": true,
+	"te": true, "tg": true, "th": true, "tk": true, "tl": true,
+	"tr": true, "tt": true, "uk": true, "ur": true, "uz": true,
+	"vi": true, "yi": true, "yo": true, "zh": true, "yue": true,
+}
+
 // RecommendModel recommends a model based on language.
 // For EU languages, parakeet-v3 is faster; for others, use whisper.
 func RecommendModel(language string) string {
@@ -488,3 +512,31 @@ func RecommendEngine(language string) string {
 	}
 	return "whisper"
 }
+
+// ModelSupportsLanguage checks if a model supports a given language.
+// Parakeet models only support 25 European languages.
+// Whisper models support 99 languages.
+func ModelSupportsLanguage(modelName, lang string) bool {
+	model := GetModel(modelName)
+	if model == nil {
+		return false
+	}
+
+	// Whisper supports 99 languages
+	if model.Engine == "whisper" {
+		return whisperLangs[lang]
+	}
+
+	// Parakeet only supports European languages
+	if model.Engine == "sherpa" {
+		return parakeetLangs[lang]
+	}
+
+	return false
+}
+
+// IsValidLanguage checks if a language code is valid (supported by any model).
+func IsValidLanguage(lang string) bool {
+	return whisperLangs[lang] || parakeetLangs[lang]
+}
+
