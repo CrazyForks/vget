@@ -15,7 +15,7 @@ var sherpaBinary []byte
 func extractSherpaBinary() (string, error) {
 	// Check for NVIDIA GPU first (hasNvidiaGPU is defined in whisper_embed_windows_amd64.go)
 	if !hasNvidiaGPU() {
-		return "", fmt.Errorf("AI features require NVIDIA GPU with CUDA support. No NVIDIA GPU detected")
+		return "", fmt.Errorf("local transcription requires NVIDIA GPU with CUDA support. No NVIDIA GPU detected. Use cloud transcription (OpenAI) instead")
 	}
 
 	if len(sherpaBinary) == 0 {

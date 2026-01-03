@@ -16,7 +16,7 @@ var whisperBinary []byte
 func extractWhisperBinary() (string, error) {
 	// Check for NVIDIA GPU first
 	if !hasNvidiaGPU() {
-		return "", fmt.Errorf("AI features require NVIDIA GPU with CUDA support. No NVIDIA GPU detected")
+		return "", fmt.Errorf("local transcription requires NVIDIA GPU with CUDA support. No NVIDIA GPU detected. Use cloud transcription (OpenAI) instead")
 	}
 
 	if len(whisperBinary) == 0 {

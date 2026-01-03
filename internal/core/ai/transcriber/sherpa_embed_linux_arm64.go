@@ -4,7 +4,8 @@ package transcriber
 
 import "fmt"
 
-// AI features are not available on Linux.
+// Local transcription is not available on Linux CLI.
+// Use cloud transcription (OpenAI) via Docker/API instead.
 func extractSherpaBinary() (string, error) {
-	return "", fmt.Errorf("AI features are not available on Linux")
+	return "", fmt.Errorf("local transcription is not available on Linux. Use cloud transcription (OpenAI) instead")
 }
