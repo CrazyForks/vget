@@ -21,6 +21,7 @@ type Pipeline struct {
 	transcriber transcriber.Transcriber
 	summarizer  summarizer.Summarizer
 	chunker     *Chunker
+	provider    string // tracks configured provider for better error messages
 }
 
 // Options configures the pipeline processing.
@@ -114,7 +115,8 @@ func NewPipelineWithAccount(account *config.AIAccount, transcriptionModel, summa
 	}
 
 	p := &Pipeline{
-		chunker: NewChunker(),
+		chunker:  NewChunker(),
+		provider: account.Provider,
 	}
 
 	// Initialize transcriber (OpenAI is the only provider that supports transcription)
@@ -141,7 +143,8 @@ func NewPipelineWithAccount(account *config.AIAccount, transcriptionModel, summa
 // If summarizationAccount is nil, summarization will not be available.
 func NewLocalPipeline(localASRCfg config.LocalASRConfig, summarizationAccount *config.AIAccount, summarizationModel, pin string) (*Pipeline, error) {
 	p := &Pipeline{
-		chunker: NewChunker(),
+		chunker:  NewChunker(),
+		provider: "local",
 	}
 
 	// Initialize local transcriber
@@ -208,6 +211,9 @@ func (p *Pipeline) ProcessWithProgress(ctx context.Context, filePath string, opt
 
 	if opts.Transcribe {
 		if p.transcriber == nil {
+			if p.provider != "" && p.provider != "openai" {
+				return nil, fmt.Errorf("transcription requires OpenAI (current provider: %s)\nHint: Configure an OpenAI account with 'vget ai config', or use local transcription with 'vget ai transcribe --local'", p.provider)
+			}
 			return nil, fmt.Errorf("transcription not configured\nRun: vget ai config")
 		}
 
@@ -399,7 +405,7 @@ func (p *Pipeline) transcribeWithProgress(ctx context.Context, filePath string, 
 	progressFn(ProgressStepChunk, 100, fmt.Sprintf("Created %d chunks", len(chunks)))
 	fmt.Printf("  Created %d chunks in: %s\n", len(chunks), manifest.ChunksDir)
 
-	// Transcribe each chunk (save each to disk for resumability)
+	// Transcribe each chunk
 	var results []*transcriber.Result
 	for i, chunk := range chunks {
 		progress := float64(i) / float64(len(chunks)) * 100
@@ -407,26 +413,9 @@ func (p *Pipeline) transcribeWithProgress(ctx context.Context, filePath string, 
 		progressFn(ProgressStepTranscribe, progress, detail)
 		fmt.Printf("  [%d/%d] Transcribing chunk...\n", i+1, len(chunks))
 
-		// Check if chunk was already transcribed (for resumability)
-		chunkTranscriptPath := strings.TrimSuffix(chunk.FilePath, filepath.Ext(chunk.FilePath)) + ".txt"
-		if manifest.Chunks[i].Status == "transcribed" {
-			if data, err := os.ReadFile(chunkTranscriptPath); err == nil {
-				fmt.Printf("  [%d/%d] Using cached transcript\n", i+1, len(chunks))
-				results = append(results, &transcriber.Result{RawText: string(data)})
-				continue
-			}
-		}
-
 		result, err := p.transcriber.Transcribe(ctx, chunk.FilePath)
 		if err != nil {
 			return nil, manifest.ChunksDir, fmt.Errorf("failed to transcribe chunk %d: %w", i+1, err)
-		}
-
-		// Save chunk transcript to disk immediately (with timestamps)
-		if err := os.WriteFile(chunkTranscriptPath, []byte(result.FormattedText()), 0644); err != nil {
-			fmt.Printf("  Warning: failed to save chunk transcript: %v\n", err)
-		} else {
-			fmt.Printf("  [%d/%d] Saved: %s\n", i+1, len(chunks), filepath.Base(chunkTranscriptPath))
 		}
 
 		results = append(results, result)

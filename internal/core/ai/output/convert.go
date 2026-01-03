@@ -164,17 +164,3 @@ func formatVTTTimestamp(d time.Duration) string {
 	return fmt.Sprintf("%02d:%02d:%02d.%03d", hours, minutes, seconds, millis)
 }
 
-// ToTXT converts segments to plain text (no timestamps).
-func ToTXT(segments []Segment) string {
-	var b strings.Builder
-
-	for _, seg := range segments {
-		text := strings.TrimSpace(seg.Text)
-		if text != "" {
-			b.WriteString(text)
-			b.WriteString("\n")
-		}
-	}
-
-	return b.String()
-}

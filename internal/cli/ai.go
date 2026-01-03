@@ -51,7 +51,6 @@ Output format is detected from -o extension:
   .md  - Markdown with timestamps (default)
   .srt - SubRip subtitle format
   .vtt - WebVTT subtitle format
-  .txt - Plain text (no timestamps)
 
 Language is required. Common language codes:
   zh - Chinese    en - English    ja - Japanese
@@ -246,9 +245,6 @@ func runTranscribe(cmd *cobra.Command, args []string) {
 		case ".vtt":
 			segments := convertSegments(result.Transcript.Segments)
 			outputContent = aioutput.ToVTT(segments)
-		case ".txt":
-			segments := convertSegments(result.Transcript.Segments)
-			outputContent = aioutput.ToTXT(segments)
 		default:
 			// .md or other - copy markdown as-is
 			data, err := os.ReadFile(result.TranscriptPath)
@@ -457,7 +453,7 @@ func init() {
 	// Flags for transcribe command
 	aiTranscribeCmd.Flags().StringVar(&aiModel, "model", "", "model to use (default: whisper-large-v3-turbo)")
 	aiTranscribeCmd.Flags().StringVarP(&aiLanguage, "language", "l", "", "language code (required, e.g., zh, en, ja)")
-	aiTranscribeCmd.Flags().StringVarP(&aiOutput, "output", "o", "", "output file path (.md, .srt, .vtt, .txt)")
+	aiTranscribeCmd.Flags().StringVarP(&aiOutput, "output", "o", "", "output file path (.md, .srt, .vtt)")
 
 	// Flags for models command
 	aiModelsCmd.Flags().BoolVarP(&aiRemote, "remote", "r", false, "list models available for download")

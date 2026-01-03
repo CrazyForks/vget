@@ -80,28 +80,8 @@ func WriteVTT(outputPath string, result *transcriber.Result) error {
 	return os.WriteFile(outputPath, []byte(b.String()), 0644)
 }
 
-// WriteTXT writes a transcription result to a plain text file.
-func WriteTXT(outputPath string, result *transcriber.Result) error {
-	var b strings.Builder
-
-	if len(result.Segments) > 0 {
-		for _, seg := range result.Segments {
-			text := strings.TrimSpace(seg.Text)
-			if text != "" {
-				b.WriteString(text)
-				b.WriteString("\n")
-			}
-		}
-	} else {
-		b.WriteString(result.RawText)
-		b.WriteString("\n")
-	}
-
-	return os.WriteFile(outputPath, []byte(b.String()), 0644)
-}
-
 // WriteTranscriptWithFormat writes a transcription result to a file in the specified format.
-// Supported formats: "md" (markdown), "srt", "vtt", "txt"
+// Supported formats: "md" (markdown), "srt", "vtt"
 func WriteTranscriptWithFormat(basePath, sourcePath, format string, result *transcriber.Result) (string, error) {
 	var outputPath string
 	var err error
@@ -113,9 +93,6 @@ func WriteTranscriptWithFormat(basePath, sourcePath, format string, result *tran
 	case "vtt":
 		outputPath = basePath + ".vtt"
 		err = WriteVTT(outputPath, result)
-	case "txt":
-		outputPath = basePath + ".txt"
-		err = WriteTXT(outputPath, result)
 	case "md", "":
 		outputPath = basePath + ".transcript.md"
 		err = WriteTranscript(outputPath, sourcePath, result)
