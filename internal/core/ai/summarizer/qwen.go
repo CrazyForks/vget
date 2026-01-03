@@ -40,14 +40,14 @@ func NewQwen(cfg config.AIServiceConfig, apiKey string) (*Qwen, error) {
 
 	client := openai.NewClient(opts...)
 
-	model := cfg.Model
-	if model == "" {
-		model = "qwen-plus" // Default to qwen-plus (good balance of cost/performance)
+	// Model is required - no defaults
+	if cfg.Model == "" {
+		return nil, fmt.Errorf("qwen model not specified")
 	}
 
 	return &Qwen{
 		client: client,
-		model:  model,
+		model:  cfg.Model,
 	}, nil
 }
 

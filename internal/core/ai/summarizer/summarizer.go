@@ -36,6 +36,8 @@ func New(provider string, cfg config.AIServiceConfig, apiKey string) (Summarizer
 		return NewAnthropic(cfg, apiKey)
 	case "qwen":
 		return NewQwen(cfg, apiKey)
+	case "deepseek", "moonshot", "zhipu", "minimax", "baichuan", "volcengine":
+		return NewOpenAICompat(provider, cfg, apiKey)
 	default:
 		return nil, fmt.Errorf("unsupported summarization provider: %s", provider)
 	}
