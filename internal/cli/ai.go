@@ -11,6 +11,7 @@ import (
 	"github.com/guiyumin/vget/internal/core/ai"
 	aioutput "github.com/guiyumin/vget/internal/core/ai/output"
 	"github.com/guiyumin/vget/internal/core/ai/transcriber"
+	"github.com/guiyumin/vget/internal/core/auth"
 	"github.com/guiyumin/vget/internal/core/config"
 	"github.com/guiyumin/vget/internal/core/i18n"
 	"github.com/spf13/cobra"
@@ -426,8 +427,18 @@ func runModelsDownload(cmd *cobra.Command, args []string) {
 			fmt.Fprintf(os.Stderr, "  vget ai download %s\n", modelName)
 			os.Exit(1)
 		}
-		downloadURL = model.VmirrorURL
 		source = "vmirror.org"
+
+		// Get signed URL from auth server
+		fmt.Println()
+		filename := transcriber.GetVmirrorFilename(modelName)
+		signedURL, err := auth.GetSignedURL(filename)
+		if err != nil {
+			errStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("196"))
+			fmt.Fprintf(os.Stderr, "%s %v\n", errStyle.Render("Authentication failed:"), err)
+			os.Exit(1)
+		}
+		downloadURL = signedURL
 	case "huggingface", "github", "":
 		// Default: GitHub for parakeet, Hugging Face for whisper (already set)
 	default:

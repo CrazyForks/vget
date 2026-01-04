@@ -263,9 +263,14 @@ func (m *ModelManager) DownloadModelWithProgress(modelName, url, lang string) (s
 		downloadURL = model.OfficialURL
 	}
 
+	// Build headers (just User-Agent, signed URLs handle auth)
+	headers := map[string]string{
+		"User-Agent": vgetUserAgent,
+	}
+
 	// Handle archive downloads (parakeet)
 	if !model.IsFile {
-		if err := m.downloadArchive(model, downloadURL); err != nil {
+		if err := m.downloadArchive(model, downloadURL, headers); err != nil {
 			return "", err
 		}
 		return m.ModelPath(modelName), nil
@@ -275,11 +280,11 @@ func (m *ModelManager) DownloadModelWithProgress(modelName, url, lang string) (s
 	target := filepath.Join(m.modelsDir, model.DirName)
 
 	// Try TUI progress bar first, fall back to simple progress if TTY not available
-	err := downloader.RunDownloadTUI(downloadURL, target, modelName, lang, nil)
+	err := downloader.RunDownloadTUI(downloadURL, target, modelName, lang, headers)
 	if err != nil && isNoTTYError(err) {
 		// Fall back to simple progress display
 		fmt.Printf("URL: %s\n\n", downloadURL)
-		if err := m.downloadModelWithSimpleProgress(model, downloadURL); err != nil {
+		if err := m.downloadModelWithSimpleProgress(model, downloadURL, headers); err != nil {
 			return "", err
 		}
 		return target, nil
@@ -300,13 +305,15 @@ func isNoTTYError(err error) bool {
 }
 
 // downloadModelWithSimpleProgress downloads with simple console progress
-func (m *ModelManager) downloadModelWithSimpleProgress(model *ASRModel, url string) error {
-	// Create request with custom User-Agent for CDN protection
+func (m *ModelManager) downloadModelWithSimpleProgress(model *ASRModel, url string, headers map[string]string) error {
+	// Create request with headers
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("User-Agent", vgetUserAgent)
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -460,7 +467,7 @@ func (m *ModelManager) downloadModel(model *ASRModel) error {
 
 // downloadArchive downloads and extracts an archive (tar.bz2 or zip) from the given URL.
 // Handles renaming for GitHub downloads where the extracted dir name differs from DirName.
-func (m *ModelManager) downloadArchive(model *ASRModel, url string) error {
+func (m *ModelManager) downloadArchive(model *ASRModel, url string, headers map[string]string) error {
 	// Ensure models directory exists
 	if err := os.MkdirAll(m.modelsDir, 0755); err != nil {
 		return fmt.Errorf("failed to create models directory: %w", err)
@@ -468,12 +475,14 @@ func (m *ModelManager) downloadArchive(model *ASRModel, url string) error {
 
 	fmt.Printf("    %s %s\n\n", dlLabelStyle.Render("URL:"), dlURLStyle.Render(url))
 
-	// Download with custom User-Agent for CDN protection
+	// Download with headers
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("User-Agent", vgetUserAgent)
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -720,6 +729,21 @@ func ListVmirrorModels() []string {
 		}
 	}
 	return names
+}
+
+// GetVmirrorFilename returns the filename for a model on vmirror CDN.
+// e.g., "whisper-tiny.bin" or "sherpa-onnx-parakeet-v3.zip"
+func GetVmirrorFilename(modelName string) string {
+	model := GetModel(modelName)
+	if model == nil {
+		return ""
+	}
+	// For single-file models, use DirName (e.g., "whisper-tiny.bin")
+	if model.IsFile {
+		return model.DirName
+	}
+	// For archive models, use DirName + ".zip"
+	return model.DirName + ".zip"
 }
 
 // Parakeet supported languages (25 European languages)
