@@ -281,6 +281,7 @@ type AICLITranslations struct {
 	AuthFailed         string `yaml:"auth_failed"`
 	EmailRequired      string `yaml:"email_required"`
 	AuthServerDown     string `yaml:"auth_server_down"`
+	RateLimitExceeded  string `yaml:"rate_limit_exceeded"`
 }
 
 var (

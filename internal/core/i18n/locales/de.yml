@@ -240,3 +240,4 @@ ai_cli:
   auth_failed: "Authentifizierung fehlgeschlagen:"
   email_required: "E-Mail ist erforderlich."
   auth_server_down: "Verbindung zum Authentifizierungsserver nicht möglich. Überprüfen Sie Ihr Netzwerk."
+  rate_limit_exceeded: "Zu viele Downloads. Bitte versuchen Sie es in einigen Stunden erneut."

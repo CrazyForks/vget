@@ -18,6 +18,9 @@ import (
 // ErrAuthServerDown indicates the auth server is unreachable
 var ErrAuthServerDown = errors.New("auth server unreachable")
 
+// ErrRateLimitExceeded indicates too many downloads
+var ErrRateLimitExceeded = errors.New("rate limit exceeded")
+
 // AuthEndpoint is the backend endpoint for authentication.
 var AuthEndpoint = getAuthEndpoint()
 
@@ -113,6 +116,7 @@ type SignedURLResponse struct {
 	URL       string `json:"url"`
 	ExpiresIn int64  `json:"expires_in"` // seconds
 	Error     string `json:"error,omitempty"`
+	ErrorCode string `json:"error_code,omitempty"`
 }
 
 // RequestSignedURL requests a signed CDN URL from the auth server.
@@ -148,6 +152,10 @@ func RequestSignedURL(email, file string) (*SignedURLResponse, error) {
 	var signedResp SignedURLResponse
 	if err := json.NewDecoder(resp.Body).Decode(&signedResp); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if signedResp.ErrorCode == "RATE_LIMIT" {
+		return nil, ErrRateLimitExceeded
 	}
 
 	if signedResp.Error != "" {
@@ -217,9 +225,12 @@ func GetSignedURL(file, lang string) (string, error) {
 	// Request signed URL
 	resp, err := RequestSignedURL(email, file)
 	if err != nil {
+		t := i18n.T(lang)
 		if errors.Is(err, ErrAuthServerDown) {
-			t := i18n.T(lang)
 			return "", errors.New(t.AICLI.AuthServerDown)
+		}
+		if errors.Is(err, ErrRateLimitExceeded) {
+			return "", errors.New(t.AICLI.RateLimitExceeded)
 		}
 		return "", err
 	}

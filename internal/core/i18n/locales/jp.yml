@@ -240,3 +240,4 @@ ai_cli:
   auth_failed: "認証に失敗しました："
   email_required: "メールアドレスを入力してください。"
   auth_server_down: "認証サーバーに接続できません。ネットワークを確認してください。"
+  rate_limit_exceeded: "ダウンロード回数が多すぎます。数時間後に再試行してください。"

@@ -240,3 +240,4 @@ ai_cli:
   auth_failed: "인증 실패:"
   email_required: "이메일을 입력하세요."
   auth_server_down: "인증 서버에 연결할 수 없습니다. 네트워크를 확인하세요."
+  rate_limit_exceeded: "다운로드 횟수가 너무 많습니다. 몇 시간 후에 다시 시도하세요."
