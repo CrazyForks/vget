@@ -1547,14 +1547,16 @@ func (s *Server) downloadVideoWithAudio(ctx context.Context, format *extractor.V
 		return fmt.Errorf("failed to download audio stream: %w", audioErr)
 	}
 
-	// Merge with ffmpeg
-	if !downloader.FFmpegAvailable() {
-		return fmt.Errorf("ffmpeg not available, video and audio downloaded separately: %s, %s", videoFile, audioFile)
-	}
-
-	_, err := downloader.MergeVideoAudioKeepOriginals(videoFile, audioFile)
-	if err != nil {
-		return fmt.Errorf("ffmpeg merge failed: %w (files: %s, %s)", err, videoFile, audioFile)
+	// Try to merge with ffmpeg if available
+	if downloader.FFmpegAvailable() {
+		_, err := downloader.MergeVideoAudioKeepOriginals(videoFile, audioFile)
+		if err != nil {
+			// Merge failed but downloads succeeded - log warning but don't fail
+			log.Printf("Warning: ffmpeg merge failed: %v (files kept: %s, %s)", err, videoFile, audioFile)
+		}
+	} else {
+		// ffmpeg not available - just leave the separate files
+		log.Printf("ffmpeg not found, video and audio saved separately: %s, %s", videoFile, audioFile)
 	}
 
 	return nil
