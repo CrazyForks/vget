@@ -68,6 +68,8 @@ docker run -d -p 8080:8080 -v ~/downloads:/home/vget/downloads ghcr.io/guiyumin/
 docker run -d --gpus all -p 8080:8080 -v ~/downloads:/home/vget/downloads ghcr.io/guiyumin/vget:cuda-large
 ```
 
+See [Docker GPU Passthrough Guide](docs/ai/docker-gpu-passthrough.md) for detailed setup instructions (Windows/Linux).
+
 ## Supported Sources
 
 See [sites.md](sites.md) for the full list of supported sites.

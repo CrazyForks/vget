@@ -17,6 +17,7 @@ require (
 	github.com/go-audio/wav v1.1.0
 	github.com/go-rod/rod v0.116.2
 	github.com/go-rod/stealth v0.4.9
+	github.com/google/uuid v1.6.0
 	github.com/gotd/td v0.136.0
 	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/k2-fsa/sherpa-onnx-go v1.12.20
@@ -68,7 +69,6 @@ require (
 	github.com/goccy/go-yaml v1.18.0 // indirect
 	github.com/google/go-github/v30 v30.1.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/gotd/ige v0.2.2 // indirect
 	github.com/gotd/neo v0.1.5 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect

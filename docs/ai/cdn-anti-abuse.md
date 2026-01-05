@@ -101,6 +101,7 @@ func GetDeviceFingerprint() string {
 | macOS | `ioreg` IOPlatformUUID | `system_profiler` serial |
 | Linux | `/etc/machine-id` | `/sys/class/dmi/id/product_serial` |
 | Windows | Registry MachineGuid | `wmic bios` serial |
+| Docker | `~/.config/vget/device_id` (persistent UUID) | N/A |
 
 **Device registration caching:**
 
@@ -110,6 +111,57 @@ func GetDeviceFingerprint() string {
   "email": "user@example.com",
   "fingerprint": "a3f8b2c1d4e5f678..."
 }
+```
+
+**Docker fingerprint generation:**
+
+Docker containers lack stable machine identifiers (`/etc/machine-id` is ephemeral, hardware serial is inaccessible). vget automatically detects Docker environments and uses a persistent UUID instead:
+
+```go
+// internal/core/auth/fingerprint_linux.go
+func isDocker() bool {
+    // Check for /.dockerenv file
+    if _, err := os.Stat("/.dockerenv"); err == nil {
+        return true
+    }
+    // Check cgroup for docker/containerd
+    if data, err := os.ReadFile("/proc/1/cgroup"); err == nil {
+        if strings.Contains(string(data), "docker") {
+            return true
+        }
+    }
+    return false
+}
+
+func getDockerDeviceID() string {
+    deviceIDPath := "~/.config/vget/device_id"
+    // Read existing or generate new UUID
+    // Persists on mounted config volume
+}
+```
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Docker Container                                            │
+│                                                              │
+│  First run:                                                  │
+│    1. Detect Docker (/.dockerenv exists)                     │
+│    2. Generate UUID: "550e8400-e29b-41d4-a716-446655440000" │
+│    3. Store in ~/.config/vget/device_id (mounted volume)    │
+│                                                              │
+│  Subsequent runs:                                            │
+│    1. Detect Docker                                          │
+│    2. Read existing device_id from volume                    │
+│    → Same fingerprint, same device registration              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Important:** The config volume must be mounted for persistence:
+
+```yaml
+# compose.yml
+volumes:
+  - ./config:/home/vget/.config/vget  # device_id persists here
 ```
 
 ### 2. Backend API (`vget-io/app/api/v1/token/`)
@@ -383,7 +435,7 @@ internal/core/auth/
 ├── email.go               # Email validation (RFC regex)
 ├── fingerprint.go         # GetDeviceFingerprint()
 ├── fingerprint_darwin.go  # macOS: IOPlatformUUID + hardware serial
-├── fingerprint_linux.go   # Linux: /etc/machine-id + DMI serial
+├── fingerprint_linux.go   # Linux: /etc/machine-id + DMI serial + Docker detection
 ├── fingerprint_windows.go # Windows: MachineGuid + BIOS serial
 └── token.go               # Signed URL request, error handling
 ```
@@ -417,3 +469,12 @@ A: Users can download from official sources (HuggingFace/GitHub) by omitting `--
 
 **Q: Why email instead of username?**
 A: Email provides natural accountability and is already familiar to users. No need to invent a new identity system.
+
+**Q: How does fingerprinting work in Docker?**
+A: Docker containers lack stable machine identifiers. vget auto-detects Docker (via `/.dockerenv` or cgroup) and generates a persistent UUID stored in `~/.config/vget/device_id`. This persists across container restarts as long as the config volume is mounted.
+
+**Q: What if I recreate my Docker container?**
+A: If the config volume is mounted, the device_id persists and you keep the same fingerprint. If you delete the volume, a new UUID is generated and counts as a new device.
+
+**Q: Can someone abuse Docker to create unlimited devices?**
+A: Each new volume creates a new device, but they still need unique emails (2 devices per email limit). The friction of managing multiple volumes + emails makes mass abuse impractical.
