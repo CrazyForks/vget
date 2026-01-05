@@ -34,8 +34,9 @@ var aiCmd = &cobra.Command{
 Models are downloaded on first use and stored in ~/.config/vget/models/
 
 Examples:
-  vget ai transcribe audio.mp3 --language zh
-  vget ai transcribe audio.mp3 -l zh -o output.srt
+  # speech-to-text (alias for transcribe)
+  vget ai stt audio.mp3 -l zh            
+  vget ai stt audio.mp3 -l zh -o out.srt
   vget ai models
   vget ai models download whisper-large-v3-turbo`,
 }
@@ -43,8 +44,10 @@ Examples:
 // aiTranscribeCmd transcribes audio/video files
 var aiTranscribeCmd = &cobra.Command{
 	Use:   "transcribe <file>",
-	Short: "Transcribe audio/video to markdown",
+	Short: "Transcribe audio/video to markdown (use 'stt' for short)",
 	Long: `Transcribe audio or video files with timestamps.
+
+Tip: Use 'vget ai stt' as a shorter alias.
 
 The transcript is saved as <filename>.transcript.md by default.
 
@@ -59,9 +62,8 @@ Language is required. Common language codes:
   de - German     ru - Russian    pt - Portuguese
 
 Examples:
-  vget ai transcribe podcast.mp3 --language zh
-  vget ai transcribe podcast.mp3 -l zh -o subtitles.srt
-  vget ai transcribe podcast.mp3 -l zh -o captions.vtt
+  vget ai stt podcast.mp3 -l zh
+  vget ai stt podcast.mp3 -l zh -o subtitles.srt
   vget ai transcribe podcast.mp3 -l en --model whisper-small`,
 	Args: cobra.ExactArgs(1),
 	Run:  runTranscribe,
@@ -138,6 +140,32 @@ Examples:
   vget ai download whisper-small --from=vmirror`,
 	Args: cobra.ExactArgs(1),
 	Run:  runModelsDownload,
+}
+
+// aiSttCmd is speech-to-text command (stt = speech-to-text)
+var aiSttCmd = &cobra.Command{
+	Use:   "stt <file>",
+	Short: "Speech-to-text transcription",
+	Long: `Transcribe audio or video files with timestamps.
+
+The transcript is saved as <filename>.transcript.md by default.
+
+Output format is detected from -o extension:
+  .md  - Markdown with timestamps (default)
+  .srt - SubRip subtitle format
+  .vtt - WebVTT subtitle format
+
+Language is required. Common language codes:
+  zh - Chinese    en - English    ja - Japanese
+  ko - Korean     es - Spanish    fr - French
+  de - German     ru - Russian    pt - Portuguese
+
+Examples:
+  vget ai stt podcast.mp3 -l zh
+  vget ai stt podcast.mp3 -l zh -o subtitles.srt
+  vget ai stt podcast.mp3 -l en --model whisper-small`,
+	Args: cobra.ExactArgs(1),
+	Run:  runTranscribe,
 }
 
 func runTranscribe(cmd *cobra.Command, args []string) {
@@ -544,12 +572,18 @@ func init() {
 	// Flags for download alias command
 	aiDownloadCmd.Flags().StringVar(&aiFrom, "from", "huggingface", "download source: huggingface (default), vmirror")
 
+	// Flags for stt alias command
+	aiSttCmd.Flags().StringVar(&aiModel, "model", "", "model to use (default: whisper-large-v3-turbo)")
+	aiSttCmd.Flags().StringVarP(&aiLanguage, "language", "l", "", "language code (required, e.g., zh, en, ja)")
+	aiSttCmd.Flags().StringVarP(&aiOutput, "output", "o", "", "output file path (.md, .srt, .vtt)")
+
 	// Add subcommands to models
 	aiModelsCmd.AddCommand(aiModelsDownloadCmd)
 	aiModelsCmd.AddCommand(aiModelsRmCmd)
 
 	// Add subcommands to ai
 	aiCmd.AddCommand(aiTranscribeCmd)
+	aiCmd.AddCommand(aiSttCmd)      // Alias for transcribe
 	aiCmd.AddCommand(aiModelsCmd)
 	aiCmd.AddCommand(aiDownloadCmd) // Alias for models download
 
