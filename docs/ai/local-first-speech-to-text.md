@@ -46,14 +46,16 @@ else:
 - Whisper is required for Chinese and other non-European languages
 - Users can override the default via settings
 
-## Docker Image Variants
+## Docker Image
 
-| Tag | Models | Size | Recommendation |
-|-----|--------|------|----------------|
-| `:latest` | None | ~200MB | Download on first use |
-| `:full-small` | Parakeet V3 INT8 + Whisper Small | ~1.0GB | NAS <8GB RAM |
-| `:full-medium` | Parakeet V3 INT8 + Whisper Medium | ~1.5GB | 8-16GB RAM |
-| `:full-large` | Parakeet V3 INT8 + Whisper Large Turbo | ~2.3GB | GPU or 32GB+ RAM |
+Single image for all users - runtime GPU detection determines behavior:
+
+| Condition | Mode | Model Source |
+|-----------|------|--------------|
+| `--gpus all` + NVIDIA GPU | Local transcription | Download on demand from HuggingFace/vmirror |
+| No GPU flag or no NVIDIA | Cloud API | OpenAI Whisper API, Groq, etc. |
+
+Models are not bundled in the image (~300MB base). They are downloaded on first use.
 
 ## Model Details
 
@@ -147,45 +149,22 @@ for {
 | `internal/core/ai/transcriber/whisper.go` | Whisper transcriber (whisper.cpp) |
 | `internal/core/ai/transcriber/models.go` | Model definitions and management |
 | `internal/core/ai/transcriber/transcriber.go` | Interface and factory |
-| `docker/vget-base/Dockerfile` | Base image with sherpa-onnx + whisper.cpp libs |
-| `docker/vget/Dockerfile` | Main image with model downloads |
-
-## Base Image (vget-base)
-
-The base image includes both sherpa-onnx and whisper.cpp shared libraries:
-
-```dockerfile
-FROM golang:1.25-bookworm
-
-# Download pre-built sherpa-onnx libraries (for Parakeet)
-ARG SHERPA_VERSION=1.12.20
-RUN curl -L "https://github.com/k2-fsa/sherpa-onnx/releases/download/v${SHERPA_VERSION}/sherpa-onnx-v${SHERPA_VERSION}-linux-x64-shared.tar.bz2" | tar -xjf - && \
-    cp sherpa-onnx-*/lib/*.so* /usr/local/lib/ && \
-    cp -r sherpa-onnx-*/include/* /usr/local/include/ && \
-    ldconfig
-
-# Build whisper.cpp from source (for optimized Whisper)
-ARG WHISPER_VERSION=1.7.3
-RUN git clone --depth 1 --branch v${WHISPER_VERSION} https://github.com/ggerganov/whisper.cpp && \
-    cd whisper.cpp && \
-    cmake -B build -DBUILD_SHARED_LIBS=ON -DGGML_NATIVE=OFF && \
-    cmake --build build --config Release && \
-    cp build/src/libwhisper.so* /usr/local/lib/ && \
-    cp include/whisper.h /usr/local/include/ && \
-    ldconfig
-
-ENV CGO_ENABLED=1
-```
+| `docker/vget/Dockerfile` | Single Docker image with sherpa-onnx + whisper.cpp |
 
 ## Docker Usage
 
 ```bash
-# Pull and run (downloads models on first use)
+# Pull and run
 docker compose up -d
 
-# Or use pre-bundled models
-# Edit compose.yml to use :full-small, :full-medium, or :full-large
+# With NVIDIA GPU for local transcription
+docker run --gpus all -p 8080:8080 ghcr.io/guiyumin/vget:latest
+
+# Without GPU - uses cloud API (OpenAI Whisper, Groq, etc.)
+docker run -p 8080:8080 ghcr.io/guiyumin/vget:latest
 ```
+
+Models are downloaded on first use from HuggingFace or vmirror (China).
 
 ## Comparison: Parakeet vs Whisper
 

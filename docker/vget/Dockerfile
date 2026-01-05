@@ -17,14 +17,102 @@ RUN npm ci
 COPY ui/ ./
 RUN npm run build
 
-# Build stage for Go binary
-# Uses pre-built base image with sherpa-onnx + whisper.cpp already installed
-# Base image is built by .github/workflows/build-base-image.yml
-FROM ghcr.io/guiyumin/vget-base:latest AS go-builder-false
-FROM ghcr.io/guiyumin/vget-base:cuda AS go-builder-true
+# Build stage for Go binary with sherpa-onnx + whisper.cpp
+FROM golang:1.25-bookworm AS go-builder-false
+FROM nvidia/cuda:12.6.3-devel-ubuntu24.04 AS go-builder-true
 
-# Select builder based on CUDA (false=CPU, true=CUDA)
+ARG ENABLE_CUDA=false
 FROM go-builder-${ENABLE_CUDA} AS go-builder
+
+# Re-declare ARG after FROM
+ARG ENABLE_CUDA=false
+
+# Install Go for CUDA image (already present in golang image)
+RUN if [ "$ENABLE_CUDA" = "true" ]; then \
+        apt-get update && apt-get install -y --no-install-recommends \
+            wget ca-certificates && \
+        wget -q https://go.dev/dl/go1.25.4.linux-amd64.tar.gz && \
+        tar -C /usr/local -xzf go1.25.4.linux-amd64.tar.gz && \
+        rm go1.25.4.linux-amd64.tar.gz && \
+        rm -rf /var/lib/apt/lists/*; \
+    fi
+
+ENV PATH="/usr/local/go/bin:${PATH}"
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# sherpa-onnx version (for Parakeet)
+ARG SHERPA_VERSION=1.12.20
+
+# Download sherpa-onnx headers from source
+RUN curl -L "https://github.com/k2-fsa/sherpa-onnx/archive/refs/tags/v${SHERPA_VERSION}.tar.gz" | tar -xzf - && \
+    cp sherpa-onnx-${SHERPA_VERSION}/sherpa-onnx/c-api/c-api.h /usr/local/include/ && \
+    cp sherpa-onnx-${SHERPA_VERSION}/sherpa-onnx/c-api/cxx-api.h /usr/local/include/ && \
+    rm -rf sherpa-onnx-${SHERPA_VERSION}
+
+# Download and install pre-built sherpa-onnx shared libraries
+ARG TARGETARCH
+RUN if [ "$ENABLE_CUDA" = "true" ]; then \
+        echo "Downloading sherpa-onnx CUDA version..." && \
+        curl -L "https://github.com/k2-fsa/sherpa-onnx/releases/download/v${SHERPA_VERSION}/sherpa-onnx-v${SHERPA_VERSION}-cuda-12.x-cudnn-9.x-linux-x64-gpu.tar.bz2" | tar -xjf - && \
+        cp sherpa-onnx-v${SHERPA_VERSION}-cuda-12.x-cudnn-9.x-linux-x64-gpu/lib/*.so* /usr/local/lib/ && \
+        rm -rf sherpa-onnx-v${SHERPA_VERSION}-cuda-12.x-cudnn-9.x-linux-x64-gpu; \
+    else \
+        if [ "$TARGETARCH" = "arm64" ]; then \
+            SHERPA_ARCH="aarch64"; \
+            SHERPA_SUFFIX="-cpu"; \
+        else \
+            SHERPA_ARCH="x64"; \
+            SHERPA_SUFFIX=""; \
+        fi && \
+        curl -L "https://github.com/k2-fsa/sherpa-onnx/releases/download/v${SHERPA_VERSION}/sherpa-onnx-v${SHERPA_VERSION}-linux-${SHERPA_ARCH}-shared${SHERPA_SUFFIX}.tar.bz2" | tar -xjf - && \
+        cp sherpa-onnx-v${SHERPA_VERSION}-linux-${SHERPA_ARCH}-shared${SHERPA_SUFFIX}/lib/*.so* /usr/local/lib/ && \
+        rm -rf sherpa-onnx-v${SHERPA_VERSION}-linux-${SHERPA_ARCH}-shared${SHERPA_SUFFIX}; \
+    fi && \
+    ldconfig
+
+# whisper.cpp commit (must match Go bindings in go.mod)
+ARG WHISPER_COMMIT=6114e692136b
+
+# Build whisper.cpp from source with shared library
+RUN git clone https://github.com/ggerganov/whisper.cpp /tmp/whisper.cpp && \
+    cd /tmp/whisper.cpp && git checkout ${WHISPER_COMMIT} && \
+    if [ "$ENABLE_CUDA" = "true" ]; then \
+        cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=ON \
+            -DGGML_NATIVE=OFF \
+            -DGGML_CUDA=ON \
+            -DWHISPER_BUILD_EXAMPLES=OFF \
+            -DWHISPER_BUILD_TESTS=OFF; \
+    else \
+        cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=ON \
+            -DGGML_NATIVE=OFF \
+            -DWHISPER_BUILD_EXAMPLES=OFF \
+            -DWHISPER_BUILD_TESTS=OFF; \
+    fi && \
+    cmake --build build --config Release -j$(nproc) && \
+    cp build/src/libwhisper.so* /usr/local/lib/ && \
+    cp build/ggml/src/libggml*.so* /usr/local/lib/ && \
+    cp include/whisper.h /usr/local/include/ && \
+    cp ggml/include/ggml*.h /usr/local/include/ && \
+    rm -rf /tmp/whisper.cpp && \
+    ldconfig
+
+# Set environment variables for CGO
+ENV CGO_ENABLED=1
+ENV LD_LIBRARY_PATH=/usr/local/lib
+ENV C_INCLUDE_PATH=/usr/local/include
+ENV LIBRARY_PATH=/usr/local/lib
+
 WORKDIR /app
 
 # Copy go mod files first for caching
@@ -40,27 +128,18 @@ COPY --from=ui-builder /app/ui/dist ./internal/server/dist
 # Build the server binary with CGO enabled
 RUN go build -ldflags="-s -w" -o /vget-server ./cmd/vget-server
 
-# Final runtime stage - use CUDA runtime for GPU support
+# Final runtime stage
 FROM debian:bookworm-slim AS runtime-false
 FROM nvidia/cuda:12.6.3-runtime-ubuntu24.04 AS runtime-true
 
-# Select runtime based on CUDA (false=CPU, true=CUDA)
-FROM runtime-${ENABLE_CUDA} AS runtime
-
-# Re-declare args after FROM
 ARG ENABLE_CUDA=false
+FROM runtime-${ENABLE_CUDA} AS runtime
 
 # No models bundled - downloaded on demand at runtime
 # GPU users: download from HuggingFace or vmirror (China)
 # No GPU: use cloud API (OpenAI Whisper, Groq, etc.)
 
 # Install runtime dependencies
-# - ca-certificates: for HTTPS requests
-# - chromium: for browser-based extractors (XHS, etc.)
-# - font packages: for proper text rendering in headless browser
-# - python3/pip: for yt-dlp and youtube-dl
-# - ffmpeg: for merging video/audio streams and audio conversion
-# - nodejs: for yt-dlp JS challenge solving (N parameter)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     chromium \
@@ -82,17 +161,16 @@ RUN pip3 install --no-cache-dir --break-system-packages \
     youtube-dl
 
 # Create non-root user
-# Models go in /home/vget/models (separate from config to avoid bind mount conflicts)
 RUN groupadd -g 1000 vget && \
     useradd -u 1000 -g vget -m -d /home/vget vget && \
     mkdir -p /home/vget/downloads /home/vget/.config/vget /home/vget/models && \
     chown -R vget:vget /home/vget
 
-# Copy sherpa-onnx shared libraries from builder (for Parakeet)
+# Copy sherpa-onnx shared libraries from builder
 COPY --from=go-builder /usr/local/lib/libsherpa-onnx-*.so* /usr/local/lib/
 COPY --from=go-builder /usr/local/lib/libonnxruntime*.so* /usr/local/lib/
 
-# Copy whisper.cpp shared libraries from builder (for Whisper)
+# Copy whisper.cpp shared libraries from builder
 COPY --from=go-builder /usr/local/lib/libwhisper*.so* /usr/local/lib/
 COPY --from=go-builder /usr/local/lib/libggml*.so* /usr/local/lib/
 RUN ldconfig

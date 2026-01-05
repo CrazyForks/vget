@@ -1,29 +1,20 @@
 ## Build Docker Image
 
-### Build vget base image
+### Build vget image (amd64 with CUDA)
 
 ```shell
-ocker build --no-cache -f docker/vget-base/Dockerfile -t ghcr.io/guiyumin/vget-base:latest .
+docker build -f docker/vget/Dockerfile --build-arg ENABLE_CUDA=true -t ghcr.io/guiyumin/vget:latest .
 ```
 
-### CPU version (no models bundled - downloads on first use)
+### Build vget image (arm64, no CUDA)
 
 ```shell
-docker build -f docker/vget/Dockerfile -t vget:latest .
+docker build -f docker/vget/Dockerfile -t ghcr.io/guiyumin/vget:latest .
 ```
 
-### CPU version with models pre-bundled
+### Runtime Behavior
 
-```shell
-docker build -f docker/vget/Dockerfile -t vget:small --build-arg MODEL_VARIANT=small .
-```
+- **GPU detected** (via `nvidia-smi`): Local transcription mode, download models on demand
+- **No GPU**: Cloud API mode (OpenAI Whisper API, Groq, etc.)
 
-```shell
-docker build -f docker/vget/Dockerfile -t vget:medium --build-arg MODEL_VARIANT=medium .
-```
-
-### CUDA/GPU version
-
-```shell
-docker build -f docker/vget/Dockerfile -t vget:cuda --build-arg ENABLE_CUDA=true .
-```
+Models are not bundled in the image. They are downloaded on first use from HuggingFace or vmirror (China).
