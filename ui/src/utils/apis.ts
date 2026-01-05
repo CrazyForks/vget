@@ -629,3 +629,69 @@ export async function updateLocalASRConfig(params: {
   });
   return res.json();
 }
+
+// Vmirror Model Download APIs
+
+export interface VmirrorModel {
+  name: string;
+  size: string;
+  description: string;
+  languages: number;
+  downloaded: boolean;
+}
+
+export interface VmirrorModelsData {
+  models: VmirrorModel[];
+  models_dir: string;
+}
+
+export interface VmirrorAuthData {
+  registered: boolean;
+  email?: string;
+}
+
+export interface VmirrorDownloadURLData {
+  url: string;
+  expires_in: number;
+  model: string;
+  filename: string;
+  size: string;
+  error_code?: string;
+}
+
+export async function fetchVmirrorModels(): Promise<
+  ApiResponse<VmirrorModelsData>
+> {
+  const res = await fetch("/api/ai/vmirror/models");
+  return res.json();
+}
+
+export async function fetchVmirrorAuth(): Promise<
+  ApiResponse<VmirrorAuthData>
+> {
+  const res = await fetch("/api/ai/vmirror/auth");
+  return res.json();
+}
+
+export async function saveVmirrorAuth(
+  email: string
+): Promise<ApiResponse<{ email: string }>> {
+  const res = await fetch("/api/ai/vmirror/auth", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  return res.json();
+}
+
+export async function requestVmirrorDownloadURL(
+  model: string,
+  email: string
+): Promise<ApiResponse<VmirrorDownloadURLData>> {
+  const res = await fetch("/api/ai/vmirror/download", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model, email }),
+  });
+  return res.json();
+}

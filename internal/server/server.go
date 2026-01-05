@@ -172,6 +172,12 @@ func (s *Server) Start() error {
 	api.GET("/ai/local-asr/capabilities", s.handleGetLocalASRCapabilities)
 	api.POST("/ai/local-asr/config", s.handleUpdateLocalASRConfig)
 
+	// Model download routes (vmirror CDN)
+	api.GET("/ai/vmirror/models", s.handleGetVmirrorModels)
+	api.GET("/ai/vmirror/auth", s.handleGetModelDownloadAuth)
+	api.POST("/ai/vmirror/auth", s.handleSaveModelDownloadAuth)
+	api.POST("/ai/vmirror/download", s.handleRequestModelDownload)
+
 	// Serve embedded UI if available
 	if distFS := GetDistFS(); distFS != nil {
 		s.setupStaticFiles(distFS)

@@ -231,6 +231,21 @@ ui:
   local_stt_model_updated: "Model updated"
   local_stt_update_failed: "Failed to update settings"
   local_stt_info: "Runs locally without sending data to external servers."
+  # Model Download
+  model_download_title: "Model Download"
+  model_download_email: "Email"
+  model_download_email_hint: "Enter your email to download models. No verification required."
+  model_download_email_placeholder: "your@email.com"
+  model_download_email_required: "Email is required"
+  model_download_email_saved: "Email saved"
+  model_download_invalid_email: "Invalid email format"
+  model_download_downloaded: "Downloaded"
+  model_download_getting_url: "Getting download URL..."
+  model_download_success: "Model downloaded successfully"
+  model_download_failed: "Download failed"
+  model_download_rate_limit: "Too many downloads. Please try again in a few hours."
+  model_download_server_down: "Cannot connect to server. Please check your network."
+  model_download_info: "Models are downloaded from vmirror.org CDN for faster access in China."
 
 # Server messages
 server:

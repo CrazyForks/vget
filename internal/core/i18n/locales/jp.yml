@@ -219,6 +219,21 @@ ui:
   local_stt_model_updated: "モデルを更新しました"
   local_stt_update_failed: "設定の更新に失敗しました"
   local_stt_info: "外部サーバーにデータを送信せずにローカルで実行されます。"
+  # モデルダウンロード
+  model_download_title: "モデルダウンロード"
+  model_download_email: "メールアドレス"
+  model_download_email_hint: "モデルをダウンロードするにはメールアドレスを入力してください。認証不要。"
+  model_download_email_placeholder: "your@email.com"
+  model_download_email_required: "メールアドレスは必須です"
+  model_download_email_saved: "メールアドレスを保存しました"
+  model_download_invalid_email: "メールアドレスの形式が無効です"
+  model_download_downloaded: "ダウンロード済み"
+  model_download_getting_url: "ダウンロードURLを取得中..."
+  model_download_success: "モデルのダウンロードが完了しました"
+  model_download_failed: "ダウンロードに失敗しました"
+  model_download_rate_limit: "ダウンロード回数が多すぎます。数時間後に再試行してください。"
+  model_download_server_down: "サーバーに接続できません。ネットワークを確認してください。"
+  model_download_info: "モデルは vmirror.org CDN からダウンロードされます。"
 
 # サーバーメッセージ
 server:

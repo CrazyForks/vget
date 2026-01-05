@@ -1,43 +1,31 @@
 import { useState, useEffect } from "react";
 import { useApp } from "../context/AppContext";
-import {
-  fetchLocalASRCapabilities,
-  updateLocalASRConfig,
-  type LocalASRCapabilities,
-} from "../utils/apis";
+import { updateLocalASRConfig, type LocalASRCapabilities } from "../utils/apis";
 import { FaMicrochip, FaRobot, FaCircleCheck, FaCircleXmark } from "react-icons/fa6";
 
 interface LocalSTTSettingsProps {
   isConnected: boolean;
+  loading: boolean;
+  capabilities: LocalASRCapabilities | null;
 }
 
-export function LocalSTTSettings({ isConnected }: LocalSTTSettingsProps) {
+export function LocalSTTSettings({
+  isConnected,
+  loading,
+  capabilities,
+}: LocalSTTSettingsProps) {
   const { t, showToast } = useApp();
 
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [capabilities, setCapabilities] = useState<LocalASRCapabilities | null>(
-    null
-  );
   const [selectedModel, setSelectedModel] = useState("");
 
-  const loadCapabilities = async () => {
-    try {
-      const res = await fetchLocalASRCapabilities();
-      if (res.code === 200) {
-        setCapabilities(res.data);
-        setSelectedModel(res.data.current_model || res.data.default_model || "");
-      }
-    } catch {
-      // Ignore errors
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    loadCapabilities();
-  }, []);
+    if (capabilities) {
+      setSelectedModel(
+        capabilities.current_model || capabilities.default_model || ""
+      );
+    }
+  }, [capabilities]);
 
   const handleModelChange = async (model: string) => {
     setSaving(true);

@@ -265,6 +265,21 @@ type UITranslations struct {
 	LocalSTTModelUpdated string `yaml:"local_stt_model_updated" json:"local_stt_model_updated"`
 	LocalSTTUpdateFailed string `yaml:"local_stt_update_failed" json:"local_stt_update_failed"`
 	LocalSTTInfo         string `yaml:"local_stt_info" json:"local_stt_info"`
+	// Model Download
+	ModelDownloadTitle            string `yaml:"model_download_title" json:"model_download_title"`
+	ModelDownloadEmail            string `yaml:"model_download_email" json:"model_download_email"`
+	ModelDownloadEmailHint        string `yaml:"model_download_email_hint" json:"model_download_email_hint"`
+	ModelDownloadEmailPlaceholder string `yaml:"model_download_email_placeholder" json:"model_download_email_placeholder"`
+	ModelDownloadEmailRequired    string `yaml:"model_download_email_required" json:"model_download_email_required"`
+	ModelDownloadEmailSaved       string `yaml:"model_download_email_saved" json:"model_download_email_saved"`
+	ModelDownloadInvalidEmail     string `yaml:"model_download_invalid_email" json:"model_download_invalid_email"`
+	ModelDownloadDownloaded       string `yaml:"model_download_downloaded" json:"model_download_downloaded"`
+	ModelDownloadGettingURL       string `yaml:"model_download_getting_url" json:"model_download_getting_url"`
+	ModelDownloadSuccess          string `yaml:"model_download_success" json:"model_download_success"`
+	ModelDownloadFailed           string `yaml:"model_download_failed" json:"model_download_failed"`
+	ModelDownloadRateLimit        string `yaml:"model_download_rate_limit" json:"model_download_rate_limit"`
+	ModelDownloadServerDown       string `yaml:"model_download_server_down" json:"model_download_server_down"`
+	ModelDownloadInfo             string `yaml:"model_download_info" json:"model_download_info"`
 }
 
 // ServerTranslations holds translations for server messages

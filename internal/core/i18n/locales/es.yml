@@ -219,6 +219,21 @@ ui:
   local_stt_model_updated: "Modelo actualizado"
   local_stt_update_failed: "Error al actualizar configuración"
   local_stt_info: "Se ejecuta localmente sin enviar datos a servidores externos."
+  # Descarga de modelos
+  model_download_title: "Descarga de Modelos"
+  model_download_email: "Correo electrónico"
+  model_download_email_hint: "Ingrese su correo para descargar modelos. Sin verificación."
+  model_download_email_placeholder: "your@email.com"
+  model_download_email_required: "Se requiere correo electrónico"
+  model_download_email_saved: "Correo guardado"
+  model_download_invalid_email: "Formato de correo inválido"
+  model_download_downloaded: "Descargado"
+  model_download_getting_url: "Obteniendo URL de descarga..."
+  model_download_success: "Modelo descargado exitosamente"
+  model_download_failed: "Descarga fallida"
+  model_download_rate_limit: "Demasiadas descargas. Inténtelo de nuevo en unas horas."
+  model_download_server_down: "No se puede conectar al servidor. Verifique su red."
+  model_download_info: "Los modelos se descargan desde vmirror.org CDN."
 
 # Mensajes del servidor
 server:

@@ -219,6 +219,21 @@ ui:
   local_stt_model_updated: "모델이 업데이트되었습니다"
   local_stt_update_failed: "설정 업데이트 실패"
   local_stt_info: "외부 서버에 데이터를 전송하지 않고 로컬에서 실행됩니다."
+  # 모델 다운로드
+  model_download_title: "모델 다운로드"
+  model_download_email: "이메일"
+  model_download_email_hint: "모델을 다운로드하려면 이메일을 입력하세요. 인증 불필요."
+  model_download_email_placeholder: "your@email.com"
+  model_download_email_required: "이메일을 입력하세요"
+  model_download_email_saved: "이메일이 저장되었습니다"
+  model_download_invalid_email: "이메일 형식이 올바르지 않습니다"
+  model_download_downloaded: "다운로드됨"
+  model_download_getting_url: "다운로드 URL 가져오는 중..."
+  model_download_success: "모델 다운로드 완료"
+  model_download_failed: "다운로드 실패"
+  model_download_rate_limit: "다운로드 횟수가 너무 많습니다. 몇 시간 후에 다시 시도하세요."
+  model_download_server_down: "서버에 연결할 수 없습니다. 네트워크를 확인하세요."
+  model_download_info: "모델은 vmirror.org CDN에서 다운로드됩니다."
 
 # 서버 메시지
 server:
