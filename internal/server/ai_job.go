@@ -119,7 +119,7 @@ type AIJobRequest struct {
 	PIN                string `json:"pin"`
 	IncludeSummary     bool   `json:"include_summary"`
 	Language           string `json:"language"`      // Language code for transcription (e.g., "zh", "en", "auto")
-	OutputFormat       string `json:"output_format"` // Output format: "md", "srt", "vtt", "txt" (default: "md")
+	OutputFormat       string `json:"output_format"` // Output format: "md", "srt", "vtt" (default: "md")
 	TranslateTo        string `json:"translate_to"`  // Target language for translation (e.g., "en", "zh")
 }
 
