@@ -358,3 +358,91 @@ func getEnvOrDefault(key, defaultValue string) string {
 	}
 	return defaultValue
 }
+
+// Google Docs MIME type mappings for export
+var googleDocsExportFormats = map[string]struct {
+	MimeType  string
+	Extension string
+}{
+	"application/vnd.google-apps.document":     {"application/pdf", "pdf"},
+	"application/vnd.google-apps.spreadsheet":  {"application/pdf", "pdf"},
+	"application/vnd.google-apps.presentation": {"application/pdf", "pdf"},
+	"application/vnd.google-apps.drawing":      {"application/pdf", "pdf"},
+}
+
+// IsGoogleDoc checks if a file is a Google Docs/Sheets/Slides file
+func IsGoogleDoc(mimeType string) bool {
+	_, ok := googleDocsExportFormats[mimeType]
+	return ok
+}
+
+// GetDownloadURL returns the download URL for a file
+// For Google Docs, it returns an export URL; for regular files, a direct download URL
+func (c *Client) GetDownloadURL(fileID, mimeType string) (string, error) {
+	// Ensure we have a valid token
+	if c.accessToken == "" {
+		if err := c.refreshAccessToken(); err != nil {
+			return "", err
+		}
+	}
+
+	if export, ok := googleDocsExportFormats[mimeType]; ok {
+		// Google Docs need to be exported
+		return fmt.Sprintf("%s/files/%s/export?mimeType=%s",
+			driveAPIBase, fileID, url.QueryEscape(export.MimeType)), nil
+	}
+
+	// Regular files can be downloaded directly
+	return fmt.Sprintf("%s/files/%s?alt=media", driveAPIBase, fileID), nil
+}
+
+// GetAuthHeader returns the Authorization header for download requests
+func (c *Client) GetAuthHeader() (string, error) {
+	if c.accessToken == "" {
+		if err := c.refreshAccessToken(); err != nil {
+			return "", err
+		}
+	}
+	return "Bearer " + c.accessToken, nil
+}
+
+// Download downloads a file and returns a reader
+func (c *Client) Download(ctx context.Context, fileID, mimeType string) (io.ReadCloser, error) {
+	downloadURL, err := c.GetDownloadURL(fileID, mimeType)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", downloadURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.accessToken)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle 401 - refresh and retry
+	if resp.StatusCode == http.StatusUnauthorized {
+		resp.Body.Close()
+		if err := c.refreshAccessToken(); err != nil {
+			return nil, fmt.Errorf("token refresh failed: %w", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+c.accessToken)
+		resp, err = c.httpClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		return nil, fmt.Errorf("download failed: %s", string(body))
+	}
+
+	return resp.Body, nil
+}

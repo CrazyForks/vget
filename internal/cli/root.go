@@ -287,11 +287,12 @@ func runGDriveDownload(rawURL string) error {
 	}
 
 	// Check if path is root or get file info
+	var fileInfo *gdrive.FileInfo
 	var isDir bool
 	if filePath == "/" {
 		isDir = true
 	} else {
-		fileInfo, err := client.Stat(ctx, filePath)
+		fileInfo, err = client.Stat(ctx, filePath)
 		if err != nil {
 			return fmt.Errorf("failed to get file info: %w", err)
 		}
@@ -310,28 +311,60 @@ func runGDriveDownload(rawURL string) error {
 		if result.SelectedFile == nil {
 			return nil
 		}
-
-		// User selected a file - show info for now
-		// TODO: implement actual Google Drive download
-		fmt.Printf("\n  Selected: %s\n", result.SelectedFile.Name)
-		fmt.Printf("  Size:     %s\n", formatSize(result.SelectedFile.Size))
-		fmt.Printf("  Path:     gdrive:%s\n", result.SelectedFile.Path)
-		fmt.Println("\n  Google Drive download not yet implemented.")
-		fmt.Println("  File ID:", result.SelectedFile.ID)
-		return nil
+		fileInfo = result.SelectedFile
 	}
 
-	// Direct file path - show info for now
-	fileInfo, err := client.Stat(ctx, filePath)
+	// Download the file
+	return downloadGDriveFile(ctx, client, fileInfo, cfg.OutputDir)
+}
+
+func downloadGDriveFile(_ context.Context, client *gdrive.Client, fileInfo *gdrive.FileInfo, outputDir string) error {
+	// Determine output filename
+	outputFile := output
+	if outputFile == "" {
+		outputFile = fileInfo.Name
+		// Add .pdf extension for Google Docs
+		if gdrive.IsGoogleDoc(fileInfo.MimeType) {
+			outputFile = strings.TrimSuffix(outputFile, filepath.Ext(outputFile)) + ".pdf"
+		}
+		if outputDir != "" {
+			outputFile = filepath.Join(outputDir, outputFile)
+		}
+	}
+
+	// Show file info
+	fmt.Printf("\n  Google Drive: %s", fileInfo.Name)
+	if fileInfo.Size > 0 {
+		fmt.Printf(" (%s)", formatSize(fileInfo.Size))
+	}
+	if gdrive.IsGoogleDoc(fileInfo.MimeType) {
+		fmt.Printf(" [exporting as PDF]")
+	}
+	fmt.Println()
+
+	// Get download URL and auth header
+	downloadURL, err := client.GetDownloadURL(fileInfo.ID, fileInfo.MimeType)
 	if err != nil {
-		return fmt.Errorf("failed to get file info: %w", err)
+		return fmt.Errorf("failed to get download URL: %w", err)
 	}
 
-	fmt.Printf("\n  File:  %s\n", fileInfo.Name)
-	fmt.Printf("  Size:  %s\n", formatSize(fileInfo.Size))
-	fmt.Println("\n  Google Drive download not yet implemented.")
-	fmt.Println("  File ID:", fileInfo.ID)
-	return nil
+	authHeader, err := client.GetAuthHeader()
+	if err != nil {
+		return fmt.Errorf("failed to get auth: %w", err)
+	}
+
+	// Use the downloader with auth header
+	headers := map[string]string{
+		"Authorization": authHeader,
+	}
+
+	return downloader.RunDownloadTUI(
+		downloadURL,
+		outputFile,
+		fileInfo.Name,
+		"en",
+		headers,
+	)
 }
 
 func formatSize(b int64) string {
