@@ -78,6 +78,13 @@ var configShowCmd = &cobra.Command{
 				}
 			}
 		}
+
+		// Show Google Drive config
+		if cfg.Google.RefreshToken != "" {
+			fmt.Println("\nGoogle Drive:")
+			fmt.Printf("  Email:         %s\n", cfg.Google.Email)
+			fmt.Println("  refresh_token: ******")
+		}
 	},
 }
 

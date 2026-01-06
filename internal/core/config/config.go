@@ -84,6 +84,18 @@ type Config struct {
 
 	// AI transcription and summarization configuration
 	AI AIConfig `yaml:"ai,omitempty"`
+
+	// Google Drive configuration
+	Google GoogleConfig `yaml:"google,omitempty"`
+}
+
+// GoogleConfig holds Google Drive OAuth configuration
+type GoogleConfig struct {
+	// RefreshToken to get new access tokens (long-lived)
+	RefreshToken string `yaml:"refresh_token,omitempty"`
+
+	// Email of the connected Google account
+	Email string `yaml:"email,omitempty"`
 }
 
 // BilibiliConfig holds Bilibili authentication settings

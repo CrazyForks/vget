@@ -11,6 +11,7 @@ import (
 	"github.com/guiyumin/vget/internal/core/config"
 	"github.com/guiyumin/vget/internal/core/downloader"
 	"github.com/guiyumin/vget/internal/core/extractor"
+	"github.com/guiyumin/vget/internal/core/gdrive"
 	"github.com/guiyumin/vget/internal/core/i18n"
 	"github.com/guiyumin/vget/internal/core/version"
 	"github.com/guiyumin/vget/internal/core/webdav"
@@ -70,6 +71,11 @@ func runDownload(url string) error {
 	// Check for config file and warn if missing
 	if !config.Exists() {
 		fmt.Fprintf(os.Stderr, "\033[33m%s. Run 'vget init'.\033[0m\n", t.Errors.ConfigNotFound)
+	}
+
+	// Handle Google Drive paths specially
+	if gdrive.IsGDrivePath(url) {
+		return runGDriveDownload(url)
 	}
 
 	// Handle WebDAV URLs specially
@@ -262,6 +268,70 @@ func runWebDAVDownload(rawURL, lang string) error {
 		fileInfo.Size,
 		msConfig,
 	)
+}
+
+func runGDriveDownload(rawURL string) error {
+	ctx := context.Background()
+	cfg := config.LoadOrDefault()
+
+	// Parse the path
+	filePath, err := gdrive.ParseGDrivePath(rawURL)
+	if err != nil {
+		return err
+	}
+
+	// Create Google Drive client
+	client, err := gdrive.NewClient(cfg)
+	if err != nil {
+		return err
+	}
+
+	// Check if path is root or get file info
+	var isDir bool
+	if filePath == "/" {
+		isDir = true
+	} else {
+		fileInfo, err := client.Stat(ctx, filePath)
+		if err != nil {
+			return fmt.Errorf("failed to get file info: %w", err)
+		}
+		isDir = fileInfo.IsDir
+	}
+
+	// If it's a directory, open the TUI browser
+	if isDir {
+		result, err := RunGDriveBrowseTUI(client, filePath)
+		if err != nil {
+			return fmt.Errorf("browse failed: %w", err)
+		}
+		if result.Cancelled {
+			return nil // User cancelled, no error
+		}
+		if result.SelectedFile == nil {
+			return nil
+		}
+
+		// User selected a file - show info for now
+		// TODO: implement actual Google Drive download
+		fmt.Printf("\n  Selected: %s\n", result.SelectedFile.Name)
+		fmt.Printf("  Size:     %s\n", formatSize(result.SelectedFile.Size))
+		fmt.Printf("  Path:     gdrive:%s\n", result.SelectedFile.Path)
+		fmt.Println("\n  Google Drive download not yet implemented.")
+		fmt.Println("  File ID:", result.SelectedFile.ID)
+		return nil
+	}
+
+	// Direct file path - show info for now
+	fileInfo, err := client.Stat(ctx, filePath)
+	if err != nil {
+		return fmt.Errorf("failed to get file info: %w", err)
+	}
+
+	fmt.Printf("\n  File:  %s\n", fileInfo.Name)
+	fmt.Printf("  Size:  %s\n", formatSize(fileInfo.Size))
+	fmt.Println("\n  Google Drive download not yet implemented.")
+	fmt.Println("  File ID:", fileInfo.ID)
+	return nil
 }
 
 func formatSize(b int64) string {

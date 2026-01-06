@@ -123,6 +123,6 @@ The XHS extractor (`internal/extractor/xiaohongshu.go`) uses browser automation:
 
 # My Rules
 
-- BUILD OUTPUT DIRECTORY IS ./build
-- YOU ONLY BUILD IT. I WILL TEST IT BY MYSELF.
--
+- YOU MUST USE ./build AS THE BUILD OUTPUT DIRECTORY
+- YOU MUST ONLY BUILD IT. I WILL TEST IT BY MYSELF.
+- YOU MUST USE THIS TO BUILD VGET LOCALLY: CGO_ENABLED=0 go build -o build/vget ./cmd/vget
