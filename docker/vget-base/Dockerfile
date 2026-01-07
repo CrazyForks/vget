@@ -58,6 +58,6 @@ RUN git clone --depth 1 --branch v${WHISPER_VERSION} https://github.com/ggergano
 
 # Set environment for Go builds
 ENV CGO_ENABLED=1
-ENV LD_LIBRARY_PATH=/usr/local/lib
+ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/local/cuda/lib64
 ENV C_INCLUDE_PATH=/usr/local/include
-ENV LIBRARY_PATH=/usr/local/lib
+ENV LIBRARY_PATH=/usr/local/lib:/usr/local/cuda/lib64
