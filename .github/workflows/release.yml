@@ -81,7 +81,8 @@ jobs:
         with:
           cuda: "12.6.0"
           method: network
-          sub-packages: '["nvcc", "cudart-dev", "cublas-dev"]'
+          sub-packages: '["nvcc", "cudart-dev"]'
+          non-cuda-sub-packages: '["libcublas-dev"]'
 
       - name: Build whisper.cpp with CUDA
         run: |
