@@ -64,7 +64,7 @@ type tokenResponse struct {
 // NewClient creates a new Google Drive client from config
 func NewClient(cfg *config.Config) (*Client, error) {
 	if cfg.Google.RefreshToken == "" {
-		return nil, fmt.Errorf("Google Drive not connected. Run 'vget login google' first")
+		return nil, fmt.Errorf("google drive not connected, run 'vget login google' first")
 	}
 
 	return &Client{
