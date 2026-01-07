@@ -117,14 +117,10 @@ patch minor major: version
 	@TYPE=$@ && \
 	echo "Current version: $(CURRENT_VERSION)" && \
 	NEW_VERSION=$$(echo "$(CURRENT_VERSION)" | awk -F. -v type="$$TYPE" '{ \
-		# Strip pre-release suffix (e.g., -alpha4, -beta1, -rc2) from patch number \
 		split($$3, parts, "-"); \
 		patch = parts[1]; \
-		has_prerelease = (length(parts) > 1 || index($$3, "-") > 0); \
-		if (has_prerelease) { \
-			# Pre-release: just release the base version \
-			print $$1"."$$2"."patch \
-		} else if (type == "major") { print $$1+1".0.0" } \
+		if (index($$3, "-") > 0) { print $$1"."$$2"."patch } \
+		else if (type == "major") { print $$1+1".0.0" } \
 		else if (type == "minor") { print $$1"."$$2+1".0" } \
 		else { print $$1"."$$2"."$$3+1 } \
 	}') && \
