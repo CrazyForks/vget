@@ -233,6 +233,10 @@ ui:
   local_stt_info: "在本地运行，数据不会发送到外部服务器。"
   # 模型下载
   model_download_title: "模型下载"
+  model_download_source: "下载源"
+  model_download_source_huggingface: "Huggingface"
+  model_download_source_vmirror: "vmirror"
+  model_download_source_vmirror_hint: "模型从 vmirror.org CDN 下载，国内访问更快"
   model_download_email: "邮箱"
   model_download_email_hint: "输入邮箱以下载模型，无需验证。"
   model_download_email_placeholder: "your@email.com"

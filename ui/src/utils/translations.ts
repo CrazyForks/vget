@@ -129,6 +129,10 @@ export interface UITranslations {
   local_stt_info: string;
   // Model Download
   model_download_title: string;
+  model_download_source: string;
+  model_download_source_huggingface: string;
+  model_download_source_vmirror: string;
+  model_download_source_vmirror_hint: string;
   model_download_email: string;
   model_download_email_hint: string;
   model_download_email_placeholder: string;
@@ -280,6 +284,10 @@ export const defaultTranslations: UITranslations = {
   local_stt_info: "Runs locally on your device without sending data to external servers.",
   // Model Download
   model_download_title: "Model Download",
+  model_download_source: "Download Source",
+  model_download_source_huggingface: "Huggingface",
+  model_download_source_vmirror: "vmirror",
+  model_download_source_vmirror_hint: "Download from vmirror.org CDN, faster in China",
   model_download_email: "Email",
   model_download_email_hint: "Enter your email to download models. No verification required.",
   model_download_email_placeholder: "your@email.com",
@@ -292,7 +300,7 @@ export const defaultTranslations: UITranslations = {
   model_download_failed: "Download failed",
   model_download_rate_limit: "Too many downloads. Please try again in a few hours.",
   model_download_server_down: "Cannot connect to server. Please check your network.",
-  model_download_info: "Models are downloaded from vmirror.org CDN for faster access in China.",
+  model_download_info: "Download Whisper models for local speech-to-text.",
 };
 
 export const defaultServerTranslations: ServerTranslations = {

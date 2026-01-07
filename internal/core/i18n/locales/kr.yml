@@ -221,6 +221,10 @@ ui:
   local_stt_info: "외부 서버에 데이터를 전송하지 않고 로컬에서 실행됩니다."
   # 모델 다운로드
   model_download_title: "모델 다운로드"
+  model_download_source: "다운로드 소스"
+  model_download_source_huggingface: "Huggingface"
+  model_download_source_vmirror: "vmirror"
+  model_download_source_vmirror_hint: "vmirror.org CDN에서 다운로드, 중국에서 더 빠름"
   model_download_email: "이메일"
   model_download_email_hint: "모델을 다운로드하려면 이메일을 입력하세요. 인증 불필요."
   model_download_email_placeholder: "your@email.com"

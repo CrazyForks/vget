@@ -266,8 +266,12 @@ type UITranslations struct {
 	LocalSTTUpdateFailed string `yaml:"local_stt_update_failed" json:"local_stt_update_failed"`
 	LocalSTTInfo         string `yaml:"local_stt_info" json:"local_stt_info"`
 	// Model Download
-	ModelDownloadTitle            string `yaml:"model_download_title" json:"model_download_title"`
-	ModelDownloadEmail            string `yaml:"model_download_email" json:"model_download_email"`
+	ModelDownloadTitle             string `yaml:"model_download_title" json:"model_download_title"`
+	ModelDownloadSource            string `yaml:"model_download_source" json:"model_download_source"`
+	ModelDownloadSourceHuggingface string `yaml:"model_download_source_huggingface" json:"model_download_source_huggingface"`
+	ModelDownloadSourceVmirror     string `yaml:"model_download_source_vmirror" json:"model_download_source_vmirror"`
+	ModelDownloadSourceVmirrorHint string `yaml:"model_download_source_vmirror_hint" json:"model_download_source_vmirror_hint"`
+	ModelDownloadEmail             string `yaml:"model_download_email" json:"model_download_email"`
 	ModelDownloadEmailHint        string `yaml:"model_download_email_hint" json:"model_download_email_hint"`
 	ModelDownloadEmailPlaceholder string `yaml:"model_download_email_placeholder" json:"model_download_email_placeholder"`
 	ModelDownloadEmailRequired    string `yaml:"model_download_email_required" json:"model_download_email_required"`

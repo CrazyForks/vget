@@ -221,6 +221,10 @@ ui:
   local_stt_info: "Se ejecuta localmente sin enviar datos a servidores externos."
   # Descarga de modelos
   model_download_title: "Descarga de Modelos"
+  model_download_source: "Fuente de descarga"
+  model_download_source_huggingface: "Huggingface"
+  model_download_source_vmirror: "vmirror"
+  model_download_source_vmirror_hint: "Descargar desde vmirror.org CDN, más rápido en China"
   model_download_email: "Correo electrónico"
   model_download_email_hint: "Ingrese su correo para descargar modelos. Sin verificación."
   model_download_email_placeholder: "your@email.com"

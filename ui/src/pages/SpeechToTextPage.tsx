@@ -203,7 +203,7 @@ export function SpeechToTextPage() {
       for (const m of localASRCapabilities.models) {
         options.push({
           value: m.name, // e.g., "whisper-medium"
-          label: `Local: ${m.name}${m.downloaded ? " (available)" : ""}`,
+          label: `Local: ${m.name}${m.downloaded ? " ✓" : ""}`,
         });
       }
     }

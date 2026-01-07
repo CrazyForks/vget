@@ -3,7 +3,8 @@ import { useApp } from "../context/AppContext";
 import {
   fetchVmirrorModels,
   fetchVmirrorAuth,
-  requestVmirrorDownloadURL,
+  saveVmirrorAuth,
+  requestModelDownload,
   type VmirrorModel,
 } from "../utils/apis";
 import {
@@ -22,6 +23,8 @@ interface DownloadState {
   error?: string;
 }
 
+type DownloadSource = "huggingface" | "vmirror";
+
 export function ModelDownloadSettings({
   isConnected,
 }: ModelDownloadSettingsProps) {
@@ -29,9 +32,9 @@ export function ModelDownloadSettings({
 
   const [loading, setLoading] = useState(true);
   const [models, setModels] = useState<VmirrorModel[]>([]);
+  const [source, setSource] = useState<DownloadSource>("huggingface");
   const [email, setEmail] = useState("");
   const [emailInput, setEmailInput] = useState("");
-  const [showEmailForm, setShowEmailForm] = useState(false);
   const [savingEmail, setSavingEmail] = useState(false);
   const [downloadStates, setDownloadStates] = useState<
     Record<string, DownloadState>
@@ -78,18 +81,24 @@ export function ModelDownloadSettings({
 
     setSavingEmail(true);
     try {
-      setEmail(emailInput);
-      setShowEmailForm(false);
-      showToast("success", t.model_download_email_saved);
+      const res = await saveVmirrorAuth(emailInput);
+      if (res.code === 200) {
+        setEmail(emailInput);
+        showToast("success", t.model_download_email_saved);
+      } else {
+        showToast("error", res.message || "Failed to save email");
+      }
+    } catch {
+      showToast("error", "Failed to save email");
     } finally {
       setSavingEmail(false);
     }
   };
 
   const handleDownload = async (modelName: string) => {
-    // Check if email is set
-    if (!email) {
-      setShowEmailForm(true);
+    // For vmirror, check if email is set
+    if (source === "vmirror" && !email) {
+      showToast("error", t.model_download_email_required);
       return;
     }
 
@@ -100,7 +109,11 @@ export function ModelDownloadSettings({
 
     try {
       // Server downloads the model directly
-      const res = await requestVmirrorDownloadURL(modelName, email);
+      const res = await requestModelDownload(
+        modelName,
+        source,
+        source === "vmirror" ? email : undefined
+      );
 
       if (res.code !== 200) {
         const errorCode = res.data?.error_code;
@@ -164,22 +177,52 @@ export function ModelDownloadSettings({
         </h2>
       </div>
 
-      {/* Email Section */}
+      {/* Source Selection */}
       <div className="mb-4 p-3 bg-zinc-50 dark:bg-zinc-800 rounded-lg">
-        {email && !showEmailForm ? (
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-zinc-700 dark:text-zinc-300">
-              <span className="text-zinc-500">{t.model_download_email}:</span>{" "}
-              {email}
+        <div className="text-sm font-medium text-zinc-700 dark:text-zinc-200 mb-3">
+          {t.model_download_source}
+        </div>
+        <div className="space-y-2">
+          {/* Huggingface option */}
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="radio"
+              name="download-source"
+              value="huggingface"
+              checked={source === "huggingface"}
+              onChange={() => setSource("huggingface")}
+              className="w-4 h-4 text-blue-500 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+            />
+            <span className="text-sm text-zinc-900 dark:text-white">
+              {t.model_download_source_huggingface}
+            </span>
+          </label>
+
+          {/* vmirror option */}
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="radio"
+              name="download-source"
+              value="vmirror"
+              checked={source === "vmirror"}
+              onChange={() => setSource("vmirror")}
+              className="w-4 h-4 mt-0.5 text-blue-500 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+            />
+            <div>
+              <span className="text-sm text-zinc-900 dark:text-white">
+                {t.model_download_source_vmirror}
+              </span>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                {t.model_download_source_vmirror_hint}
+              </p>
             </div>
-            <button
-              onClick={() => setShowEmailForm(true)}
-              className="text-xs text-blue-500 hover:text-blue-600"
-            >
-              {t.edit}
-            </button>
-          </div>
-        ) : (
+          </label>
+        </div>
+      </div>
+
+      {/* Email Section - only show when vmirror is selected */}
+      {source === "vmirror" && (
+        <div className="mb-4 p-3 bg-zinc-50 dark:bg-zinc-800 rounded-lg">
           <div className="space-y-2">
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
               {t.model_download_email_hint}
@@ -199,21 +242,16 @@ export function ModelDownloadSettings({
               >
                 {savingEmail ? <FaSpinner className="animate-spin" /> : t.save}
               </button>
-              {showEmailForm && email && (
-                <button
-                  onClick={() => {
-                    setShowEmailForm(false);
-                    setEmailInput(email);
-                  }}
-                  className="px-4 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm rounded hover:bg-zinc-300 dark:hover:bg-zinc-600"
-                >
-                  {t.cancel}
-                </button>
-              )}
             </div>
+            {email && (
+              <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                <FaCheck className="text-xs" />
+                {t.model_download_email}: {email}
+              </p>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Models List */}
       <div className="space-y-2">

@@ -785,81 +785,124 @@ func (s *Server) handleSaveModelDownloadAuth(c *gin.Context) {
 
 // ModelDownloadRequest is the request body for downloading a model
 type ModelDownloadRequest struct {
-	Model string `json:"model" binding:"required"`
-	Email string `json:"email" binding:"required"`
+	Model  string `json:"model" binding:"required"`
+	Source string `json:"source"` // "huggingface" or "vmirror", defaults to "huggingface"
+	Email  string `json:"email"`  // required only for vmirror
 }
 
-// handleRequestModelDownload downloads a model from vmirror CDN
+// handleRequestModelDownload downloads a model from Huggingface or vmirror CDN
 func (s *Server) handleRequestModelDownload(c *gin.Context) {
 	var req ModelDownloadRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, Response{
 			Code:    400,
 			Data:    nil,
-			Message: "model and email are required",
+			Message: "model is required",
 		})
 		return
 	}
 
-	// Validate email
-	if !auth.IsValidEmail(req.Email) {
+	// Default to huggingface if source not specified
+	if req.Source == "" {
+		req.Source = "huggingface"
+	}
+
+	// Validate source
+	if req.Source != "huggingface" && req.Source != "vmirror" {
 		c.JSON(http.StatusBadRequest, Response{
 			Code:    400,
 			Data:    nil,
-			Message: "invalid email format",
+			Message: "source must be 'huggingface' or 'vmirror'",
 		})
 		return
 	}
 
-	// Check if model exists on vmirror
-	if !transcriber.IsAvailableOnVmirror(req.Model) {
+	// Get model info
+	model := transcriber.GetModel(req.Model)
+	if model == nil {
 		c.JSON(http.StatusBadRequest, Response{
 			Code:    400,
 			Data:    nil,
-			Message: fmt.Sprintf("model '%s' is not available on vmirror", req.Model),
+			Message: fmt.Sprintf("unknown model: %s", req.Model),
 		})
 		return
 	}
 
-	// Get vmirror filename for the model
-	filename := transcriber.GetVmirrorFilename(req.Model)
-	if filename == "" {
-		c.JSON(http.StatusBadRequest, Response{
-			Code:    400,
-			Data:    nil,
-			Message: "failed to get vmirror filename",
-		})
-		return
-	}
+	var downloadURL string
 
-	// Save auth for future use
-	authData := &auth.AuthData{
-		Email:       req.Email,
-		Fingerprint: auth.GetDeviceFingerprint(),
-	}
-	if err := auth.SaveAuth(authData); err != nil {
-		// Non-fatal, just log
-		fmt.Printf("Warning: failed to cache auth: %v\n", err)
-	}
-
-	// Request signed URL from auth server
-	signedResp, err := auth.RequestSignedURL(req.Email, filename)
-	if err != nil {
-		errCode := ""
-		errMsg := err.Error()
-		if err == auth.ErrAuthServerDown {
-			errCode = "AUTH_SERVER_DOWN"
-			errMsg = "Cannot connect to auth server. Please check your network."
-		} else if err == auth.ErrRateLimitExceeded {
-			errCode = "RATE_LIMIT"
-			errMsg = "Too many downloads. Please try again in a few hours."
+	if req.Source == "vmirror" {
+		// Validate email for vmirror
+		if req.Email == "" {
+			c.JSON(http.StatusBadRequest, Response{
+				Code:    400,
+				Data:    nil,
+				Message: "email is required for vmirror downloads",
+			})
+			return
 		}
-		c.JSON(http.StatusBadRequest, Response{
-			Code:    400,
-			Data:    gin.H{"error_code": errCode},
-			Message: errMsg,
-		})
-		return
+		if !auth.IsValidEmail(req.Email) {
+			c.JSON(http.StatusBadRequest, Response{
+				Code:    400,
+				Data:    nil,
+				Message: "invalid email format",
+			})
+			return
+		}
+
+		// Check if model exists on vmirror
+		if !transcriber.IsAvailableOnVmirror(req.Model) {
+			c.JSON(http.StatusBadRequest, Response{
+				Code:    400,
+				Data:    nil,
+				Message: fmt.Sprintf("model '%s' is not available on vmirror", req.Model),
+			})
+			return
+		}
+
+		// Get vmirror filename for the model
+		filename := transcriber.GetVmirrorFilename(req.Model)
+		if filename == "" {
+			c.JSON(http.StatusBadRequest, Response{
+				Code:    400,
+				Data:    nil,
+				Message: "failed to get vmirror filename",
+			})
+			return
+		}
+
+		// Save auth for future use
+		authData := &auth.AuthData{
+			Email:       req.Email,
+			Fingerprint: auth.GetDeviceFingerprint(),
+		}
+		if err := auth.SaveAuth(authData); err != nil {
+			// Non-fatal, just log
+			fmt.Printf("Warning: failed to cache auth: %v\n", err)
+		}
+
+		// Request signed URL from auth server
+		signedResp, err := auth.RequestSignedURL(req.Email, filename)
+		if err != nil {
+			errCode := ""
+			errMsg := err.Error()
+			if err == auth.ErrAuthServerDown {
+				errCode = "AUTH_SERVER_DOWN"
+				errMsg = "Cannot connect to auth server. Please check your network."
+			} else if err == auth.ErrRateLimitExceeded {
+				errCode = "RATE_LIMIT"
+				errMsg = "Too many downloads. Please try again in a few hours."
+			}
+			c.JSON(http.StatusBadRequest, Response{
+				Code:    400,
+				Data:    gin.H{"error_code": errCode},
+				Message: errMsg,
+			})
+			return
+		}
+		downloadURL = signedResp.URL
+	} else {
+		// Huggingface: use official URL directly
+		downloadURL = model.OfficialURL
 	}
 
 	// Get models directory
@@ -878,27 +921,24 @@ func (s *Server) handleRequestModelDownload(c *gin.Context) {
 		}
 	}
 
-	// Download the model using the signed URL
+	// Download the model
 	manager := transcriber.NewModelManager(modelsDir)
-	_, err = manager.DownloadModelWithProgress(req.Model, signedResp.URL, "en")
-	if err != nil {
+	_, downloadErr := manager.DownloadModelWithProgress(req.Model, downloadURL, "en")
+	if downloadErr != nil {
 		c.JSON(http.StatusInternalServerError, Response{
 			Code:    500,
 			Data:    nil,
-			Message: fmt.Sprintf("failed to download model: %v", err),
+			Message: fmt.Sprintf("failed to download model: %v", downloadErr),
 		})
 		return
 	}
 
-	// Get model info for response
-	model := transcriber.GetModel(req.Model)
-
 	c.JSON(http.StatusOK, Response{
 		Code: 200,
 		Data: gin.H{
-			"model":    req.Model,
-			"filename": filename,
-			"size":     model.Size,
+			"model":  req.Model,
+			"source": req.Source,
+			"size":   model.Size,
 		},
 		Message: "Model downloaded successfully",
 	})

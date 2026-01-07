@@ -684,14 +684,15 @@ export async function saveVmirrorAuth(
   return res.json();
 }
 
-export async function requestVmirrorDownloadURL(
+export async function requestModelDownload(
   model: string,
-  email: string
+  source: "huggingface" | "vmirror",
+  email?: string
 ): Promise<ApiResponse<VmirrorDownloadURLData>> {
   const res = await fetch("/api/ai/vmirror/download", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, email }),
+    body: JSON.stringify({ model, source, email }),
   });
   return res.json();
 }
