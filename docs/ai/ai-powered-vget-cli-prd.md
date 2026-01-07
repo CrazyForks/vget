@@ -166,7 +166,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Install CUDA Toolkit
-        uses: Jimver/cuda-toolkit@v0.2.19
+        uses: Jimver/cuda-toolkit@v0.2.30
+        with:
+          cuda: "12.6.0"
       - name: Build whisper.cpp with CUDA
         run: |
           cmake -B build -DGGML_CUDA=ON
@@ -189,7 +191,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Install CUDA Toolkit
-        uses: Jimver/cuda-toolkit@v0.2.19
+        uses: Jimver/cuda-toolkit@v0.2.30
+        with:
+          cuda: "12.6.0"
       - name: Build sherpa-onnx with CUDA
         run: |
           cmake -B build -DSHERPA_ONNX_ENABLE_GPU=ON -DSHERPA_ONNX_ENABLE_TTS=OFF

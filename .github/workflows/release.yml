@@ -78,6 +78,8 @@ jobs:
 
       - name: Install CUDA Toolkit
         uses: Jimver/cuda-toolkit@v0.2.30
+        with:
+          cuda: "12.6.0"
 
       - name: Build whisper.cpp with CUDA
         run: |
