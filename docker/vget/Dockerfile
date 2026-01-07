@@ -88,9 +88,9 @@ COPY --from=ui-builder /app/ui/dist ./internal/server/dist
 
 # Build with CGO for whisper.cpp/sherpa-onnx bindings
 ENV CGO_ENABLED=1
-ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/local/cuda/lib64
+ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/local/cuda/lib64:/usr/local/cuda/lib64/stubs
 ENV C_INCLUDE_PATH=/usr/local/include
-ENV LIBRARY_PATH=/usr/local/lib:/usr/local/cuda/lib64
+ENV LIBRARY_PATH=/usr/local/lib:/usr/local/cuda/lib64:/usr/local/cuda/lib64/stubs
 
 RUN go build -ldflags="-s -w" -o /vget-server ./cmd/vget-server
 
