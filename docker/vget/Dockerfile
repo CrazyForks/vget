@@ -92,6 +92,13 @@ ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/local/cuda/lib64:/usr/local/cuda/lib64/s
 ENV C_INCLUDE_PATH=/usr/local/include
 ENV LIBRARY_PATH=/usr/local/lib:/usr/local/cuda/lib64:/usr/local/cuda/lib64/stubs
 
+RUN if [ "$ENABLE_CUDA" = "true" ]; then \
+        ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/lib/libcuda.so && \
+        ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/lib/libcuda.so.1 && \
+        ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 && \
+        ldconfig; \
+    fi
+
 RUN go build -ldflags="-s -w" -o /vget-server ./cmd/vget-server
 
 # Runtime stage
