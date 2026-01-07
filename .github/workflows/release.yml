@@ -40,10 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install CUDA Toolkit
-        uses: Jimver/cuda-toolkit@v0.2.19
-        with:
-          cuda: '12.6.3'
-          method: 'network'
+        uses: Jimver/cuda-toolkit@v0.2.30
       - name: Build whisper.cpp with CUDA
         shell: bash
         run: |
@@ -92,10 +89,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install CUDA Toolkit
-        uses: Jimver/cuda-toolkit@v0.2.19
-        with:
-          cuda: '12.6.3'
-          method: 'network'
+        uses: Jimver/cuda-toolkit@v0.2.30
       - name: Build sherpa-onnx with CUDA
         shell: bash
         run: |

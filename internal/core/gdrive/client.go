@@ -324,8 +324,7 @@ func IsGDrivePath(path string) bool {
 func ParseGDrivePath(remotePath string) (string, error) {
 	// Handle gdrive:/path, gdrive:path, drive:/path formats
 	for _, prefix := range []string{"gdrive:", "drive:"} {
-		if strings.HasPrefix(remotePath, prefix) {
-			path := strings.TrimPrefix(remotePath, prefix)
+		if path, found := strings.CutPrefix(remotePath, prefix); found {
 			if !strings.HasPrefix(path, "/") {
 				path = "/" + path
 			}
