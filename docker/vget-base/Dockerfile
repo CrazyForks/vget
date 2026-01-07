@@ -50,6 +50,7 @@ RUN git clone --depth 1 --branch v${WHISPER_VERSION} https://github.com/ggergano
     cmake --build build --config Release -j$(nproc) && \
     cp build/src/libwhisper.so* /usr/local/lib/ && \
     cp build/ggml/src/libggml*.so* /usr/local/lib/ && \
+    cp build/ggml/src/ggml-cuda/libggml-cuda.so* /usr/local/lib/ && \
     cp include/whisper.h /usr/local/include/ && \
     cp ggml/include/ggml*.h /usr/local/include/ && \
     rm -rf /tmp/whisper.cpp && \
