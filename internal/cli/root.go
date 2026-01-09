@@ -11,7 +11,6 @@ import (
 	"github.com/guiyumin/vget/internal/core/config"
 	"github.com/guiyumin/vget/internal/core/downloader"
 	"github.com/guiyumin/vget/internal/core/extractor"
-	"github.com/guiyumin/vget/internal/core/gdrive"
 	"github.com/guiyumin/vget/internal/core/i18n"
 	"github.com/guiyumin/vget/internal/core/version"
 	"github.com/guiyumin/vget/internal/core/webdav"
@@ -71,11 +70,6 @@ func runDownload(url string) error {
 	// Check for config file and warn if missing
 	if !config.Exists() {
 		fmt.Fprintf(os.Stderr, "\033[33m%s. Run 'vget init'.\033[0m\n", t.Errors.ConfigNotFound)
-	}
-
-	// Handle Google Drive paths specially
-	if gdrive.IsGDrivePath(url) {
-		return runGDriveDownload(url)
 	}
 
 	// Handle WebDAV URLs specially
@@ -267,103 +261,6 @@ func runWebDAVDownload(rawURL, lang string) error {
 		lang,
 		fileInfo.Size,
 		msConfig,
-	)
-}
-
-func runGDriveDownload(rawURL string) error {
-	ctx := context.Background()
-	cfg := config.LoadOrDefault()
-
-	// Parse the path
-	filePath, err := gdrive.ParseGDrivePath(rawURL)
-	if err != nil {
-		return err
-	}
-
-	// Create Google Drive client
-	client, err := gdrive.NewClient(cfg)
-	if err != nil {
-		return err
-	}
-
-	// Check if path is root or get file info
-	var fileInfo *gdrive.FileInfo
-	var isDir bool
-	if filePath == "/" {
-		isDir = true
-	} else {
-		fileInfo, err = client.Stat(ctx, filePath)
-		if err != nil {
-			return fmt.Errorf("failed to get file info: %w", err)
-		}
-		isDir = fileInfo.IsDir
-	}
-
-	// If it's a directory, open the TUI browser
-	if isDir {
-		result, err := RunGDriveBrowseTUI(client, filePath)
-		if err != nil {
-			return fmt.Errorf("browse failed: %w", err)
-		}
-		if result.Cancelled {
-			return nil // User cancelled, no error
-		}
-		if result.SelectedFile == nil {
-			return nil
-		}
-		fileInfo = result.SelectedFile
-	}
-
-	// Download the file
-	return downloadGDriveFile(ctx, client, fileInfo, cfg.OutputDir)
-}
-
-func downloadGDriveFile(_ context.Context, client *gdrive.Client, fileInfo *gdrive.FileInfo, outputDir string) error {
-	// Determine output filename
-	outputFile := output
-	if outputFile == "" {
-		outputFile = fileInfo.Name
-		// Add .pdf extension for Google Docs
-		if gdrive.IsGoogleDoc(fileInfo.MimeType) {
-			outputFile = strings.TrimSuffix(outputFile, filepath.Ext(outputFile)) + ".pdf"
-		}
-		if outputDir != "" {
-			outputFile = filepath.Join(outputDir, outputFile)
-		}
-	}
-
-	// Show file info
-	fmt.Printf("\n  Google Drive: %s", fileInfo.Name)
-	if fileInfo.Size > 0 {
-		fmt.Printf(" (%s)", formatSize(fileInfo.Size))
-	}
-	if gdrive.IsGoogleDoc(fileInfo.MimeType) {
-		fmt.Printf(" [exporting as PDF]")
-	}
-	fmt.Println()
-
-	// Get download URL and auth header
-	downloadURL, err := client.GetDownloadURL(fileInfo.ID, fileInfo.MimeType)
-	if err != nil {
-		return fmt.Errorf("failed to get download URL: %w", err)
-	}
-
-	authHeader, err := client.GetAuthHeader()
-	if err != nil {
-		return fmt.Errorf("failed to get auth: %w", err)
-	}
-
-	// Use the downloader with auth header
-	headers := map[string]string{
-		"Authorization": authHeader,
-	}
-
-	return downloader.RunDownloadTUI(
-		downloadURL,
-		outputFile,
-		fileInfo.Name,
-		"en",
-		headers,
 	)
 }
 

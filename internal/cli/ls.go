@@ -7,7 +7,6 @@ import (
 	"sort"
 
 	"github.com/guiyumin/vget/internal/core/config"
-	"github.com/guiyumin/vget/internal/core/gdrive"
 	"github.com/guiyumin/vget/internal/core/webdav"
 	"github.com/spf13/cobra"
 )
@@ -17,11 +16,9 @@ var jsonFlag bool
 var lsCmd = &cobra.Command{
 	Use:   "ls <remote>:<path>",
 	Short: "List files in a remote directory",
-	Long: `List files in a remote directory (WebDAV or Google Drive).
+	Long: `List files in a remote WebDAV directory.
 
 Examples:
-  vget ls gdrive:/
-  vget ls gdrive:/Movies
   vget ls pikpak:/
   vget ls pikpak:/Movies`,
 	Args: cobra.ExactArgs(1),
@@ -46,14 +43,9 @@ func runLs(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	cfg := config.LoadOrDefault()
 
-	// Check if it's a Google Drive path
-	if gdrive.IsGDrivePath(remotePath) {
-		return runGDriveLs(ctx, cfg, remotePath)
-	}
-
 	// Check if it's a WebDAV remote path
 	if !webdav.IsRemotePath(remotePath) && !webdav.IsWebDAVURL(remotePath) {
-		return fmt.Errorf("invalid remote path: %s\nUse format: <remote>:<path> (e.g., gdrive:/ or pikpak:/Movies)", remotePath)
+		return fmt.Errorf("invalid remote path: %s\nUse format: <remote>:<path> (e.g., pikpak:/Movies)", remotePath)
 	}
 
 	var client *webdav.Client
@@ -123,91 +115,6 @@ func runLs(cmd *cobra.Command, args []string) error {
 	// Build remote path prefix for full paths
 	remotePrefix := remotePath
 	if remotePrefix[len(remotePrefix)-1] != '/' {
-		remotePrefix += "/"
-	}
-
-	// JSON output
-	if jsonFlag {
-		entries := make([]FileEntry, len(files))
-		for i, f := range files {
-			entries[i] = FileEntry{
-				Name:  f.Name,
-				Path:  remotePrefix + f.Name,
-				IsDir: f.IsDir,
-				Size:  f.Size,
-			}
-		}
-		output, err := json.MarshalIndent(entries, "", "  ")
-		if err != nil {
-			return fmt.Errorf("failed to marshal JSON: %w", err)
-		}
-		fmt.Println(string(output))
-		return nil
-	}
-
-	// Human-readable output
-	if len(files) == 0 {
-		fmt.Println("(empty directory)")
-		return nil
-	}
-
-	// Print header
-	fmt.Printf("%s\n", remotePath)
-
-	// Print files
-	for _, f := range files {
-		if f.IsDir {
-			fmt.Printf("  📁 %s/\n", f.Name)
-		} else {
-			fmt.Printf("  📄 %-40s %s\n", f.Name, formatSize(f.Size))
-		}
-	}
-
-	return nil
-}
-
-// runGDriveLs lists files in a Google Drive directory
-func runGDriveLs(ctx context.Context, cfg *config.Config, remotePath string) error {
-	// Parse the path
-	dirPath, err := gdrive.ParseGDrivePath(remotePath)
-	if err != nil {
-		return err
-	}
-
-	// Create Google Drive client
-	client, err := gdrive.NewClient(cfg)
-	if err != nil {
-		return err
-	}
-
-	// Check if path is a directory (for root, skip this check)
-	if dirPath != "/" {
-		info, err := client.Stat(ctx, dirPath)
-		if err != nil {
-			return fmt.Errorf("failed to access path: %w", err)
-		}
-		if !info.IsDir {
-			return fmt.Errorf("'%s' is not a directory", remotePath)
-		}
-	}
-
-	// List directory contents
-	files, err := client.List(ctx, dirPath)
-	if err != nil {
-		return fmt.Errorf("failed to list directory: %w", err)
-	}
-
-	// Sort: directories first, then files, alphabetically
-	sort.Slice(files, func(i, j int) bool {
-		if files[i].IsDir != files[j].IsDir {
-			return files[i].IsDir // dirs first
-		}
-		return files[i].Name < files[j].Name
-	})
-
-	// Build remote path prefix for full paths
-	remotePrefix := remotePath
-	if len(remotePrefix) > 0 && remotePrefix[len(remotePrefix)-1] != '/' {
 		remotePrefix += "/"
 	}
 

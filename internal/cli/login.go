@@ -19,9 +19,7 @@ var logoutCmd = &cobra.Command{
 
 func init() {
 	loginCmd.AddCommand(login.BilibiliCmd())
-	loginCmd.AddCommand(login.GoogleCmd())
 	logoutCmd.AddCommand(login.BilibiliLogoutCmd())
-	logoutCmd.AddCommand(login.GoogleLogoutCmd())
 	rootCmd.AddCommand(loginCmd)
 	rootCmd.AddCommand(logoutCmd)
 }
