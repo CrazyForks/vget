@@ -1,4 +1,4 @@
-//go:build !cgo && ((linux && amd64) || (windows && amd64))
+//go:build !cgo && ((linux && amd64) || (windows && amd64)) && !noai
 
 package transcriber
 

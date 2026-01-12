@@ -1,4 +1,4 @@
-//go:build !cgo && linux && arm64
+//go:build !cgo && linux && arm64 && !noai
 
 package transcriber
 

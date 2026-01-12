@@ -1,4 +1,4 @@
-//go:build !cgo && darwin && arm64
+//go:build !cgo && darwin && arm64 && !noai
 
 package transcriber
 

@@ -175,7 +175,6 @@ jobs:
           context: .
           file: ./docker/vget/Dockerfile
           platforms: linux/amd64
-          build-args: ENABLE_CUDA=true
           outputs: type=image,name=ghcr.io/${{ github.repository }},push-by-digest=true,name-canonical=true,push=true
 
   docker-arm64:

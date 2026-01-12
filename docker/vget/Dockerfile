@@ -1,11 +1,6 @@
 # vget Docker Image
-# Build args:
-#   ENABLE_CUDA=true  - amd64 builds with CUDA GPU support (uses pre-built base image)
-#   ENABLE_CUDA=false - arm64 builds (CPU only)
-#
-# Runtime: App detects GPU and enables AI features only if GPU is available
-
-ARG ENABLE_CUDA=false
+# Always builds with CUDA support for GPU acceleration
+# Runtime: entrypoint detects GPU and selects appropriate binary
 
 # Build stage for UI
 FROM node:22-slim AS ui-builder
@@ -15,47 +10,8 @@ RUN npm ci
 COPY ui/ ./
 RUN npm run build
 
-# Go builder stage
-# CUDA: use pre-built base image with whisper.cpp
-# Non-CUDA: build from scratch
-FROM golang:1.25-bookworm AS go-builder-base
-FROM ghcr.io/guiyumin/vget-base:latest AS go-builder-cuda
-
-ARG ENABLE_CUDA=false
-FROM go-builder-cuda AS go-builder-select-true
-FROM go-builder-base AS go-builder-select-false
-FROM go-builder-select-${ENABLE_CUDA} AS go-builder
-
-ARG ENABLE_CUDA=false
-ARG TARGETARCH
-
-# For non-CUDA builds, install dependencies and build from source
-RUN if [ "$ENABLE_CUDA" = "false" ]; then \
-        apt-get update && apt-get install -y --no-install-recommends \
-            build-essential cmake curl git && \
-        rm -rf /var/lib/apt/lists/*; \
-    fi
-
-# whisper.cpp (non-CUDA only, CUDA base image already has it)
-ARG WHISPER_VERSION=1.8.2
-
-RUN if [ "$ENABLE_CUDA" = "false" ]; then \
-        git clone --depth 1 --branch v${WHISPER_VERSION} https://github.com/ggerganov/whisper.cpp /tmp/whisper.cpp && \
-        cd /tmp/whisper.cpp && \
-        cmake -B build \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_SHARED_LIBS=ON \
-            -DGGML_NATIVE=OFF \
-            -DWHISPER_BUILD_EXAMPLES=OFF \
-            -DWHISPER_BUILD_TESTS=OFF && \
-        cmake --build build --config Release -j$(nproc) && \
-        cp build/src/libwhisper.so* /usr/local/lib/ && \
-        cp build/ggml/src/libggml*.so* /usr/local/lib/ && \
-        cp include/whisper.h /usr/local/include/ && \
-        cp ggml/include/ggml*.h /usr/local/include/ && \
-        rm -rf /tmp/whisper.cpp && \
-        ldconfig; \
-    fi
+# Go builder stage - use pre-built CUDA base image with whisper.cpp
+FROM ghcr.io/guiyumin/vget-base:latest AS go-builder
 
 WORKDIR /app
 
@@ -65,29 +21,27 @@ RUN go mod download
 COPY . .
 COPY --from=ui-builder /app/ui/dist ./internal/server/dist
 
-# Build with CGO for whisper.cpp bindings
-ENV CGO_ENABLED=1
+# Build environment for whisper.cpp bindings
 ENV LD_LIBRARY_PATH=/usr/local/lib:/usr/local/cuda/lib64:/usr/local/cuda/lib64/stubs
 ENV C_INCLUDE_PATH=/usr/local/include
 ENV LIBRARY_PATH=/usr/local/lib:/usr/local/cuda/lib64:/usr/local/cuda/lib64/stubs
 
-RUN if [ "$ENABLE_CUDA" = "true" ]; then \
-        ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/lib/libcuda.so && \
-        ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/lib/libcuda.so.1 && \
-        ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 && \
-        ldconfig; \
-    fi
+# Setup CUDA stubs for linking
+RUN ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/lib/libcuda.so && \
+    ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/lib/libcuda.so.1 && \
+    ln -sf /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1 && \
+    ldconfig
 
-RUN go build -ldflags="-s -w" -o /vget-server ./cmd/vget-server
+# Build TWO binaries:
+# - vget-server: no AI, pure Go, no CUDA dependencies (used when no GPU detected)
+# - vget-server-cuda: full AI with CUDA support (used when GPU is available)
+RUN echo "Building vget-server (no AI, pure Go)..." && \
+    CGO_ENABLED=0 go build -tags noai -ldflags="-s -w" -o /vget-server ./cmd/vget-server && \
+    echo "Building vget-server-cuda (full AI with CUDA)..." && \
+    CGO_ENABLED=1 go build -ldflags="-s -w" -o /vget-server-cuda ./cmd/vget-server
 
-# Runtime stage
-FROM debian:bookworm-slim AS runtime-base
-FROM nvidia/cuda:12.6.3-runtime-ubuntu24.04 AS runtime-cuda
-
-ARG ENABLE_CUDA=false
-FROM runtime-cuda AS runtime-select-true
-FROM runtime-base AS runtime-select-false
-FROM runtime-select-${ENABLE_CUDA} AS runtime
+# Runtime stage - CUDA runtime for GPU support
+FROM nvidia/cuda:12.6.3-runtime-ubuntu24.04 AS runtime
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -113,12 +67,14 @@ RUN (getent group 1000 >/dev/null || groupadd -g 1000 vget) && \
     mkdir -p /home/vget/downloads /home/vget/.config/vget /home/vget/models && \
     chown -R 1000:1000 /home/vget
 
-# Copy AI libraries
+# Copy AI libraries (whisper.cpp with CUDA)
 COPY --from=go-builder /usr/local/lib/libwhisper*.so* /usr/local/lib/
 COPY --from=go-builder /usr/local/lib/libggml*.so* /usr/local/lib/
 RUN ldconfig
 
+# Copy both binaries
 COPY --from=go-builder /vget-server /usr/local/bin/vget-server
+COPY --from=go-builder /vget-server-cuda /usr/local/bin/vget-server-cuda
 
 ENV ROD_BROWSER=/usr/bin/chromium
 ENV LD_LIBRARY_PATH=/usr/local/lib
