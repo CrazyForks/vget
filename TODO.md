@@ -28,6 +28,10 @@
 - [ ] Rate limiting
 - [x] Cookie/auth support
 - [ ] Metadata embedding
+  - Audio (MP3/M4A): ID3 tags - title, artist, album, cover art
+  - Video (MP4): title, description, thumbnail
+  - Auto-fill from source (podcast name, episode title, artwork)
+  - Media players (Apple Music, VLC, etc.) would then show this info instead of just the filename.
 - [x] `vget server` - HTTP server mode
   - REST API for remote downloads
   - Run as background daemon (`vget server start -d`)
