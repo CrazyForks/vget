@@ -9,14 +9,17 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/guiyumin/vget/internal/core/config"
+	"github.com/tetratelabs/wazero"
+
+	"codeberg.org/gruf/go-ffmpreg/ffmpreg"
+	"codeberg.org/gruf/go-ffmpreg/wasm"
 )
 
 // HLSConfig holds configuration for HLS downloads
@@ -501,38 +504,56 @@ func DownloadHLSWithProgress(ctx context.Context, m3u8URL, output string, header
 	return finalPath, nil
 }
 
-// convertTsToMp4 converts a .ts file to .mp4 using ffmpeg (copy, no re-encoding)
-// Only runs in Docker environment where ffmpeg is available
+// convertTsToMp4 converts a .ts file to .mp4 using embedded ffmpeg (copy, no re-encoding)
 // Returns the new .mp4 path if conversion succeeded, otherwise returns original path
 func convertTsToMp4(tsPath string) (string, error) {
-	// Only convert in Docker
-	if !config.IsRunningInDocker() {
-		return tsPath, nil
-	}
-
 	// Only convert .ts files
 	if !strings.HasSuffix(strings.ToLower(tsPath), ".ts") {
 		return tsPath, nil
 	}
 
-	// Build mp4 output path
-	mp4Path := strings.TrimSuffix(tsPath, ".ts") + ".mp4"
-	if strings.HasSuffix(tsPath, ".TS") {
-		mp4Path = strings.TrimSuffix(tsPath, ".TS") + ".mp4"
+	// Get absolute path for WASM filesystem mounting
+	absPath, err := filepath.Abs(tsPath)
+	if err != nil {
+		return tsPath, fmt.Errorf("failed to get absolute path: %w", err)
 	}
 
-	// Run ffmpeg with stream copy (fast, no re-encoding)
-	// -threads 1: Limit threads to work on resource-constrained systems (Docker, low ulimits)
-	cmd := exec.Command("ffmpeg", "-threads", "1", "-i", tsPath, "-c", "copy", "-y", mp4Path)
-	output, err := cmd.CombinedOutput()
+	// Build mp4 output path
+	mp4Path := strings.TrimSuffix(absPath, ".ts") + ".mp4"
+	if strings.HasSuffix(absPath, ".TS") {
+		mp4Path = strings.TrimSuffix(absPath, ".TS") + ".mp4"
+	}
+
+	// Mount directory for WASM filesystem access
+	dir := filepath.Dir(absPath)
+
+	// Run embedded ffmpeg with stream copy (fast, no re-encoding)
+	ctx := context.Background()
+	args := wasm.Args{
+		Stderr: io.Discard,
+		Stdout: io.Discard,
+		Args: []string{
+			"-i", absPath,
+			"-c", "copy",
+			"-y",
+			mp4Path,
+		},
+		Config: func(cfg wazero.ModuleConfig) wazero.ModuleConfig {
+			return cfg.WithFSConfig(wazero.NewFSConfig().
+				WithDirMount(dir, dir))
+		},
+	}
+
+	rc, err := ffmpreg.Ffmpeg(ctx, args)
 	if err != nil {
-		// Conversion failed, keep the .ts file
-		return tsPath, fmt.Errorf("ffmpeg conversion failed: %w\nOutput: %s", err, string(output))
+		return tsPath, fmt.Errorf("ffmpeg conversion failed: %w", err)
+	}
+	if rc != 0 {
+		return tsPath, fmt.Errorf("ffmpeg exited with code %d", rc)
 	}
 
 	// Conversion succeeded, delete the .ts file
 	if err := os.Remove(tsPath); err != nil {
-		// Log but don't fail - the mp4 was created successfully
 		fmt.Printf("Warning: could not remove original .ts file: %v\n", err)
 	}
 
