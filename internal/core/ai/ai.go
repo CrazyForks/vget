@@ -223,18 +223,24 @@ func (p *Pipeline) ProcessWithProgress(ctx context.Context, filePath string, opt
 		progressFn(ProgressStepCompress, 0, "Compressing audio...")
 
 		// Transcribe the file with progress reporting
-		transcript, chunksDir, err := p.transcribeWithProgress(ctx, filePath, progressFn)
+		transcript, audioOrChunksPath, err := p.transcribeWithProgress(ctx, filePath, progressFn)
 		if err != nil {
 			return nil, fmt.Errorf("transcription failed: %w", err)
 		}
 		result.Transcript = transcript
-		result.ChunksDir = chunksDir
 
-		// Check for extracted audio path
-		if chunksDir != "" {
-			manifest, _ := LoadManifest(chunksDir)
-			if manifest != nil && manifest.ExtractedAudioPath != "" {
-				result.ExtractedAudioPath = manifest.ExtractedAudioPath
+		// Check what audioOrChunksPath contains
+		if audioOrChunksPath != "" {
+			if strings.HasSuffix(audioOrChunksPath, ".mp3") {
+				// Direct audio extraction (no chunking)
+				result.ExtractedAudioPath = audioOrChunksPath
+			} else {
+				// Chunks directory - check manifest for extracted audio
+				result.ChunksDir = audioOrChunksPath
+				manifest, _ := LoadManifest(audioOrChunksPath)
+				if manifest != nil && manifest.ExtractedAudioPath != "" {
+					result.ExtractedAudioPath = manifest.ExtractedAudioPath
+				}
 			}
 		}
 
@@ -352,14 +358,42 @@ func (p *Pipeline) transcribeWithProgress(ctx context.Context, filePath string, 
 	maxSize := p.transcriber.MaxFileSize()
 	if maxSize == 0 {
 		// No file size limit - transcribe directly without chunking
+		// But first extract audio if this is a video file (so user can see it)
+		transcribeFile := filePath
+		var extractedAudioPath string
+
+		if isVideoFile(filePath) {
+			progressFn(ProgressStepCompress, 0, "Extracting audio from video...")
+			fmt.Println("  Extracting audio from video...")
+
+			ext := filepath.Ext(filePath)
+			base := strings.TrimSuffix(filepath.Base(filePath), ext)
+			extractedAudioPath = filepath.Join(filepath.Dir(filePath), base+".audio.mp3")
+
+			if err := p.chunker.extractFullAudio(filePath, extractedAudioPath); err != nil {
+				return nil, "", fmt.Errorf("failed to extract audio: %w", err)
+			}
+
+			fmt.Printf("  Extracted audio: %s\n", extractedAudioPath)
+			progressFn(ProgressStepCompress, 100, "Audio extracted")
+			transcribeFile = extractedAudioPath
+		}
+
 		progressFn(ProgressStepTranscribe, 0, "Transcribing...")
 
-		result, err := p.transcriber.Transcribe(ctx, filePath)
+		result, err := p.transcriber.Transcribe(ctx, transcribeFile)
 		if err != nil {
 			return nil, "", err
 		}
 
 		progressFn(ProgressStepTranscribe, 100, "Transcription complete")
+
+		// Return extracted audio path in chunksDir field (reusing for simplicity)
+		// The caller will check for this
+		if extractedAudioPath != "" {
+			// Create a simple marker file so caller knows about extracted audio
+			return result, extractedAudioPath, nil
+		}
 		return result, "", nil
 	}
 

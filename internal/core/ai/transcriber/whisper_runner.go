@@ -122,6 +122,11 @@ func (w *WhisperRunner) Transcribe(ctx context.Context, filePath string) (*Resul
 		"-osrt", // SRT format with timestamps
 		"-of", outputBase,
 		"-pp", // print progress
+
+		// Anti-hallucination flags
+		"-nc",          // --no-context: don't use previous text as context (prevents repetition loops)
+		"-et", "2.4",   // --entropy-thold: skip segments with entropy > threshold (gibberish detection)
+		"-lpt", "-0.5", // --logprob-thold: skip segments with avg logprob < threshold (low confidence)
 	}
 
 	if w.language != "" && w.language != "auto" {
@@ -178,6 +183,9 @@ func (w *WhisperRunner) Transcribe(ctx context.Context, filePath string) (*Resul
 
 	// Parse segments from output (whisper.cpp txt format has timestamps)
 	segments := parseWhisperOutput(text)
+
+	// Filter out hallucinated segments (repeated text)
+	segments = filterHallucinatedSegments(segments)
 
 	// Get audio duration
 	duration, _ := getAudioDuration(wavPath)
@@ -561,6 +569,58 @@ func cleanTranscriptText(text string) string {
 	}
 
 	return strings.Join(lines, " ")
+}
+
+// filterHallucinatedSegments detects and removes hallucinated segments.
+// Whisper models often hallucinate repetitive text during silence, music, or non-speech audio.
+// This function detects consecutive repeated segments and collapses them.
+func filterHallucinatedSegments(segments []Segment) []Segment {
+	if len(segments) < 3 {
+		return segments
+	}
+
+	var filtered []Segment
+	var repeatCount int
+	var lastText string
+
+	for _, seg := range segments {
+		text := strings.TrimSpace(seg.Text)
+		normalizedText := normalizeForComparison(text)
+
+		if normalizedText == lastText {
+			repeatCount++
+			// If we see the same text 3+ times consecutively, it's likely hallucination
+			if repeatCount >= 3 {
+				continue // Skip this segment
+			}
+		} else {
+			// Text changed
+			if repeatCount >= 3 {
+				// Previous run was hallucination - we already skipped those segments
+				// Optionally: add a [non-speech] marker here
+			}
+			repeatCount = 1
+			lastText = normalizedText
+		}
+
+		filtered = append(filtered, seg)
+	}
+
+	return filtered
+}
+
+// normalizeForComparison normalizes text for repetition detection.
+// Removes punctuation and lowercases for more robust matching.
+func normalizeForComparison(text string) string {
+	text = strings.ToLower(text)
+	// Remove common punctuation
+	text = strings.Map(func(r rune) rune {
+		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == ' ' {
+			return r
+		}
+		return -1
+	}, text)
+	return strings.TrimSpace(text)
 }
 
 // getAudioDuration gets the duration of a WAV file.
