@@ -34,6 +34,10 @@ rm vget.zip
 
 ![下载进度](screenshots/pikpak_download.png)
 
+### AI 语音转录
+
+![AI 语音转录](screenshots/vget-ai-transcribe-screenshot.png)
+
 ### Docker 服务器界面
 
 ![](screenshots/vget_server_ui.png)

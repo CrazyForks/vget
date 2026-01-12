@@ -34,6 +34,10 @@ rm vget.zip
 
 ![다운로드 진행률](screenshots/pikpak_download.png)
 
+### AI 음성 인식
+
+![AI 음성 인식](screenshots/vget-ai-transcribe-screenshot.png)
+
 ### Docker 서버 UI
 
 ![](screenshots/vget_server_ui.png)

@@ -34,6 +34,10 @@ Laden Sie `vget-windows-amd64.zip` von [Releases](https://github.com/guiyumin/vg
 
 ![Download-Fortschritt](screenshots/pikpak_download.png)
 
+### KI-Transkription
+
+![KI-Transkription](screenshots/vget-ai-transcribe-screenshot.png)
+
 ### Docker Server-Benutzeroberfläche
 
 ![](screenshots/vget_server_ui.png)

@@ -34,6 +34,10 @@ rm vget.zip
 
 ![ダウンロード進捗](screenshots/pikpak_download.png)
 
+### AI 文字起こし
+
+![AI 文字起こし](screenshots/vget-ai-transcribe-screenshot.png)
+
 ### Docker サーバー UI
 
 ![](screenshots/vget_server_ui.png)

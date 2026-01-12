@@ -34,6 +34,10 @@ Téléchargez `vget-windows-amd64.zip` depuis [Releases](https://github.com/guiy
 
 ![Progression du téléchargement](screenshots/pikpak_download.png)
 
+### Transcription IA
+
+![Transcription IA](screenshots/vget-ai-transcribe-screenshot.png)
+
 ### Interface serveur Docker
 
 ![](screenshots/vget_server_ui.png)
