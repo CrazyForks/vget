@@ -1,4 +1,9 @@
 {
   "makefile.configureOnOpen": false,
-  "diffEditor.renderSideBySide": false
+  "diffEditor.renderSideBySide": false,
+  "gopls": {
+    "build.env": {
+      "CGO_ENABLED": "0"
+    }
+  }
 }
