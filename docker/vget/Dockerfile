@@ -51,12 +51,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
     python3-venv \
-    ffmpeg \
     nodejs \
     gosu \
     curl \
     bzip2 \
+    xz-utils \
     && rm -rf /var/lib/apt/lists/*
+
+# Install ffmpeg 7.x static build (more stable than Ubuntu's 6.1.1)
+RUN curl -L https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz | \
+    tar -xJ --strip-components=1 -C /usr/local && \
+    ln -sf /usr/local/bin/ffmpeg /usr/bin/ffmpeg && \
+    ln -sf /usr/local/bin/ffprobe /usr/bin/ffprobe
 
 RUN pip3 install --no-cache-dir --break-system-packages \
     yt-dlp \

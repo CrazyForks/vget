@@ -23,12 +23,18 @@ func MergeVideoAudio(videoPath, audioPath, outputPath string, deleteOriginals bo
 	}
 
 	// Run ffmpeg with stream copy (fast, no re-encoding)
+	// -threads 1: single thread for stability in containers
 	// -y: overwrite output file without asking
+	// -f mp4: explicit output format
+	// -map 0:v -map 1:a: take video from first input, audio from second
 	cmd := exec.Command("ffmpeg",
 		"-threads", "1",
 		"-i", videoPath,
 		"-i", audioPath,
+		"-map", "0:v",
+		"-map", "1:a",
 		"-c", "copy",
+		"-f", "mp4",
 		"-y",
 		outputPath,
 	)
