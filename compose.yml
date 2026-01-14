@@ -33,3 +33,6 @@ services:
       - ${VGET_CONFIG:?Set VGET_CONFIG in .env}:/home/vget/.config/vget
     environment:
       - TZ=${TZ:-Asia/Shanghai}
+    # Required for NAS systems (Synology, QNAP, etc.) to allow ffmpeg thread creation
+    security_opt:
+      - seccomp:unconfined
