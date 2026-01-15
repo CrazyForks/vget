@@ -371,3 +371,123 @@ on:
     tags:
       - 'desktop-v*'
 ```
+
+---
+
+## Shared Config Directory
+
+CLI and Desktop share the same config directory at `~/.config/vget/`. This ensures settings sync between both apps.
+
+### Directory Structure
+
+```
+~/.config/vget/
+├── config.yml              # Main configuration (shared by CLI & Desktop)
+├── update.key              # Desktop auto-updater signing key (private)
+├── update.key.pub          # Desktop auto-updater signing key (public)
+├── auth.json               # Authentication tokens
+├── xhs_cookies.json        # Xiaohongshu browser cookies
+├── youtube_session.json    # YouTube session data
+├── telegram/               # Telegram MTProto session
+│   └── session
+└── models/                 # AI models (whisper, etc.)
+```
+
+### config.yml Format
+
+```yaml
+# vget configuration file
+# Shared between CLI and Desktop
+
+# Basic settings
+language: zh                          # en, zh, jp, kr, es, fr, de
+output_dir: /Users/yumin/Downloads/vget
+format: mp4                           # mp4, webm, best
+quality: best                         # best, 1080p, 720p, 480p
+
+# WebDAV servers (for cloud storage like PikPak)
+webdavServers:
+    pikpak:
+        url: https://dav.mypikpak.com
+        username: your_username
+        password: your_password
+
+# Twitter/X authentication
+twitter:
+    auth_token: your_auth_token       # Required for NSFW content
+
+# Bilibili authentication
+bilibili:
+    cookie: SESSDATA=xxx; bili_jct=xxx; DedeUserID=xxx
+
+# Server mode settings (CLI only)
+server:
+    max_concurrent: 10
+
+# Express tracking (CLI only)
+express:
+    kuaidi100:
+        customer: xxx
+        key: xxx
+```
+
+### Config File Locations by Platform
+
+| Platform | Path |
+|----------|------|
+| macOS | `~/.config/vget/config.yml` |
+| Linux | `~/.config/vget/config.yml` |
+| Windows | `%USERPROFILE%\.config\vget\config.yml` |
+
+**Note:** Desktop does NOT use `~/Library/Application Support/` on macOS to maintain compatibility with CLI.
+
+### Rust Config Struct
+
+```rust
+// src-tauri/src/config.rs
+
+pub struct Config {
+    pub language: String,
+    pub output_dir: String,
+    pub format: String,
+    pub quality: String,
+    #[serde(rename = "webdavServers")]
+    pub webdav_servers: HashMap<String, WebDAVServer>,
+    pub twitter: TwitterConfig,
+    pub bilibili: BilibiliConfig,
+    pub server: ServerConfig,
+    pub express: ExpressConfig,
+}
+
+pub struct TwitterConfig {
+    pub auth_token: Option<String>,
+}
+
+pub struct BilibiliConfig {
+    pub cookie: Option<String>,
+}
+
+pub struct WebDAVServer {
+    pub url: String,
+    pub username: String,
+    pub password: String,
+}
+```
+
+### TypeScript Config Interface
+
+```typescript
+// src/components/settings/types.ts
+
+interface Config {
+  language: string;
+  output_dir: string;
+  format: string;
+  quality: string;
+  webdav_servers: Record<string, WebDAVServer>;
+  twitter: { auth_token: string | null };
+  bilibili: { cookie: string | null };
+  server: { max_concurrent: number };
+  express: { kuaidi100: Kuaidi100Config | null };
+}
+```

@@ -1,9 +1,12 @@
 mod config;
+mod downloader;
 mod extractor;
 
 use config::{get_config as load_config, save_config as store_config, Config};
+use downloader::{DownloadJob, DownloadManager, DownloadStatus, SimpleDownloader};
 use extractor::{extract_media as do_extract, MediaInfo};
-use tauri::Emitter;
+use std::sync::Arc;
+use tauri::{Emitter, State};
 
 // ============ CONFIG COMMANDS ============
 
@@ -30,26 +33,81 @@ async fn extract_media(url: String) -> Result<MediaInfo, String> {
 async fn start_download(
     url: String,
     output_path: String,
-    format_id: Option<String>,
+    _format_id: Option<String>,
     window: tauri::Window,
+    download_manager: State<'_, Arc<DownloadManager>>,
 ) -> Result<String, String> {
     let job_id = uuid::Uuid::new_v4().to_string();
 
-    // TODO: Implement download with progress events
-    let _ = window.emit("download-progress", serde_json::json!({
-        "jobId": job_id,
-        "progress": 0,
-        "total": 100,
-        "speed": 0
-    }));
+    // Create job and get cancellation receiver
+    let job = DownloadJob {
+        id: job_id.clone(),
+        url: url.clone(),
+        output_path: output_path.clone(),
+        status: DownloadStatus::Pending,
+        progress: None,
+        error: None,
+    };
+
+    let cancel_rx = download_manager.add_job(job).await;
+
+    // Update status to downloading
+    download_manager
+        .update_job(&job_id, DownloadStatus::Downloading, None, None)
+        .await;
+
+    // Clone for async task
+    let dm = download_manager.inner().clone();
+    let jid = job_id.clone();
+
+    // Spawn download task
+    tauri::async_runtime::spawn(async move {
+        let downloader = SimpleDownloader::new();
+
+        match downloader
+            .download(&jid, &url, &output_path, &window, cancel_rx)
+            .await
+        {
+            Ok(()) => {
+                dm.update_job(&jid, DownloadStatus::Completed, None, None)
+                    .await;
+            }
+            Err(e) => {
+                if e.contains("cancelled") {
+                    dm.update_job(&jid, DownloadStatus::Cancelled, None, Some(e.clone()))
+                        .await;
+                } else {
+                    dm.update_job(&jid, DownloadStatus::Failed, None, Some(e.clone()))
+                        .await;
+                }
+                let _ = window.emit(
+                    "download-error",
+                    serde_json::json!({
+                        "jobId": jid,
+                        "error": e,
+                    }),
+                );
+            }
+        }
+    });
 
     Ok(job_id)
 }
 
 #[tauri::command]
-fn cancel_download(_job_id: String) -> Result<(), String> {
-    // TODO: Implement cancel
-    Ok(())
+async fn cancel_download(
+    job_id: String,
+    download_manager: State<'_, Arc<DownloadManager>>,
+) -> Result<(), String> {
+    download_manager.cancel_job(&job_id).await
+}
+
+#[tauri::command]
+async fn get_download_status(
+    job_id: String,
+    download_manager: State<'_, Arc<DownloadManager>>,
+) -> Result<Option<DownloadJob>, String> {
+    Ok(download_manager.get_job(&job_id).await)
 }
 
 // ============ TAURI SETUP ============
@@ -61,6 +119,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .manage(Arc::new(DownloadManager::new()))
         .invoke_handler(tauri::generate_handler![
             // Config
             get_config,
@@ -70,6 +129,7 @@ pub fn run() {
             // Download
             start_download,
             cancel_download,
+            get_download_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
