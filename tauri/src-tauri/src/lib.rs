@@ -1,7 +1,12 @@
+mod auth;
 mod config;
 mod downloader;
 mod extractor;
 
+use auth::{
+    bilibili_check_status, bilibili_logout, bilibili_qr_generate, bilibili_qr_poll,
+    bilibili_save_cookie, xhs_check_status, xhs_logout, xhs_open_login_window,
+};
 use config::{get_config as load_config, save_config as store_config, Config};
 use downloader::{DownloadJob, DownloadManager, DownloadStatus, SimpleDownloader};
 use extractor::{extract_media as do_extract, MediaInfo};
@@ -182,6 +187,16 @@ pub fn run() {
             start_download,
             cancel_download,
             get_download_status,
+            // Auth - Bilibili
+            bilibili_check_status,
+            bilibili_qr_generate,
+            bilibili_qr_poll,
+            bilibili_save_cookie,
+            bilibili_logout,
+            // Auth - Xiaohongshu
+            xhs_check_status,
+            xhs_logout,
+            xhs_open_login_window,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

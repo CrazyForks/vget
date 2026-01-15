@@ -1,9 +1,8 @@
-import { createFileRoute, Link as RouterLink } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   Download,
-  Settings,
   Folder,
   Link,
   X,
@@ -12,7 +11,6 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
-import logo from "@/assets/logo.png";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import {
@@ -202,27 +200,16 @@ function Home() {
   );
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-full">
       {/* Header */}
-      <header className="border-b border-border">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <img src={logo} alt="vget" className="h-8 w-8" />
-            <h1 className="text-xl font-semibold">VGet</h1>
-          </div>
-          <RouterLink
-            to="/settings"
-            className="p-2 rounded-lg hover:bg-muted transition-colors"
-          >
-            <Settings className="h-5 w-5 text-muted-foreground" />
-          </RouterLink>
-        </div>
+      <header className="h-14 border-b border-border flex items-center px-6">
+        <h1 className="text-xl font-semibold">Download</h1>
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <div className="p-6">
         {/* URL Input */}
-        <form onSubmit={handleSubmit} className="max-w-2xl mx-auto">
+        <form onSubmit={handleSubmit} className="max-w-2xl">
           <div className="relative">
             <Link className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <input
@@ -230,7 +217,7 @@ function Home() {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="Paste video URL here..."
-              className="w-full pl-12 pr-24 py-4 rounded-xl border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              className="w-full pl-12 pr-32 py-4 rounded-xl border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             />
             <button
               type="submit"
@@ -244,15 +231,15 @@ function Home() {
         </form>
 
         {/* Supported Sites */}
-        <div className="mt-8 max-w-2xl mx-auto">
-          <p className="text-sm text-muted-foreground text-center">
+        <div className="mt-4 max-w-2xl">
+          <p className="text-sm text-muted-foreground">
             Supports Twitter/X, Bilibili, Xiaohongshu, YouTube, Apple Podcasts,
             and direct URLs
           </p>
         </div>
 
         {/* Downloads Section */}
-        <div className="mt-12 max-w-2xl mx-auto">
+        <div className="mt-8 max-w-2xl">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-medium">Downloads</h2>
             <div className="flex items-center gap-2">
@@ -294,7 +281,7 @@ function Home() {
             </div>
           )}
         </div>
-      </main>
+      </div>
     </div>
   );
 }

@@ -9,12 +9,24 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as XiaohongshuRouteImport } from './routes/xiaohongshu'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as BilibiliRouteImport } from './routes/bilibili'
 import { Route as IndexRouteImport } from './routes/index'
 
+const XiaohongshuRoute = XiaohongshuRouteImport.update({
+  id: '/xiaohongshu',
+  path: '/xiaohongshu',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BilibiliRoute = BilibiliRouteImport.update({
+  id: '/bilibili',
+  path: '/bilibili',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -25,37 +37,59 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/bilibili': typeof BilibiliRoute
   '/settings': typeof SettingsRoute
+  '/xiaohongshu': typeof XiaohongshuRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/bilibili': typeof BilibiliRoute
   '/settings': typeof SettingsRoute
+  '/xiaohongshu': typeof XiaohongshuRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/bilibili': typeof BilibiliRoute
   '/settings': typeof SettingsRoute
+  '/xiaohongshu': typeof XiaohongshuRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/settings'
+  fullPaths: '/' | '/bilibili' | '/settings' | '/xiaohongshu'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/settings'
-  id: '__root__' | '/' | '/settings'
+  to: '/' | '/bilibili' | '/settings' | '/xiaohongshu'
+  id: '__root__' | '/' | '/bilibili' | '/settings' | '/xiaohongshu'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  BilibiliRoute: typeof BilibiliRoute
   SettingsRoute: typeof SettingsRoute
+  XiaohongshuRoute: typeof XiaohongshuRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/xiaohongshu': {
+      id: '/xiaohongshu'
+      path: '/xiaohongshu'
+      fullPath: '/xiaohongshu'
+      preLoaderRoute: typeof XiaohongshuRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings': {
       id: '/settings'
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bilibili': {
+      id: '/bilibili'
+      path: '/bilibili'
+      fullPath: '/bilibili'
+      preLoaderRoute: typeof BilibiliRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -70,7 +104,9 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  BilibiliRoute: BilibiliRoute,
   SettingsRoute: SettingsRoute,
+  XiaohongshuRoute: XiaohongshuRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
