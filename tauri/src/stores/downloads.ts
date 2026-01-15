@@ -103,13 +103,15 @@ export async function startDownload(
   url: string,
   title: string,
   outputPath: string,
-  headers?: Record<string, string>
+  headers?: Record<string, string>,
+  audioUrl?: string
 ): Promise<string> {
   const jobId = await invoke<string>("start_download", {
     url,
     outputPath,
     formatId: null,
     headers: headers || null,
+    audioUrl: audioUrl || null,
   });
 
   useDownloadsStore.getState().addDownload({

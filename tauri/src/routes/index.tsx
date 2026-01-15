@@ -168,8 +168,14 @@ function Home() {
         .substring(0, 100);
       const outputPath = `${config.output_dir}/${sanitizedTitle}.${ext}`;
 
-      // Start download with headers if present
-      await startDownload(format.url, mediaInfo.title, outputPath, format.headers);
+      // Start download with headers and audio URL if present (for DASH streams)
+      await startDownload(
+        format.url,
+        mediaInfo.title,
+        outputPath,
+        format.headers,
+        format.audio_url || undefined
+      );
       setUrl("");
       toast.success("Download started");
     } catch (err) {

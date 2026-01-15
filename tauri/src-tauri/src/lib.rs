@@ -2,6 +2,7 @@ mod auth;
 mod config;
 mod downloader;
 mod extractor;
+mod ffmpeg;
 
 use auth::{
     bilibili_check_status, bilibili_logout, bilibili_qr_generate, bilibili_qr_poll,
@@ -90,6 +91,7 @@ async fn start_download(
     output_path: String,
     _format_id: Option<String>,
     headers: Option<std::collections::HashMap<String, String>>,
+    audio_url: Option<String>,
     window: tauri::Window,
     download_manager: State<'_, Arc<DownloadManager>>,
 ) -> Result<String, String> {
@@ -120,10 +122,27 @@ async fn start_download(
     tauri::async_runtime::spawn(async move {
         let downloader = SimpleDownloader::new();
 
-        match downloader
-            .download(&jid, &url, &output_path, &window, cancel_rx, headers)
-            .await
-        {
+        let result = if let Some(audio) = audio_url {
+            // DASH stream: download video + audio separately, then merge
+            downloader
+                .download_and_merge(
+                    &jid,
+                    &url,
+                    &audio,
+                    &output_path,
+                    &window,
+                    cancel_rx,
+                    headers,
+                )
+                .await
+        } else {
+            // Simple download
+            downloader
+                .download(&jid, &url, &output_path, &window, cancel_rx, headers)
+                .await
+        };
+
+        match result {
             Ok(()) => {
                 dm.update_job(&jid, DownloadStatus::Completed, None, None)
                     .await;
