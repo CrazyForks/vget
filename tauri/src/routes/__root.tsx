@@ -15,7 +15,7 @@ function RootLayout() {
       <main className="flex-1 overflow-auto">
         <Outlet />
       </main>
-      <Toaster position="bottom-right" />
+      <Toaster position="top-center" richColors />
     </div>
   );
 }
