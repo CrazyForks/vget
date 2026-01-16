@@ -446,6 +446,64 @@ pub fn delete_pages(input_path: &str, output_path: &str, pages_to_delete: &[u32]
     Ok(())
 }
 
+/// Print a PDF file using the system printer
+pub fn print_pdf(path: &str) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("lpr")
+            .arg(path)
+            .status()
+            .map_err(|e| format!("Failed to print: {}", e))?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(["/C", "print", path])
+            .status()
+            .map_err(|e| format!("Failed to print: {}", e))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("lpr")
+            .arg(path)
+            .status()
+            .map_err(|e| format!("Failed to print: {}", e))?;
+    }
+
+    Ok(())
+}
+
+/// Open PDF with system default application
+pub fn open_pdf_external(path: &str) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(path)
+            .status()
+            .map_err(|e| format!("Failed to open PDF: {}", e))?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "", path])
+            .status()
+            .map_err(|e| format!("Failed to open PDF: {}", e))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(path)
+            .status()
+            .map_err(|e| format!("Failed to open PDF: {}", e))?;
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

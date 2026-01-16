@@ -637,6 +637,20 @@ async fn pdf_remove_watermark(
         .map_err(|e| e.to_string())?
 }
 
+#[tauri::command]
+async fn pdf_print(input_path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || pdf::print_pdf(&input_path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn pdf_open_external(input_path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || pdf::open_pdf_external(&input_path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 // ============ TAURI SETUP ============
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -683,6 +697,8 @@ pub fn run() {
             pdf_images_to_pdf,
             pdf_delete_pages,
             pdf_remove_watermark,
+            pdf_print,
+            pdf_open_external,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

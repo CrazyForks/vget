@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
-import { Combine, Image, Trash2, Droplets } from "lucide-react";
+import { Combine, Image, Trash2, Droplets, Info } from "lucide-react";
 import { PdfToolId, Config } from "./types";
-import { MergePdfPanel, ImagesToPdfPanel, DeletePagesPanel, RemoveWatermarkPanel } from "./panels";
+import { PdfInfoPanel, MergePdfPanel, ImagesToPdfPanel, DeletePagesPanel, RemoveWatermarkPanel } from "./panels";
 
 interface Tool {
   id: PdfToolId;
@@ -13,6 +13,12 @@ interface Tool {
 }
 
 const tools: Tool[] = [
+  {
+    id: "info",
+    title: "PDF Info & Print",
+    description: "View PDF details and print to connected printer",
+    icon: <Info className="h-4 w-4" />,
+  },
   {
     id: "merge",
     title: "Merge PDFs",
@@ -40,7 +46,7 @@ const tools: Tool[] = [
 ];
 
 export function PDFToolsPage() {
-  const [activeTool, setActiveTool] = useState<PdfToolId>("merge");
+  const [activeTool, setActiveTool] = useState<PdfToolId>("info");
   const [loading, setLoading] = useState(false);
   const [config, setConfig] = useState<Config | null>(null);
 
@@ -66,6 +72,8 @@ export function PDFToolsPage() {
 
   const renderPanel = () => {
     switch (activeTool) {
+      case "info":
+        return <PdfInfoPanel {...panelProps} />;
       case "merge":
         return <MergePdfPanel {...panelProps} />;
       case "images-to-pdf":
