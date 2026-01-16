@@ -36,3 +36,8 @@ regex = "1"
 thiserror = "1"
 md5 = "0.7"
 ffmpeg-sidecar = "2"
+
+# PDF processing
+lopdf = "0.34"
+image = "0.25"
+printpdf = "0.8"

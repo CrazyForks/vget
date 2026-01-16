@@ -1,5 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { Download, Settings, ChevronLeft, Wrench } from "lucide-react";
+import { PdfIcon } from "./icons/PdfIcon";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +27,11 @@ const navItems: NavItem[] = [
     to: "/media-tools",
     icon: <Wrench className="h-5 w-5" />,
     label: "Media Tools",
+  },
+  {
+    to: "/pdf-tools",
+    icon: <PdfIcon className="h-5 w-5" />,
+    label: "PDF Tools",
   },
   {
     to: "/settings",

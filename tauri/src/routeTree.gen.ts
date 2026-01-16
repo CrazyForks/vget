@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as PdfToolsRouteImport } from './routes/pdf-tools'
 import { Route as MediaToolsRouteImport } from './routes/media-tools'
 import { Route as IndexRouteImport } from './routes/index'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PdfToolsRoute = PdfToolsRouteImport.update({
+  id: '/pdf-tools',
+  path: '/pdf-tools',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MediaToolsRoute = MediaToolsRouteImport.update({
@@ -32,30 +38,34 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/media-tools': typeof MediaToolsRoute
+  '/pdf-tools': typeof PdfToolsRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/media-tools': typeof MediaToolsRoute
+  '/pdf-tools': typeof PdfToolsRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/media-tools': typeof MediaToolsRoute
+  '/pdf-tools': typeof PdfToolsRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/media-tools' | '/settings'
+  fullPaths: '/' | '/media-tools' | '/pdf-tools' | '/settings'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/media-tools' | '/settings'
-  id: '__root__' | '/' | '/media-tools' | '/settings'
+  to: '/' | '/media-tools' | '/pdf-tools' | '/settings'
+  id: '__root__' | '/' | '/media-tools' | '/pdf-tools' | '/settings'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   MediaToolsRoute: typeof MediaToolsRoute
+  PdfToolsRoute: typeof PdfToolsRoute
   SettingsRoute: typeof SettingsRoute
 }
 
@@ -66,6 +76,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pdf-tools': {
+      id: '/pdf-tools'
+      path: '/pdf-tools'
+      fullPath: '/pdf-tools'
+      preLoaderRoute: typeof PdfToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/media-tools': {
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   MediaToolsRoute: MediaToolsRoute,
+  PdfToolsRoute: PdfToolsRoute,
   SettingsRoute: SettingsRoute,
 }
 export const routeTree = rootRouteImport

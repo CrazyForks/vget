@@ -3,6 +3,7 @@ mod config;
 mod downloader;
 mod extractor;
 mod ffmpeg;
+mod pdf;
 
 use auth::{
     bilibili_check_status, bilibili_logout, bilibili_qr_generate, bilibili_qr_poll,
@@ -590,6 +591,52 @@ async fn ffmpeg_convert_audio(
     Ok(job_id)
 }
 
+// ============ PDF TOOLS ============
+
+#[tauri::command]
+async fn pdf_get_info(input_path: String) -> Result<pdf::PdfInfo, String> {
+    tauri::async_runtime::spawn_blocking(move || pdf::get_pdf_info(&input_path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn pdf_merge(input_paths: Vec<String>, output_path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || pdf::merge_pdfs(&input_paths, &output_path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn pdf_images_to_pdf(image_paths: Vec<String>, output_path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || pdf::images_to_pdf(&image_paths, &output_path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn pdf_delete_pages(
+    input_path: String,
+    output_path: String,
+    pages: Vec<u32>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        pdf::delete_pages(&input_path, &output_path, &pages)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn pdf_remove_watermark(
+    input_path: String,
+    output_path: String,
+) -> Result<pdf::WatermarkRemovalResult, String> {
+    tauri::async_runtime::spawn_blocking(move || pdf::remove_watermark(&input_path, &output_path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 // ============ TAURI SETUP ============
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -630,6 +677,12 @@ pub fn run() {
             ffmpeg_extract_audio,
             ffmpeg_extract_frames,
             ffmpeg_convert_audio,
+            // PDF Tools
+            pdf_get_info,
+            pdf_merge,
+            pdf_images_to_pdf,
+            pdf_delete_pages,
+            pdf_remove_watermark,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
