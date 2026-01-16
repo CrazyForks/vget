@@ -1,0 +1,83 @@
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { FolderOpen } from "lucide-react";
+import { PanelProps, formatBytes, formatDuration } from "../types";
+
+export function MediaInfoPanel({
+  inputFile,
+  mediaInfo,
+  onSelectInput,
+}: PanelProps) {
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label>Input File</Label>
+        <div className="flex gap-2">
+          <Input
+            value={inputFile}
+            readOnly
+            placeholder="Select a file..."
+            className="min-w-0 flex-1"
+          />
+          <Button variant="outline" onClick={onSelectInput} className="shrink-0">
+            <FolderOpen className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      {mediaInfo && (
+        <div className="space-y-3 text-sm">
+          <div className="p-3 bg-muted rounded-lg space-y-2">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Format</span>
+              <span className="truncate ml-2">{mediaInfo.format_long_name || mediaInfo.format_name}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Size</span>
+              <span>{formatBytes(mediaInfo.size)}</span>
+            </div>
+            {mediaInfo.duration && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Duration</span>
+                <span>{formatDuration(mediaInfo.duration)}</span>
+              </div>
+            )}
+            {mediaInfo.bit_rate && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Bitrate</span>
+                <span>{Math.round(mediaInfo.bit_rate / 1000)} kbps</span>
+              </div>
+            )}
+          </div>
+          {mediaInfo.streams.map((stream) => (
+            <div key={stream.index} className="p-3 bg-muted rounded-lg space-y-2">
+              <div className="font-medium capitalize">{stream.codec_type} Stream</div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Codec</span>
+                <span className="truncate ml-2">{stream.codec_long_name || stream.codec_name}</span>
+              </div>
+              {stream.width && stream.height && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Resolution</span>
+                  <span>{stream.width}x{stream.height}</span>
+                </div>
+              )}
+              {stream.sample_rate && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Sample Rate</span>
+                  <span>{stream.sample_rate} Hz</span>
+                </div>
+              )}
+              {stream.channels && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Channels</span>
+                  <span>{stream.channels}</span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -34,15 +34,13 @@ export type ToolId =
   | "extract-frames"
   | "audio-convert";
 
-export interface DialogProps {
-  open: boolean;
+export interface PanelProps {
   inputFile: string;
   outputDir: string;
   loading: boolean;
   progress: number;
   mediaInfo: MediaInfo | null;
   onSelectInput: () => Promise<void>;
-  onClose: () => void;
   setLoading: (loading: boolean) => void;
   setProgress: (progress: number) => void;
   setJobId: (jobId: string | null) => void;

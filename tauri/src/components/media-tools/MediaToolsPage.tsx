@@ -2,12 +2,7 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import {
   FileVideo,
   FileAudio,
@@ -19,13 +14,15 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { MediaInfo, ToolId, Config } from "./types";
-import { MediaInfoDialog } from "./dialogs/MediaInfoDialog";
-import { ConvertDialog } from "./dialogs/ConvertDialog";
-import { CompressDialog } from "./dialogs/CompressDialog";
-import { TrimDialog } from "./dialogs/TrimDialog";
-import { ExtractAudioDialog } from "./dialogs/ExtractAudioDialog";
-import { ExtractFramesDialog } from "./dialogs/ExtractFramesDialog";
-import { AudioConvertDialog } from "./dialogs/AudioConvertDialog";
+import {
+  MediaInfoPanel,
+  ConvertPanel,
+  CompressPanel,
+  TrimPanel,
+  ExtractAudioPanel,
+  ExtractFramesPanel,
+  AudioConvertPanel,
+} from "./panels";
 
 interface Tool {
   id: ToolId;
@@ -39,48 +36,48 @@ const tools: Tool[] = [
     id: "info",
     title: "Media Info",
     description: "View detailed information about media files",
-    icon: <Info className="h-6 w-6" />,
+    icon: <Info className="h-4 w-4" />,
   },
   {
     id: "convert",
-    title: "Convert",
+    title: "Convert Video",
     description: "Convert between video formats (MP4, WebM, MKV, MOV)",
-    icon: <FileVideo className="h-6 w-6" />,
+    icon: <FileVideo className="h-4 w-4" />,
   },
   {
     id: "compress",
-    title: "Compress",
+    title: "Compress Video",
     description: "Reduce file size while maintaining quality",
-    icon: <Minimize2 className="h-6 w-6" />,
+    icon: <Minimize2 className="h-4 w-4" />,
   },
   {
     id: "trim",
-    title: "Trim",
+    title: "Trim Video",
     description: "Cut clips from videos with start and end times",
-    icon: <Scissors className="h-6 w-6" />,
+    icon: <Scissors className="h-4 w-4" />,
   },
   {
     id: "extract-audio",
     title: "Extract Audio",
     description: "Extract audio track from video files",
-    icon: <FileAudio className="h-6 w-6" />,
+    icon: <FileAudio className="h-4 w-4" />,
   },
   {
     id: "extract-frames",
     title: "Extract Frames",
     description: "Extract images or thumbnails from video",
-    icon: <Image className="h-6 w-6" />,
+    icon: <Image className="h-4 w-4" />,
   },
   {
     id: "audio-convert",
-    title: "Audio Convert",
+    title: "Convert Audio",
     description: "Convert between audio formats (MP3, AAC, FLAC, WAV)",
-    icon: <FileType className="h-6 w-6" />,
+    icon: <FileType className="h-4 w-4" />,
   },
 ];
 
 export function MediaToolsPage() {
-  const [activeTool, setActiveTool] = useState<ToolId | null>(null);
+  const [activeTool, setActiveTool] = useState<ToolId>("info");
   const [inputFile, setInputFile] = useState("");
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -116,7 +113,6 @@ export function MediaToolsPage() {
           setProgress(100);
           toast.success("Operation completed successfully!");
           setTimeout(() => {
-            setActiveTool(null);
             resetState();
           }, 1500);
         }
@@ -167,67 +163,98 @@ export function MediaToolsPage() {
     }
   };
 
-  const closeDialog = () => {
+  const handleToolChange = (toolId: ToolId) => {
     if (!loading) {
-      setActiveTool(null);
+      setActiveTool(toolId);
       resetState();
     }
   };
 
-  const dialogProps = {
+  const panelProps = {
     inputFile,
     outputDir: config?.output_dir || "",
     loading,
     progress,
     mediaInfo,
     onSelectInput: selectInputFile,
-    onClose: closeDialog,
     setLoading,
     setProgress,
     setJobId,
   };
 
+  const activeTolData = tools.find((t) => t.id === activeTool);
+
+  const renderPanel = () => {
+    switch (activeTool) {
+      case "info":
+        return <MediaInfoPanel {...panelProps} />;
+      case "convert":
+        return <ConvertPanel {...panelProps} />;
+      case "compress":
+        return <CompressPanel {...panelProps} />;
+      case "trim":
+        return <TrimPanel {...panelProps} />;
+      case "extract-audio":
+        return <ExtractAudioPanel {...panelProps} />;
+      case "extract-frames":
+        return <ExtractFramesPanel {...panelProps} />;
+      case "audio-convert":
+        return <AudioConvertPanel {...panelProps} />;
+      default:
+        return null;
+    }
+  };
+
   return (
-    <div className="h-full">
-      <header className="h-14 border-b border-border flex items-center px-6">
+    <div className="h-full flex flex-col">
+      <header className="h-14 border-b border-border flex items-center px-6 shrink-0">
         <h1 className="text-xl font-semibold">Media Tools</h1>
       </header>
 
-      <div className="p-6">
-        <p className="text-sm text-muted-foreground mb-6">
-          Process your media files with FFmpeg-powered tools
-        </p>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {tools.map((tool) => (
-            <Card
-              key={tool.id}
-              className="cursor-pointer transition-all hover:border-primary/50 hover:shadow-md"
-              onClick={() => setActiveTool(tool.id)}
-            >
-              <CardHeader className="flex flex-row items-start gap-4 space-y-0">
-                <div className="p-2 rounded-lg bg-primary/10 text-primary">
+      <div className="flex-1 flex min-h-0">
+        {/* Left pane - Tool list */}
+        <div className="w-56 border-r border-border p-2 overflow-y-auto shrink-0">
+          <div className="space-y-1">
+            {tools.map((tool) => (
+              <button
+                key={tool.id}
+                onClick={() => handleToolChange(tool.id)}
+                disabled={loading}
+                className={cn(
+                  "w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors",
+                  "hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed",
+                  activeTool === tool.id
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <span className={cn(
+                  "shrink-0",
+                  activeTool === tool.id ? "text-primary" : ""
+                )}>
                   {tool.icon}
-                </div>
-                <div className="flex-1">
-                  <CardTitle className="text-base">{tool.title}</CardTitle>
-                  <CardDescription className="text-sm mt-1">
-                    {tool.description}
-                  </CardDescription>
-                </div>
-              </CardHeader>
-            </Card>
-          ))}
+                </span>
+                <span className="text-sm font-medium truncate">{tool.title}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Right pane - Tool content */}
+        <div className="flex-1 p-6 overflow-y-auto">
+          {activeTolData && (
+            <div className="max-w-lg">
+              <div className="mb-6">
+                <h2 className="text-lg font-semibold">{activeTolData.title}</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {activeTolData.description}
+                </p>
+              </div>
+              {renderPanel()}
+            </div>
+          )}
         </div>
       </div>
-
-      <MediaInfoDialog open={activeTool === "info"} {...dialogProps} />
-      <ConvertDialog open={activeTool === "convert"} {...dialogProps} />
-      <CompressDialog open={activeTool === "compress"} {...dialogProps} />
-      <TrimDialog open={activeTool === "trim"} {...dialogProps} />
-      <ExtractAudioDialog open={activeTool === "extract-audio"} {...dialogProps} />
-      <ExtractFramesDialog open={activeTool === "extract-frames"} {...dialogProps} />
-      <AudioConvertDialog open={activeTool === "audio-convert"} {...dialogProps} />
     </div>
   );
 }
