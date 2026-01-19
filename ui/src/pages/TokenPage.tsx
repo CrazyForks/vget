@@ -8,7 +8,7 @@ interface GenerateTokenResponse {
 }
 
 export function TokenPage() {
-  const { isConnected } = useApp();
+  const { isConnected, t } = useApp();
   const [payload, setPayload] = useState("{}");
   const [payloadError, setPayloadError] = useState<string | null>(null);
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
@@ -22,7 +22,7 @@ export function TokenPage() {
       setPayloadError(null);
       return true;
     } catch {
-      setPayloadError("Invalid JSON");
+      setPayloadError(t.token_invalid_json);
       return false;
     }
   };
@@ -83,18 +83,17 @@ export function TokenPage() {
     <div className="max-w-2xl mx-auto">
       <div className="bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg p-6">
         <h1 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4">
-          API Token Generator
+          {t.token_title}
         </h1>
 
         <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-6">
-          Generate JWT tokens for external API access (Chrome extension, scripts, etc.).
-          Tokens are signed with your configured <code className="px-1 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded">api_key</code>.
+          {t.token_description}
         </p>
 
         {/* Custom Payload */}
         <div className="mb-4">
           <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-            Custom Payload (optional)
+            {t.token_custom_payload}
           </label>
           <textarea
             className={`w-full h-32 px-3 py-2 font-mono text-sm border rounded-lg bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${
@@ -111,7 +110,7 @@ export function TokenPage() {
             <p className="mt-1 text-xs text-red-500">{payloadError}</p>
           )}
           <p className="mt-1 text-xs text-zinc-500">
-            Add custom claims to include in the JWT token. Must be valid JSON.
+            {t.token_custom_payload_hint}
           </p>
         </div>
 
@@ -121,7 +120,7 @@ export function TokenPage() {
           onClick={handleGenerate}
           disabled={!isConnected || generating || !!payloadError}
         >
-          {generating ? "Generating..." : "Generate Token"}
+          {generating ? t.token_generating : t.token_generate}
         </button>
 
         {/* Error Message */}
@@ -138,13 +137,13 @@ export function TokenPage() {
           <div className="mt-6 p-4 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 rounded-lg">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Generated Token
+                {t.token_generated}
               </span>
               <button
                 className="px-3 py-1 rounded text-xs font-medium cursor-pointer transition-colors bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
                 onClick={handleCopy}
               >
-                {copied ? "Copied!" : "Copy"}
+                {copied ? t.token_copied : t.token_copy}
               </button>
             </div>
             <code className="block w-full p-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded text-xs font-mono text-zinc-800 dark:text-zinc-200 break-all select-all overflow-x-auto">
@@ -152,7 +151,7 @@ export function TokenPage() {
             </code>
             <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded">
               <p className="text-xs text-blue-700 dark:text-blue-300 font-medium mb-1">
-                Usage:
+                {t.token_usage}:
               </p>
               <code className="text-xs text-blue-600 dark:text-blue-400 font-mono">
                 Authorization: Bearer {generatedToken.slice(0, 20)}...

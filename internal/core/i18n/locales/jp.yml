@@ -238,6 +238,18 @@ ui:
   model_download_rate_limit: "ダウンロード回数が多すぎます。数時間後に再試行してください。"
   model_download_server_down: "サーバーに接続できません。ネットワークを確認してください。"
   model_download_info: "モデルは vmirror.org CDN からダウンロードされます。"
+  # API Token
+  token_title: "API Token 生成"
+  token_description: "外部 API アクセス用の JWT Token を生成します（Chrome 拡張機能、スクリプトなど）。Token は設定した api_key で署名されます。"
+  token_custom_payload: "カスタムペイロード（オプション）"
+  token_custom_payload_hint: "JWT Token に含めるカスタムクレームを追加します。有効な JSON である必要があります。"
+  token_generate: "Token を生成"
+  token_generating: "生成中..."
+  token_generated: "生成された Token"
+  token_copy: "コピー"
+  token_copied: "コピーしました！"
+  token_usage: "使用方法"
+  token_invalid_json: "無効な JSON"
 
 # サーバーメッセージ
 server:

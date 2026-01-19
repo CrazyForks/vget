@@ -20,18 +20,18 @@ const (
 
 // JWTClaims represents the claims in a JWT token
 type JWTClaims struct {
-	TokenType string                 `json:"type"` // "session" or "api"
-	Custom    map[string]interface{} `json:"custom,omitempty"`
+	TokenType string         `json:"type"` // "session" or "api"
+	Custom    map[string]any `json:"custom,omitempty"`
 	jwt.RegisteredClaims
 }
 
 // GenerateTokenRequest is the request body for POST /api/auth/token
 type GenerateTokenRequest struct {
-	Payload map[string]interface{} `json:"payload,omitempty"`
+	Payload map[string]any `json:"payload,omitempty"`
 }
 
 // generateJWT creates a new JWT token signed with the api_key
-func (s *Server) generateJWT(tokenType string, duration time.Duration, customPayload map[string]interface{}) (string, error) {
+func (s *Server) generateJWT(tokenType string, duration time.Duration, customPayload map[string]any) (string, error) {
 	now := time.Now()
 	claims := JWTClaims{
 		TokenType: tokenType,

@@ -26,9 +26,9 @@ import (
 
 // Response is the standard API response structure
 type Response struct {
-	Code    int         `json:"code"`
-	Data    interface{} `json:"data"`
-	Message string      `json:"message"`
+	Code    int    `json:"code"`
+	Data    any    `json:"data"`
+	Message string `json:"message"`
 }
 
 // DownloadRequest is the request body for POST /download

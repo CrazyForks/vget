@@ -238,6 +238,18 @@ ui:
   model_download_rate_limit: "다운로드 횟수가 너무 많습니다. 몇 시간 후에 다시 시도하세요."
   model_download_server_down: "서버에 연결할 수 없습니다. 네트워크를 확인하세요."
   model_download_info: "모델은 vmirror.org CDN에서 다운로드됩니다."
+  # API Token
+  token_title: "API Token 생성기"
+  token_description: "외부 API 접근을 위한 JWT Token을 생성합니다 (Chrome 확장 프로그램, 스크립트 등). Token은 설정된 api_key로 서명됩니다."
+  token_custom_payload: "사용자 정의 페이로드 (선택사항)"
+  token_custom_payload_hint: "JWT Token에 포함할 사용자 정의 클레임을 추가합니다. 유효한 JSON이어야 합니다."
+  token_generate: "Token 생성"
+  token_generating: "생성 중..."
+  token_generated: "생성된 Token"
+  token_copy: "복사"
+  token_copied: "복사됨!"
+  token_usage: "사용법"
+  token_invalid_json: "잘못된 JSON"
 
 # 서버 메시지
 server:

@@ -238,6 +238,18 @@ ui:
   model_download_rate_limit: "Zu viele Downloads. Bitte versuchen Sie es in einigen Stunden erneut."
   model_download_server_down: "Verbindung zum Server nicht möglich. Überprüfen Sie Ihr Netzwerk."
   model_download_info: "Modelle werden von vmirror.org CDN heruntergeladen."
+  # API Token
+  token_title: "API-Token-Generator"
+  token_description: "Generieren Sie JWT-Tokens für externen API-Zugriff (Chrome-Erweiterung, Skripte, etc.). Tokens werden mit Ihrem konfigurierten api_key signiert."
+  token_custom_payload: "Benutzerdefinierte Nutzlast (optional)"
+  token_custom_payload_hint: "Fügen Sie benutzerdefinierte Claims hinzu, die im JWT-Token enthalten sein sollen. Muss gültiges JSON sein."
+  token_generate: "Token generieren"
+  token_generating: "Generiere..."
+  token_generated: "Generierter Token"
+  token_copy: "Kopieren"
+  token_copied: "Kopiert!"
+  token_usage: "Verwendung"
+  token_invalid_json: "Ungültiges JSON"
 
 # Server-Nachrichten
 server:

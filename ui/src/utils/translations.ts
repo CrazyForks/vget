@@ -146,6 +146,18 @@ export interface UITranslations {
   model_download_rate_limit: string;
   model_download_server_down: string;
   model_download_info: string;
+  // API Token
+  token_title: string;
+  token_description: string;
+  token_custom_payload: string;
+  token_custom_payload_hint: string;
+  token_generate: string;
+  token_generating: string;
+  token_generated: string;
+  token_copy: string;
+  token_copied: string;
+  token_usage: string;
+  token_invalid_json: string;
 }
 
 export interface ServerTranslations {
@@ -301,6 +313,18 @@ export const defaultTranslations: UITranslations = {
   model_download_rate_limit: "Too many downloads. Please try again in a few hours.",
   model_download_server_down: "Cannot connect to server. Please check your network.",
   model_download_info: "Download Whisper models for local speech-to-text.",
+  // API Token
+  token_title: "API Token Generator",
+  token_description: "Generate JWT tokens for external API access (Chrome extension, scripts, etc.). Tokens are signed with your configured api_key.",
+  token_custom_payload: "Custom Payload (optional)",
+  token_custom_payload_hint: "Add custom claims to include in the JWT token. Must be valid JSON.",
+  token_generate: "Generate Token",
+  token_generating: "Generating...",
+  token_generated: "Generated Token",
+  token_copy: "Copy",
+  token_copied: "Copied!",
+  token_usage: "Usage",
+  token_invalid_json: "Invalid JSON",
 };
 
 export const defaultServerTranslations: ServerTranslations = {

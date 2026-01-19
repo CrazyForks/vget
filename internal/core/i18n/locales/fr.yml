@@ -238,6 +238,18 @@ ui:
   model_download_rate_limit: "Trop de téléchargements. Réessayez dans quelques heures."
   model_download_server_down: "Impossible de se connecter au serveur. Vérifiez votre réseau."
   model_download_info: "Les modèles sont téléchargés depuis vmirror.org CDN."
+  # API Token
+  token_title: "Générateur de Token API"
+  token_description: "Générez des tokens JWT pour l'accès API externe (extension Chrome, scripts, etc.). Les tokens sont signés avec votre api_key configurée."
+  token_custom_payload: "Charge personnalisée (optionnel)"
+  token_custom_payload_hint: "Ajoutez des claims personnalisés à inclure dans le token JWT. Doit être du JSON valide."
+  token_generate: "Générer Token"
+  token_generating: "Génération..."
+  token_generated: "Token Généré"
+  token_copy: "Copier"
+  token_copied: "Copié !"
+  token_usage: "Utilisation"
+  token_invalid_json: "JSON invalide"
 
 # Messages du serveur
 server:

@@ -250,6 +250,18 @@ ui:
   model_download_rate_limit: "下载次数过多，请几小时后再试。"
   model_download_server_down: "无法连接服务器，请检查网络。"
   model_download_info: "模型从 vmirror.org CDN 下载，国内访问更快。"
+  # API Token
+  token_title: "API Token 生成器"
+  token_description: "生成用于外部 API 访问的 JWT Token（Chrome 扩展、脚本等）。Token 使用您配置的 api_key 签名。"
+  token_custom_payload: "自定义载荷（可选）"
+  token_custom_payload_hint: "添加自定义声明到 JWT Token 中。必须是有效的 JSON。"
+  token_generate: "生成 Token"
+  token_generating: "生成中..."
+  token_generated: "生成的 Token"
+  token_copy: "复制"
+  token_copied: "已复制！"
+  token_usage: "使用方法"
+  token_invalid_json: "无效的 JSON"
 
 # 服务器消息
 server:
