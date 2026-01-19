@@ -83,6 +83,26 @@ export async function fetchHealth(): Promise<ApiResponse<HealthData>> {
   return res.json();
 }
 
+// Auth APIs
+
+export interface AuthStatusData {
+  api_key_configured: boolean;
+}
+
+export interface GenerateTokenData {
+  jwt: string;
+}
+
+export async function fetchAuthStatus(): Promise<ApiResponse<AuthStatusData>> {
+  const res = await fetch("/api/auth/status");
+  return res.json();
+}
+
+export async function generateApiToken(): Promise<ApiResponse<GenerateTokenData>> {
+  const res = await fetch("/api/auth/token", { method: "POST" });
+  return res.json();
+}
+
 export async function fetchJobs(): Promise<ApiResponse<JobsData>> {
   const res = await fetch("/api/jobs");
   return res.json();

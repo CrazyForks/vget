@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WebdavRouteImport } from './routes/webdav'
 import { Route as TorrentRouteImport } from './routes/torrent'
+import { Route as TokenRouteImport } from './routes/token'
 import { Route as PodcastRouteImport } from './routes/podcast'
 import { Route as Kuaidi100RouteImport } from './routes/kuaidi100'
 import { Route as ConfigRouteImport } from './routes/config'
@@ -28,6 +29,11 @@ const WebdavRoute = WebdavRouteImport.update({
 const TorrentRoute = TorrentRouteImport.update({
   id: '/torrent',
   path: '/torrent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TokenRoute = TokenRouteImport.update({
+  id: '/token',
+  path: '/token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PodcastRoute = PodcastRouteImport.update({
@@ -78,6 +84,7 @@ export interface FileRoutesByFullPath {
   '/config': typeof ConfigRoute
   '/kuaidi100': typeof Kuaidi100Route
   '/podcast': typeof PodcastRoute
+  '/token': typeof TokenRoute
   '/torrent': typeof TorrentRoute
   '/webdav': typeof WebdavRoute
   '/ai/settings': typeof AiSettingsRoute
@@ -90,6 +97,7 @@ export interface FileRoutesByTo {
   '/config': typeof ConfigRoute
   '/kuaidi100': typeof Kuaidi100Route
   '/podcast': typeof PodcastRoute
+  '/token': typeof TokenRoute
   '/torrent': typeof TorrentRoute
   '/webdav': typeof WebdavRoute
   '/ai/settings': typeof AiSettingsRoute
@@ -103,6 +111,7 @@ export interface FileRoutesById {
   '/config': typeof ConfigRoute
   '/kuaidi100': typeof Kuaidi100Route
   '/podcast': typeof PodcastRoute
+  '/token': typeof TokenRoute
   '/torrent': typeof TorrentRoute
   '/webdav': typeof WebdavRoute
   '/ai/settings': typeof AiSettingsRoute
@@ -117,6 +126,7 @@ export interface FileRouteTypes {
     | '/config'
     | '/kuaidi100'
     | '/podcast'
+    | '/token'
     | '/torrent'
     | '/webdav'
     | '/ai/settings'
@@ -129,6 +139,7 @@ export interface FileRouteTypes {
     | '/config'
     | '/kuaidi100'
     | '/podcast'
+    | '/token'
     | '/torrent'
     | '/webdav'
     | '/ai/settings'
@@ -141,6 +152,7 @@ export interface FileRouteTypes {
     | '/config'
     | '/kuaidi100'
     | '/podcast'
+    | '/token'
     | '/torrent'
     | '/webdav'
     | '/ai/settings'
@@ -154,6 +166,7 @@ export interface RootRouteChildren {
   ConfigRoute: typeof ConfigRoute
   Kuaidi100Route: typeof Kuaidi100Route
   PodcastRoute: typeof PodcastRoute
+  TokenRoute: typeof TokenRoute
   TorrentRoute: typeof TorrentRoute
   WebdavRoute: typeof WebdavRoute
   AiSettingsRoute: typeof AiSettingsRoute
@@ -174,6 +187,13 @@ declare module '@tanstack/react-router' {
       path: '/torrent'
       fullPath: '/torrent'
       preLoaderRoute: typeof TorrentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/token': {
+      id: '/token'
+      path: '/token'
+      fullPath: '/token'
+      preLoaderRoute: typeof TokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/podcast': {
@@ -242,6 +262,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConfigRoute: ConfigRoute,
   Kuaidi100Route: Kuaidi100Route,
   PodcastRoute: PodcastRoute,
+  TokenRoute: TokenRoute,
   TorrentRoute: TorrentRoute,
   WebdavRoute: WebdavRoute,
   AiSettingsRoute: AiSettingsRoute,

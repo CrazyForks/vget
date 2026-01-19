@@ -109,12 +109,17 @@ func (s *Server) Start() error {
 	s.engine.Use(gin.Recovery())
 	s.engine.Use(s.loggingMiddleware())
 	if s.apiKey != "" {
-		s.engine.Use(s.authMiddleware())
+		s.engine.Use(s.jwtAuthMiddleware())
 	}
 
 	// API routes
 	api := s.engine.Group("/api")
 	api.GET("/health", s.handleHealth)
+
+	// Auth routes (don't require authentication)
+	api.GET("/auth/status", s.handleAuthStatus)
+	api.POST("/auth/token", s.handleGenerateToken)
+
 	api.GET("/download", s.handleFileDownload) // Download local file by path
 	api.POST("/download", s.handleDownload)
 	api.POST("/bulk-download", s.handleBulkDownload)
@@ -210,43 +215,6 @@ func (s *Server) Stop(ctx context.Context) error {
 
 // Middleware
 
-func (s *Server) authMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		path := c.Request.URL.Path
-
-		// Health endpoint doesn't require auth
-		if path == "/api/health" {
-			c.Next()
-			return
-		}
-
-		// Only API routes require auth (those under /api prefix)
-		// Exclude /api/download and /api/jobs which need auth
-		isProtectedAPIRoute := path == "/api/download" ||
-			path == "/api/bulk-download" ||
-			strings.HasPrefix(path, "/api/status/") ||
-			path == "/api/jobs" ||
-			strings.HasPrefix(path, "/api/jobs/")
-
-		if !isProtectedAPIRoute {
-			c.Next()
-			return
-		}
-
-		apiKey := c.GetHeader("X-API-Key")
-		if apiKey != s.apiKey {
-			c.JSON(http.StatusUnauthorized, Response{
-				Code:    401,
-				Data:    nil,
-				Message: "invalid or missing API key",
-			})
-			c.Abort()
-			return
-		}
-		c.Next()
-	}
-}
-
 func (s *Server) loggingMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
@@ -278,6 +246,9 @@ func (s *Server) setupStaticFiles(distFS fs.FS) {
 			})
 			return
 		}
+
+		// Set session cookie for web UI access
+		s.setSessionCookie(c)
 
 		indexFile, err := fs.ReadFile(distFS, "index.html")
 		if err != nil {

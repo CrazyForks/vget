@@ -12,6 +12,7 @@ import {
   FaB,
   FaWandMagicSparkles,
   FaMicrophone,
+  FaKey,
 } from "react-icons/fa6";
 import { useApp } from "../context/AppContext";
 
@@ -93,6 +94,12 @@ export function Sidebar({ lang }: SidebarProps) {
       icon: <FaTruck />,
       label: "快递查询",
       show: lang === "zh",
+    },
+    {
+      to: "/token",
+      icon: <FaKey />,
+      label: "API Token",
+      show: true,
     },
     {
       to: "/config",
