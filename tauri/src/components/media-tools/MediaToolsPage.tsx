@@ -10,12 +10,10 @@ import {
   Minimize2,
   Image,
   FileType,
-  Info,
 } from "lucide-react";
 import { toast } from "sonner";
 import { MediaInfo, ToolId, Config } from "./types";
 import {
-  MediaInfoPanel,
   ConvertPanel,
   CompressPanel,
   TrimPanel,
@@ -32,12 +30,6 @@ interface Tool {
 }
 
 const tools: Tool[] = [
-  {
-    id: "info",
-    title: "Media Info",
-    description: "View detailed information about media files",
-    icon: <Info className="h-4 w-4" />,
-  },
   {
     id: "convert",
     title: "Convert Video",
@@ -77,7 +69,7 @@ const tools: Tool[] = [
 ];
 
 export function MediaToolsPage() {
-  const [activeTool, setActiveTool] = useState<ToolId>("info");
+  const [activeTool, setActiveTool] = useState<ToolId>("convert");
   const [inputFile, setInputFile] = useState("");
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -186,8 +178,6 @@ export function MediaToolsPage() {
 
   const renderPanel = () => {
     switch (activeTool) {
-      case "info":
-        return <MediaInfoPanel {...panelProps} />;
       case "convert":
         return <ConvertPanel {...panelProps} />;
       case "compress":

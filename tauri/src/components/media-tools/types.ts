@@ -26,7 +26,6 @@ export interface Config {
 }
 
 export type ToolId =
-  | "info"
   | "convert"
   | "compress"
   | "trim"

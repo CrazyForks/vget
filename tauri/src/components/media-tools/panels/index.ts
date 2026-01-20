@@ -1,4 +1,3 @@
-export { MediaInfoPanel } from "./MediaInfoPanel";
 export { ConvertPanel } from "./ConvertPanel";
 export { CompressPanel } from "./CompressPanel";
 export { TrimPanel } from "./TrimPanel";

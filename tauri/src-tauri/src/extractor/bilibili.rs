@@ -557,6 +557,7 @@ struct VideoStream {
     id: i32,
     #[serde(rename = "baseUrl")]
     base_url: String,
+    #[allow(dead_code)]
     bandwidth: i64,
     width: i32,
     height: i32,
@@ -567,5 +568,6 @@ struct VideoStream {
 struct AudioStream {
     #[serde(rename = "baseUrl")]
     base_url: String,
+    #[allow(dead_code)]
     bandwidth: i64,
 }

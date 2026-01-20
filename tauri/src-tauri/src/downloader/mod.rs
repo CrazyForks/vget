@@ -80,6 +80,7 @@ impl DownloadManager {
         self.jobs.read().await.get(job_id).cloned()
     }
 
+    #[allow(dead_code)]
     pub async fn remove_job(&self, job_id: &str) {
         self.jobs.write().await.remove(job_id);
         self.cancellation_tokens.write().await.remove(job_id);

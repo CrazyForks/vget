@@ -1,4 +1,3 @@
-export { PdfInfoPanel } from "./PdfInfoPanel";
 export { MergePdfPanel } from "./MergePdfPanel";
 export { ImagesToPdfPanel } from "./ImagesToPdfPanel";
 export { DeletePagesPanel } from "./DeletePagesPanel";
