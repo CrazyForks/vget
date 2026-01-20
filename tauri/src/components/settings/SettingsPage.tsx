@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Settings, Globe, Info } from "lucide-react";
 import { Link } from "@tanstack/react-router";
@@ -11,17 +12,14 @@ import { cn } from "@/lib/utils";
 
 type SettingsSection = "general" | "sites" | "about";
 
-const sections: {
-  id: SettingsSection;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-}[] = [
-  { id: "general", label: "General", icon: Settings },
-  { id: "sites", label: "Sites", icon: Globe },
-  { id: "about", label: "About", icon: Info },
-];
+const sectionIcons: Record<SettingsSection, React.ComponentType<{ className?: string }>> = {
+  general: Settings,
+  sites: Globe,
+  about: Info,
+};
 
 export function SettingsPage() {
+  const { t } = useTranslation();
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -65,10 +63,16 @@ export function SettingsPage() {
     }
   };
 
+  const sections: { id: SettingsSection; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+    { id: "general", label: t("settings.sections.general"), icon: sectionIcons.general },
+    { id: "sites", label: t("settings.sections.sites"), icon: sectionIcons.sites },
+    { id: "about", label: t("settings.sections.about"), icon: sectionIcons.about },
+  ];
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <p className="text-muted-foreground">Loading settings...</p>
+        <p className="text-muted-foreground">{t("settings.loading")}</p>
       </div>
     );
   }
@@ -76,7 +80,7 @@ export function SettingsPage() {
   if (!config) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <p className="text-destructive">Failed to load settings</p>
+        <p className="text-destructive">{t("settings.loadFailed")}</p>
       </div>
     );
   }
@@ -104,7 +108,7 @@ export function SettingsPage() {
             className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm font-medium">Back</span>
+            <span className="text-sm font-medium">{t("settings.back")}</span>
           </Link>
         </div>
 
@@ -133,7 +137,7 @@ export function SettingsPage() {
         </nav>
 
         <div className="mt-auto p-4 border-t">
-          <p className="text-xs text-muted-foreground">VGet Desktop</p>
+          <p className="text-xs text-muted-foreground">{t("nav.vgetDesktop")}</p>
         </div>
       </aside>
 
@@ -146,11 +150,11 @@ export function SettingsPage() {
           <div className="flex items-center gap-3">
             {dirty && (
               <span className="text-sm text-muted-foreground">
-                Unsaved changes
+                {t("settings.unsavedChanges")}
               </span>
             )}
             <Button onClick={saveConfig} disabled={!dirty || saving} size="sm">
-              {saving ? "Saving..." : "Save"}
+              {saving ? t("settings.saving") : t("settings.save")}
             </Button>
           </div>
         </header>

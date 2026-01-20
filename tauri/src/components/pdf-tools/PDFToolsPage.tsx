@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { Combine, Image, Trash2, Droplets } from "lucide-react";
 import { PdfToolId, Config } from "./types";
@@ -7,39 +8,40 @@ import { MergePdfPanel, ImagesToPdfPanel, DeletePagesPanel, RemoveWatermarkPanel
 
 interface Tool {
   id: PdfToolId;
-  title: string;
-  description: string;
+  titleKey: string;
+  descKey: string;
   icon: React.ReactNode;
 }
 
-const tools: Tool[] = [
+const toolsConfig: Tool[] = [
   {
     id: "merge",
-    title: "Merge PDFs",
-    description: "Combine multiple PDF files into one",
+    titleKey: "pdfTools.tools.merge.title",
+    descKey: "pdfTools.tools.merge.desc",
     icon: <Combine className="h-4 w-4" />,
   },
   {
     id: "images-to-pdf",
-    title: "Images to PDF",
-    description: "Convert images to a single PDF document",
+    titleKey: "pdfTools.tools.imagesToPdf.title",
+    descKey: "pdfTools.tools.imagesToPdf.desc",
     icon: <Image className="h-4 w-4" />,
   },
   {
     id: "delete-pages",
-    title: "Delete Pages",
-    description: "Remove specific pages from a PDF",
+    titleKey: "pdfTools.tools.deletePages.title",
+    descKey: "pdfTools.tools.deletePages.desc",
     icon: <Trash2 className="h-4 w-4" />,
   },
   {
     id: "remove-watermark",
-    title: "Remove Watermark",
-    description: "Try to remove watermarks from a PDF",
+    titleKey: "pdfTools.tools.removeWatermark.title",
+    descKey: "pdfTools.tools.removeWatermark.desc",
     icon: <Droplets className="h-4 w-4" />,
   },
 ];
 
 export function PDFToolsPage() {
+  const { t } = useTranslation();
   const [activeTool, setActiveTool] = useState<PdfToolId>("merge");
   const [loading, setLoading] = useState(false);
   const [config, setConfig] = useState<Config | null>(null);
@@ -62,7 +64,7 @@ export function PDFToolsPage() {
     setLoading,
   };
 
-  const activeToolData = tools.find((t) => t.id === activeTool);
+  const activeToolData = toolsConfig.find((tool) => tool.id === activeTool);
 
   const renderPanel = () => {
     switch (activeTool) {
@@ -82,14 +84,14 @@ export function PDFToolsPage() {
   return (
     <div className="h-full flex flex-col">
       <header className="h-14 border-b border-border flex items-center px-6 shrink-0">
-        <h1 className="text-xl font-semibold">PDF Tools</h1>
+        <h1 className="text-xl font-semibold">{t("pdfTools.title")}</h1>
       </header>
 
       <div className="flex-1 flex min-h-0">
         {/* Left pane - Tool list */}
         <div className="w-56 border-r border-border p-2 overflow-y-auto shrink-0">
           <div className="space-y-1">
-            {tools.map((tool) => (
+            {toolsConfig.map((tool) => (
               <button
                 key={tool.id}
                 onClick={() => handleToolChange(tool.id)}
@@ -110,7 +112,7 @@ export function PDFToolsPage() {
                 >
                   {tool.icon}
                 </span>
-                <span className="text-sm font-medium truncate">{tool.title}</span>
+                <span className="text-sm font-medium truncate">{t(tool.titleKey)}</span>
               </button>
             ))}
           </div>
@@ -121,9 +123,9 @@ export function PDFToolsPage() {
           {activeToolData && (
             <div className="max-w-lg">
               <div className="mb-6">
-                <h2 className="text-lg font-semibold">{activeToolData.title}</h2>
+                <h2 className="text-lg font-semibold">{t(activeToolData.titleKey)}</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {activeToolData.description}
+                  {t(activeToolData.descKey)}
                 </p>
               </div>
               {renderPanel()}

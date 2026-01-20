@@ -1,5 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { Download, Settings, ChevronLeft, Wrench } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { PdfIcon } from "./icons/PdfIcon";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -17,29 +18,6 @@ interface NavItem {
   label: string;
 }
 
-const navItems: NavItem[] = [
-  {
-    to: "/",
-    icon: <Download className="h-5 w-5" />,
-    label: "Download",
-  },
-  {
-    to: "/media-tools",
-    icon: <Wrench className="h-5 w-5" />,
-    label: "Media Tools",
-  },
-  {
-    to: "/pdf-tools",
-    icon: <PdfIcon className="h-5 w-5" />,
-    label: "PDF Tools",
-  },
-  {
-    to: "/settings",
-    icon: <Settings className="h-5 w-5" />,
-    label: "Settings",
-  },
-];
-
 interface AppSidebarProps {
   collapsed: boolean;
   onToggle: () => void;
@@ -47,6 +25,30 @@ interface AppSidebarProps {
 
 export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
   const location = useLocation();
+  const { t } = useTranslation();
+
+  const navItems: NavItem[] = [
+    {
+      to: "/",
+      icon: <Download className="h-5 w-5" />,
+      label: t("nav.download"),
+    },
+    {
+      to: "/media-tools",
+      icon: <Wrench className="h-5 w-5" />,
+      label: t("nav.mediaTools"),
+    },
+    {
+      to: "/pdf-tools",
+      icon: <PdfIcon className="h-5 w-5" />,
+      label: t("nav.pdfTools"),
+    },
+    {
+      to: "/settings",
+      icon: <Settings className="h-5 w-5" />,
+      label: t("nav.settings"),
+    },
+  ];
 
   const isActive = (path: string) => {
     if (path === "/") {
@@ -80,7 +82,7 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
                   <img src={logo} alt="VGet" className="h-8 w-8" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="right">Expand menu</TooltipContent>
+              <TooltipContent side="right">{t("nav.expandMenu")}</TooltipContent>
             </Tooltip>
           ) : (
             <>
@@ -152,7 +154,7 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
         {/* Footer */}
         <div className="p-2 border-t">
           {!collapsed && (
-            <p className="text-xs text-muted-foreground px-2">VGet Desktop</p>
+            <p className="text-xs text-muted-foreground px-2">{t("nav.vgetDesktop")}</p>
           )}
         </div>
       </aside>

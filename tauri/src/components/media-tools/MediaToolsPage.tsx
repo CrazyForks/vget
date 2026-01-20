@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import {
   FileVideo,
@@ -24,51 +25,52 @@ import {
 
 interface Tool {
   id: ToolId;
-  title: string;
-  description: string;
+  titleKey: string;
+  descKey: string;
   icon: React.ReactNode;
 }
 
-const tools: Tool[] = [
+const toolsConfig: Tool[] = [
   {
     id: "convert",
-    title: "Convert Video",
-    description: "Convert between video formats (MP4, WebM, MKV, MOV)",
+    titleKey: "mediaTools.tools.convert.title",
+    descKey: "mediaTools.tools.convert.desc",
     icon: <FileVideo className="h-4 w-4" />,
   },
   {
     id: "compress",
-    title: "Compress Video",
-    description: "Reduce file size while maintaining quality",
+    titleKey: "mediaTools.tools.compress.title",
+    descKey: "mediaTools.tools.compress.desc",
     icon: <Minimize2 className="h-4 w-4" />,
   },
   {
     id: "trim",
-    title: "Trim Video",
-    description: "Cut clips from videos with start and end times",
+    titleKey: "mediaTools.tools.trim.title",
+    descKey: "mediaTools.tools.trim.desc",
     icon: <Scissors className="h-4 w-4" />,
   },
   {
     id: "extract-audio",
-    title: "Extract Audio",
-    description: "Extract audio track from video files",
+    titleKey: "mediaTools.tools.extractAudio.title",
+    descKey: "mediaTools.tools.extractAudio.desc",
     icon: <FileAudio className="h-4 w-4" />,
   },
   {
     id: "extract-frames",
-    title: "Extract Frames",
-    description: "Extract images or thumbnails from video",
+    titleKey: "mediaTools.tools.extractFrames.title",
+    descKey: "mediaTools.tools.extractFrames.desc",
     icon: <Image className="h-4 w-4" />,
   },
   {
     id: "audio-convert",
-    title: "Convert Audio",
-    description: "Convert between audio formats (MP3, AAC, FLAC, WAV)",
+    titleKey: "mediaTools.tools.audioConvert.title",
+    descKey: "mediaTools.tools.audioConvert.desc",
     icon: <FileType className="h-4 w-4" />,
   },
 ];
 
 export function MediaToolsPage() {
+  const { t } = useTranslation();
   const [activeTool, setActiveTool] = useState<ToolId>("convert");
   const [inputFile, setInputFile] = useState("");
   const [loading, setLoading] = useState(false);
@@ -103,7 +105,7 @@ export function MediaToolsPage() {
         if (event.payload.jobId === jobId) {
           setLoading(false);
           setProgress(100);
-          toast.success("Operation completed successfully!");
+          toast.success(t("mediaTools.operationComplete"));
           setTimeout(() => {
             resetState();
           }, 1500);
@@ -174,7 +176,7 @@ export function MediaToolsPage() {
     setJobId,
   };
 
-  const activeTolData = tools.find((t) => t.id === activeTool);
+  const activeToolData = toolsConfig.find((tool) => tool.id === activeTool);
 
   const renderPanel = () => {
     switch (activeTool) {
@@ -198,14 +200,14 @@ export function MediaToolsPage() {
   return (
     <div className="h-full flex flex-col">
       <header className="h-14 border-b border-border flex items-center px-6 shrink-0">
-        <h1 className="text-xl font-semibold">Media Tools</h1>
+        <h1 className="text-xl font-semibold">{t("mediaTools.title")}</h1>
       </header>
 
       <div className="flex-1 flex min-h-0">
         {/* Left pane - Tool list */}
         <div className="w-56 border-r border-border p-2 overflow-y-auto shrink-0">
           <div className="space-y-1">
-            {tools.map((tool) => (
+            {toolsConfig.map((tool) => (
               <button
                 key={tool.id}
                 onClick={() => handleToolChange(tool.id)}
@@ -224,7 +226,7 @@ export function MediaToolsPage() {
                 )}>
                   {tool.icon}
                 </span>
-                <span className="text-sm font-medium truncate">{tool.title}</span>
+                <span className="text-sm font-medium truncate">{t(tool.titleKey)}</span>
               </button>
             ))}
           </div>
@@ -232,12 +234,12 @@ export function MediaToolsPage() {
 
         {/* Right pane - Tool content */}
         <div className="flex-1 p-6 overflow-y-auto">
-          {activeTolData && (
+          {activeToolData && (
             <div className="max-w-lg">
               <div className="mb-6">
-                <h2 className="text-lg font-semibold">{activeTolData.title}</h2>
+                <h2 className="text-lg font-semibold">{t(activeToolData.titleKey)}</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {activeTolData.description}
+                  {t(activeToolData.descKey)}
                 </p>
               </div>
               {renderPanel()}

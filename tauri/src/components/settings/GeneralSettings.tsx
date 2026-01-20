@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
+import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -20,8 +21,9 @@ import {
 import { Folder } from "lucide-react";
 import type { Config } from "./types";
 
-// Use global theme function from main.tsx
+// Use global functions from main.tsx
 const applyTheme = (window as any).__applyTheme as (theme: string) => void;
+const changeLanguage = (window as any).__changeLanguage as (lang: string) => void;
 
 interface GeneralSettingsProps {
   config: Config;
@@ -29,17 +31,23 @@ interface GeneralSettingsProps {
 }
 
 export function GeneralSettings({ config, onUpdate }: GeneralSettingsProps) {
+  const { t } = useTranslation();
   const theme = config.theme || "light";
+  const language = config.language || "en";
 
   useEffect(() => {
     applyTheme?.(theme);
   }, [theme]);
 
+  useEffect(() => {
+    changeLanguage?.(language);
+  }, [language]);
+
   const handleSelectFolder = async () => {
     const selected = await open({
       directory: true,
       multiple: false,
-      title: "Select Download Directory",
+      title: t("settings.general.selectDirectory"),
     });
     if (selected) {
       onUpdate({ output_dir: selected as string });
@@ -50,12 +58,12 @@ export function GeneralSettings({ config, onUpdate }: GeneralSettingsProps) {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Downloads</CardTitle>
-          <CardDescription>Configure download preferences</CardDescription>
+          <CardTitle>{t("settings.general.downloads")}</CardTitle>
+          <CardDescription>{t("settings.general.downloadsDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-2">
-            <Label htmlFor="output_dir">Download Location</Label>
+            <Label htmlFor="output_dir">{t("settings.general.downloadLocation")}</Label>
             <div className="flex gap-2">
               <Input
                 id="output_dir"
@@ -68,45 +76,45 @@ export function GeneralSettings({ config, onUpdate }: GeneralSettingsProps) {
               </Button>
             </div>
             <p className="text-sm text-muted-foreground">
-              Where downloaded files will be saved
+              {t("settings.general.downloadLocationHint")}
             </p>
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="format">Default Format</Label>
+            <Label htmlFor="format">{t("settings.general.defaultFormat")}</Label>
             <Select
               value={config.format}
               onValueChange={(value) => onUpdate({ format: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select format" />
+                <SelectValue placeholder={t("settings.general.selectFormat")} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="mp4">MP4</SelectItem>
                 <SelectItem value="webm">WebM</SelectItem>
-                <SelectItem value="best">Best Available</SelectItem>
+                <SelectItem value="best">{t("settings.general.bestAvailable")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="quality">Default Quality</Label>
+            <Label htmlFor="quality">{t("settings.general.defaultQuality")}</Label>
             <Select
               value={config.quality}
               onValueChange={(value) => onUpdate({ quality: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select quality" />
+                <SelectValue placeholder={t("settings.general.selectQuality")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="best">Best Available</SelectItem>
+                <SelectItem value="best">{t("settings.general.bestAvailable")}</SelectItem>
                 <SelectItem value="1080p">1080p</SelectItem>
                 <SelectItem value="720p">720p</SelectItem>
                 <SelectItem value="480p">480p</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-sm text-muted-foreground">
-              Preferred video quality when multiple options are available
+              {t("settings.general.qualityHint")}
             </p>
           </div>
         </CardContent>
@@ -114,8 +122,8 @@ export function GeneralSettings({ config, onUpdate }: GeneralSettingsProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Language</CardTitle>
-          <CardDescription>Application display language</CardDescription>
+          <CardTitle>{t("settings.general.language")}</CardTitle>
+          <CardDescription>{t("settings.general.languageDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           <Select
@@ -123,7 +131,7 @@ export function GeneralSettings({ config, onUpdate }: GeneralSettingsProps) {
             onValueChange={(value) => onUpdate({ language: value })}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select language" />
+              <SelectValue placeholder={t("settings.general.selectLanguage")} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="en">English</SelectItem>
@@ -140,18 +148,18 @@ export function GeneralSettings({ config, onUpdate }: GeneralSettingsProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Theme</CardTitle>
-          <CardDescription>Choose your preferred appearance</CardDescription>
+          <CardTitle>{t("settings.general.theme")}</CardTitle>
+          <CardDescription>{t("settings.general.themeDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           <Select value={theme} onValueChange={(value) => onUpdate({ theme: value })}>
             <SelectTrigger>
-              <SelectValue placeholder="Select theme" />
+              <SelectValue placeholder={t("settings.general.selectTheme")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="light">Light</SelectItem>
-              <SelectItem value="dark">Dark</SelectItem>
-              <SelectItem value="system">System</SelectItem>
+              <SelectItem value="light">{t("settings.general.light")}</SelectItem>
+              <SelectItem value="dark">{t("settings.general.dark")}</SelectItem>
+              <SelectItem value="system">{t("settings.general.system")}</SelectItem>
             </SelectContent>
           </Select>
         </CardContent>

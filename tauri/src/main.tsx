@@ -4,6 +4,8 @@ import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { invoke } from "@tauri-apps/api/core";
 import "./index.css";
 import { routeTree } from "./routeTree.gen";
+import './i18n';
+import { changeLanguage } from './i18n';
 
 // Theme management
 let currentTheme = "light";
@@ -29,17 +31,19 @@ mediaQuery.addEventListener("change", (e) => {
   }
 });
 
-// Apply theme on startup from config
-invoke<{ theme: string }>("get_config")
+// Apply theme and language on startup from config
+invoke<{ theme: string; language: string }>("get_config")
   .then((config) => {
     applyTheme(config.theme || "light");
+    changeLanguage(config.language || "en");
   })
   .catch(() => {
-    // Config not available yet, default to light
+    // Config not available yet, defaults applied
   });
 
 // Export for use in settings
 (window as any).__applyTheme = applyTheme;
+(window as any).__changeLanguage = changeLanguage;
 
 const router = createRouter({ routeTree });
 

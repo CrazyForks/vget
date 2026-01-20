@@ -1,4 +1,5 @@
 import { X, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -10,11 +11,13 @@ interface DownloadItemProps {
 }
 
 export function DownloadItem({ download }: DownloadItemProps) {
+  const { t } = useTranslation();
+
   const handleCancel = async () => {
     try {
       await cancelDownload(download.id);
     } catch (err) {
-      toast.error("Failed to cancel download");
+      toast.error(t("home.failedToCancel"));
     }
   };
 
@@ -68,7 +71,7 @@ export function DownloadItem({ download }: DownloadItemProps) {
       {download.status === "pending" && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
-          <span>Starting download...</span>
+          <span>{t("home.startingDownload")}</span>
         </div>
       )}
 

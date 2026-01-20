@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Download, Folder, Link, Loader2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +18,7 @@ export function HomePage() {
   const [config, setConfig] = useState<Config | null>(null);
   const downloads = useDownloadsStore((state) => state.downloads);
   const clearCompleted = useDownloadsStore((state) => state.clearCompleted);
+  const { t } = useTranslation();
 
   useEffect(() => {
     setupDownloadListeners();
@@ -35,7 +37,7 @@ export function HomePage() {
       const mediaInfo = await invoke<MediaInfo>("extract_media", { url });
 
       if (mediaInfo.formats.length === 0) {
-        toast.error("No downloadable formats found");
+        toast.error(t("home.noFormats"));
         return;
       }
 
@@ -54,7 +56,7 @@ export function HomePage() {
         format.audio_url || undefined
       );
       setUrl("");
-      toast.success("Download started");
+      toast.success(t("home.downloadStarted"));
     } catch (err) {
       console.error("Extraction failed:", err);
       toast.error(err instanceof Error ? err.message : String(err));
@@ -68,7 +70,7 @@ export function HomePage() {
       try {
         await invoke("open_output_folder", { path: config.output_dir });
       } catch (err) {
-        toast.error("Failed to open folder");
+        toast.error(t("home.failedToOpenFolder"));
         console.error(err);
       }
     }
@@ -87,7 +89,7 @@ export function HomePage() {
   return (
     <div className="h-full">
       <header className="h-14 border-b border-border flex items-center px-6">
-        <h1 className="text-xl font-semibold">Download</h1>
+        <h1 className="text-xl font-semibold">{t("home.title")}</h1>
       </header>
 
       <div className="p-6">
@@ -98,7 +100,7 @@ export function HomePage() {
               type="text"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="Paste video URL here..."
+              placeholder={t("home.urlPlaceholder")}
               className="w-full pl-12 pr-32 py-4 rounded-xl border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             />
             <button
@@ -107,21 +109,20 @@ export function HomePage() {
               className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity flex items-center gap-2"
             >
               {isExtracting && <Loader2 className="h-4 w-4 animate-spin" />}
-              {isExtracting ? "Extracting..." : "Download"}
+              {isExtracting ? t("home.extracting") : t("home.download")}
             </button>
           </div>
         </form>
 
         <div className="mt-4 max-w-2xl">
           <p className="text-sm text-muted-foreground">
-            Supports Twitter/X, Bilibili, Xiaohongshu, YouTube, Apple Podcasts,
-            and direct URLs
+            {t("home.supportsHint")}
           </p>
         </div>
 
         <div className="mt-8 max-w-2xl">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-medium">Downloads</h2>
+            <h2 className="text-lg font-medium">{t("home.downloads")}</h2>
             <div className="flex items-center gap-2">
               {completedDownloads.length > 0 && (
                 <Button
@@ -130,7 +131,7 @@ export function HomePage() {
                   onClick={clearCompleted}
                   className="text-muted-foreground"
                 >
-                  Clear completed
+                  {t("home.clearCompleted")}
                 </Button>
               )}
               <button
@@ -138,7 +139,7 @@ export function HomePage() {
                 className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 <Folder className="h-4 w-4" />
-                Open folder
+                {t("home.openFolder")}
               </button>
             </div>
           </div>
@@ -147,7 +148,7 @@ export function HomePage() {
             <div className="border border-dashed border-border rounded-xl p-12 text-center">
               <Download className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
               <p className="text-muted-foreground">
-                No downloads yet. Paste a URL above to get started.
+                {t("home.noDownloadsYet")}
               </p>
             </div>
           ) : (

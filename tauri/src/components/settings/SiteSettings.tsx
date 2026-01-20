@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,7 @@ function buildCookie(fields: CookieFields): string {
 }
 
 export function SiteSettings({ config, onUpdate }: SiteSettingsProps) {
+  const { t } = useTranslation();
   const [showTwitterToken, setShowTwitterToken] = useState(false);
   const { bilibili, xiaohongshu, setBilibiliStatus, logout, checkAuthStatus } =
     useAuthStore();
@@ -68,14 +70,14 @@ export function SiteSettings({ config, onUpdate }: SiteSettingsProps) {
       {/* Twitter */}
       <Card>
         <CardHeader>
-          <CardTitle>Twitter / X</CardTitle>
+          <CardTitle>{t("settings.sites.twitter.title")}</CardTitle>
           <CardDescription>
-            Required for downloading NSFW or protected content
+            {t("settings.sites.twitter.desc")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-2">
-            <Label htmlFor="twitter_auth_token">Auth Token</Label>
+            <Label htmlFor="twitter_auth_token">{t("settings.sites.twitter.authToken")}</Label>
             <div className="flex gap-2">
               <Input
                 id="twitter_auth_token"
@@ -89,7 +91,7 @@ export function SiteSettings({ config, onUpdate }: SiteSettingsProps) {
                     },
                   })
                 }
-                placeholder="Enter your auth_token cookie value"
+                placeholder={t("settings.sites.twitter.tokenPlaceholder")}
                 className="flex-1"
               />
               <Button
@@ -105,7 +107,7 @@ export function SiteSettings({ config, onUpdate }: SiteSettingsProps) {
               </Button>
             </div>
             <p className="text-sm text-muted-foreground">
-              Find this in your browser's cookies after logging into Twitter/X
+              {t("settings.sites.twitter.tokenHint")}
             </p>
           </div>
         </CardContent>
@@ -115,15 +117,17 @@ export function SiteSettings({ config, onUpdate }: SiteSettingsProps) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            Bilibili
+            {t("settings.sites.bilibili.title")}
             {bilibili.status === "logged_in" && (
               <CheckCircle2 className="h-4 w-4 text-green-500" />
             )}
           </CardTitle>
           <CardDescription>
             {bilibili.status === "logged_in"
-              ? `Logged in${bilibili.username ? ` as ${bilibili.username}` : ""}`
-              : "Required for high-quality downloads and member-only content"}
+              ? bilibili.username
+                ? t("settings.sites.bilibili.loggedInAs", { username: bilibili.username })
+                : t("settings.sites.bilibili.loggedIn")
+              : t("settings.sites.bilibili.desc")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -133,31 +137,31 @@ export function SiteSettings({ config, onUpdate }: SiteSettingsProps) {
               onClick={async () => {
                 try {
                   await logout("bilibili");
-                  toast.success("Logged out successfully");
+                  toast.success(t("settings.sites.logoutSuccess"));
                 } catch {
-                  toast.error("Failed to logout");
+                  toast.error(t("settings.sites.logoutFailed"));
                 }
               }}
             >
               <LogOut className="h-4 w-4 mr-2" />
-              Logout
+              {t("settings.sites.bilibili.logout")}
             </Button>
           ) : bilibili.status === "checking" ? (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Checking login status...
+              {t("settings.sites.bilibili.checkingStatus")}
             </div>
           ) : (
             <Tabs defaultValue="qr">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="qr">QR Code</TabsTrigger>
-                <TabsTrigger value="cookie">Cookie</TabsTrigger>
+                <TabsTrigger value="qr">{t("settings.sites.bilibili.qrCode")}</TabsTrigger>
+                <TabsTrigger value="cookie">{t("settings.sites.bilibili.cookie")}</TabsTrigger>
               </TabsList>
               <TabsContent value="qr" className="mt-4">
                 <BilibiliQRLogin
                   onSuccess={(username) => {
                     setBilibiliStatus({ status: "logged_in", username });
-                    toast.success(`Welcome, ${username || "User"}!`);
+                    toast.success(t("settings.sites.welcome", { username: username || "User" }));
                   }}
                 />
               </TabsContent>
@@ -165,7 +169,7 @@ export function SiteSettings({ config, onUpdate }: SiteSettingsProps) {
                 <BilibiliCookieLogin
                   onSuccess={(username) => {
                     setBilibiliStatus({ status: "logged_in", username });
-                    toast.success("Login successful!");
+                    toast.success(t("settings.sites.loginSuccess"));
                   }}
                 />
               </TabsContent>
@@ -178,7 +182,7 @@ export function SiteSettings({ config, onUpdate }: SiteSettingsProps) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            Xiaohongshu
+            {t("settings.sites.xiaohongshu.title")}
             {xiaohongshu.status === "logged_in" && (
               <CheckCircle2 className="h-4 w-4 text-green-500" />
             )}
@@ -186,9 +190,9 @@ export function SiteSettings({ config, onUpdate }: SiteSettingsProps) {
           <CardDescription>
             {xiaohongshu.status === "logged_in"
               ? xiaohongshu.username
-                ? `Logged in as ${xiaohongshu.username}`
-                : "Session cookies saved"
-              : "Required for downloading videos and images"}
+                ? t("settings.sites.xiaohongshu.loggedInAs", { username: xiaohongshu.username })
+                : t("settings.sites.xiaohongshu.sessionSaved")
+              : t("settings.sites.xiaohongshu.desc")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -198,19 +202,19 @@ export function SiteSettings({ config, onUpdate }: SiteSettingsProps) {
               onClick={async () => {
                 try {
                   await logout("xiaohongshu");
-                  toast.success("Logged out successfully");
+                  toast.success(t("settings.sites.logoutSuccess"));
                 } catch {
-                  toast.error("Failed to logout");
+                  toast.error(t("settings.sites.logoutFailed"));
                 }
               }}
             >
               <LogOut className="h-4 w-4 mr-2" />
-              Logout
+              {t("settings.sites.bilibili.logout")}
             </Button>
           ) : xiaohongshu.status === "checking" ? (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Checking login status...
+              {t("settings.sites.bilibili.checkingStatus")}
             </div>
           ) : (
             <XiaohongshuLogin />
@@ -226,6 +230,7 @@ function BilibiliQRLogin({
 }: {
   onSuccess: (username?: string) => void;
 }) {
+  const { t } = useTranslation();
   const [qrSession, setQrSession] = useState<QRSession | null>(null);
   const [qrStatus, setQrStatus] = useState<number | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -243,7 +248,7 @@ function BilibiliQRLogin({
       setQrStatus(QR_WAITING);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to generate QR code"
+        err instanceof Error ? err.message : t("settings.sites.bilibili.failedToGenerateQR")
       );
     } finally {
       setGenerating(false);
@@ -300,13 +305,13 @@ function BilibiliQRLogin({
   const getStatusText = () => {
     switch (qrStatus) {
       case QR_WAITING:
-        return "Scan with Bilibili app";
+        return t("settings.sites.bilibili.scanWithApp");
       case QR_SCANNED:
-        return "Confirm login on your phone";
+        return t("settings.sites.bilibili.confirmLogin");
       case QR_EXPIRED:
-        return "QR code expired";
+        return t("settings.sites.bilibili.qrExpired");
       case QR_CONFIRMED:
-        return "Login successful!";
+        return t("settings.sites.bilibili.loginSuccess");
       default:
         return "";
     }
@@ -332,7 +337,7 @@ function BilibiliQRLogin({
           />
         ) : (
           <div className="w-40 h-40 flex items-center justify-center text-muted-foreground">
-            Waiting...
+            {t("settings.sites.bilibili.waiting")}
           </div>
         )}
       </div>
@@ -353,7 +358,7 @@ function BilibiliQRLogin({
       {(qrStatus === QR_EXPIRED || error) && (
         <Button onClick={generateQR} disabled={generating} variant="outline" size="sm">
           <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh QR Code
+          {t("settings.sites.bilibili.refreshQR")}
         </Button>
       )}
     </div>
@@ -365,6 +370,7 @@ function BilibiliCookieLogin({
 }: {
   onSuccess: (username?: string) => void;
 }) {
+  const { t } = useTranslation();
   const [fields, setFields] = useState<CookieFields>({
     sessdata: "",
     biliJct: "",
@@ -375,7 +381,7 @@ function BilibiliCookieLogin({
   const handleSave = async () => {
     const cookie = buildCookie(fields);
     if (!cookie) {
-      toast.error("Please fill in at least one field");
+      toast.error(t("settings.sites.bilibili.fillOneField"));
       return;
     }
 
@@ -384,7 +390,7 @@ function BilibiliCookieLogin({
       await saveBilibiliCookie(cookie);
       onSuccess();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save cookie");
+      toast.error(err instanceof Error ? err.message : t("settings.sites.bilibili.failedToSave"));
     } finally {
       setSaving(false);
     }
@@ -395,12 +401,12 @@ function BilibiliCookieLogin({
   return (
     <div className="space-y-4">
       <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
-        <p className="font-medium mb-2">How to get cookies:</p>
+        <p className="font-medium mb-2">{t("settings.sites.bilibili.cookieInstructions")}</p>
         <ol className="list-decimal list-inside space-y-1">
-          <li>Open bilibili.com and login</li>
-          <li>Press F12 to open DevTools</li>
-          <li>Go to Application tab → Cookies</li>
-          <li>Copy the values below</li>
+          <li>{t("settings.sites.bilibili.step1")}</li>
+          <li>{t("settings.sites.bilibili.step2")}</li>
+          <li>{t("settings.sites.bilibili.step3")}</li>
+          <li>{t("settings.sites.bilibili.step4")}</li>
         </ol>
       </div>
 
@@ -413,7 +419,7 @@ function BilibiliCookieLogin({
             onChange={(e) =>
               setFields((f) => ({ ...f, sessdata: e.target.value }))
             }
-            placeholder="Paste SESSDATA value"
+            placeholder={t("settings.sites.bilibili.pasteSessdata")}
             className="font-mono text-sm"
           />
         </div>
@@ -426,7 +432,7 @@ function BilibiliCookieLogin({
             onChange={(e) =>
               setFields((f) => ({ ...f, biliJct: e.target.value }))
             }
-            placeholder="Paste bili_jct value"
+            placeholder={t("settings.sites.bilibili.pasteBiliJct")}
             className="font-mono text-sm"
           />
         </div>
@@ -439,7 +445,7 @@ function BilibiliCookieLogin({
             onChange={(e) =>
               setFields((f) => ({ ...f, dedeUserId: e.target.value }))
             }
-            placeholder="Paste DedeUserID value"
+            placeholder={t("settings.sites.bilibili.pasteDedeUserId")}
             className="font-mono text-sm"
           />
         </div>
@@ -447,13 +453,14 @@ function BilibiliCookieLogin({
 
       <Button onClick={handleSave} disabled={saving || !hasAnyInput} className="w-full">
         {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-        Save
+        {t("common.save")}
       </Button>
     </div>
   );
 }
 
 function XiaohongshuLogin() {
+  const { t } = useTranslation();
   const { checkAuthStatus } = useAuthStore();
   const [opening, setOpening] = useState(false);
 
@@ -465,12 +472,12 @@ function XiaohongshuLogin() {
         await checkAuthStatus();
         const state = useAuthStore.getState();
         if (state.xiaohongshu.status === "logged_in") {
-          toast.success("Login successful!");
+          toast.success(t("settings.sites.loginSuccess"));
         }
       }, 1000);
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Failed to open login window"
+        err instanceof Error ? err.message : t("settings.sites.xiaohongshu.failedToOpenLogin")
       );
     } finally {
       setOpening(false);
@@ -480,11 +487,11 @@ function XiaohongshuLogin() {
   return (
     <div className="space-y-4">
       <div className="p-3 bg-muted rounded-lg text-sm text-muted-foreground">
-        <p className="mb-2">Click below to open a login window:</p>
+        <p className="mb-2">{t("settings.sites.xiaohongshu.loginInstructions")}</p>
         <ul className="list-disc list-inside space-y-1">
-          <li>Scan QR with Xiaohongshu app</li>
-          <li>Or login with phone number</li>
-          <li>Close the window when done</li>
+          <li>{t("settings.sites.xiaohongshu.scanWithApp")}</li>
+          <li>{t("settings.sites.xiaohongshu.orLoginPhone")}</li>
+          <li>{t("settings.sites.xiaohongshu.closeWhenDone")}</li>
         </ul>
       </div>
 
@@ -495,7 +502,7 @@ function XiaohongshuLogin() {
           ) : (
             <ExternalLink className="h-4 w-4 mr-2" />
           )}
-          {opening ? "Opening..." : "Open Login Window"}
+          {opening ? t("settings.sites.xiaohongshu.opening") : t("settings.sites.xiaohongshu.openLoginWindow")}
         </Button>
 
         <Button variant="outline" onClick={checkAuthStatus}>
