@@ -20,6 +20,7 @@ import {
   RefreshCw,
   LogOut,
   ExternalLink,
+  Server,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Config } from "./types";
@@ -35,6 +36,13 @@ import {
   QR_CONFIRMED,
   type QRSession,
 } from "@/stores/auth";
+import {
+  getDockerServerUrl,
+  setDockerServerUrl,
+  checkDockerHealth,
+  getDockerJwtToken,
+  setDockerJwtToken,
+} from "@/services/dockerApi";
 
 interface SiteSettingsProps {
   config: Config;
@@ -221,6 +229,9 @@ export function SiteSettings({ config, onUpdate }: SiteSettingsProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Docker Server (for YouTube) */}
+      <DockerServerSettings />
     </div>
   );
 }
@@ -510,5 +521,129 @@ function XiaohongshuLogin() {
         </Button>
       </div>
     </div>
+  );
+}
+
+function DockerServerSettings() {
+  const { t } = useTranslation();
+  const [serverUrl, setServerUrl] = useState(getDockerServerUrl());
+  const [jwtToken, setJwtToken] = useState(getDockerJwtToken());
+  const [showToken, setShowToken] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<"unknown" | "connected" | "failed">("unknown");
+
+  const handleTestConnection = async () => {
+    setTesting(true);
+    setConnectionStatus("unknown");
+    try {
+      // Save settings first
+      setDockerServerUrl(serverUrl);
+      if (jwtToken) {
+        setDockerJwtToken(jwtToken);
+      }
+
+      const isHealthy = await checkDockerHealth();
+      setConnectionStatus(isHealthy ? "connected" : "failed");
+      if (isHealthy) {
+        toast.success(t("settings.sites.docker.connectionSuccess") || "Connected to Docker server!");
+      } else {
+        toast.error(t("settings.sites.docker.connectionFailed") || "Failed to connect to Docker server");
+      }
+    } catch {
+      setConnectionStatus("failed");
+      toast.error(t("settings.sites.docker.connectionFailed") || "Failed to connect to Docker server");
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSave = () => {
+    setDockerServerUrl(serverUrl);
+    setDockerJwtToken(jwtToken);
+    toast.success(t("settings.sites.docker.saved") || "Docker server settings saved");
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Server className="h-5 w-5" />
+          {t("settings.sites.docker.title") || "Docker Server (YouTube)"}
+          {connectionStatus === "connected" && (
+            <CheckCircle2 className="h-4 w-4 text-green-500" />
+          )}
+        </CardTitle>
+        <CardDescription>
+          {t("settings.sites.docker.desc") || "Configure vget-server for YouTube downloads. Run the Docker container or vget-server locally."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-2">
+          <Label htmlFor="docker_server_url">
+            {t("settings.sites.docker.serverUrl") || "Server URL"}
+          </Label>
+          <Input
+            id="docker_server_url"
+            type="text"
+            value={serverUrl}
+            onChange={(e) => setServerUrl(e.target.value)}
+            placeholder="http://localhost:8080"
+          />
+          <p className="text-sm text-muted-foreground">
+            {t("settings.sites.docker.serverUrlHint") || "URL of the vget-server (default: http://localhost:8080)"}
+          </p>
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="docker_jwt_token">
+            {t("settings.sites.docker.jwtToken") || "JWT Token (optional)"}
+          </Label>
+          <div className="flex gap-2">
+            <Input
+              id="docker_jwt_token"
+              type={showToken ? "text" : "password"}
+              value={jwtToken}
+              onChange={(e) => setJwtToken(e.target.value)}
+              placeholder={t("settings.sites.docker.jwtPlaceholder") || "Paste JWT token if server requires authentication"}
+              className="flex-1 font-mono text-sm"
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setShowToken(!showToken)}
+            >
+              {showToken ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {t("settings.sites.docker.jwtHint") || "Only needed if the server has api_key configured. Get token from: POST /api/auth/token"}
+          </p>
+        </div>
+
+        <div className="flex gap-2">
+          <Button onClick={handleSave} variant="outline">
+            {t("common.save")}
+          </Button>
+          <Button onClick={handleTestConnection} disabled={testing}>
+            {testing ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
+            {t("settings.sites.docker.testConnection") || "Test Connection"}
+          </Button>
+        </div>
+
+        {connectionStatus === "failed" && (
+          <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm text-destructive">
+            {t("settings.sites.docker.notRunningHint") || "Docker server is not running. Start it with: docker run -p 8080:8080 ghcr.io/guiyumin/vget:latest"}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

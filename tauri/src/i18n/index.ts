@@ -1,12 +1,22 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import en from './locales/en.json';
-import zh from './locales/zh.json';
-import jp from './locales/jp.json';
-import kr from './locales/kr.json';
-import es from './locales/es.json';
-import fr from './locales/fr.json';
-import de from './locales/de.json';
+import yaml from 'js-yaml';
+
+import enYml from './locales/en.yml?raw';
+import zhYml from './locales/zh.yml?raw';
+import jpYml from './locales/jp.yml?raw';
+import krYml from './locales/kr.yml?raw';
+import esYml from './locales/es.yml?raw';
+import frYml from './locales/fr.yml?raw';
+import deYml from './locales/de.yml?raw';
+
+const en = yaml.load(enYml) as Record<string, unknown>;
+const zh = yaml.load(zhYml) as Record<string, unknown>;
+const jp = yaml.load(jpYml) as Record<string, unknown>;
+const kr = yaml.load(krYml) as Record<string, unknown>;
+const es = yaml.load(esYml) as Record<string, unknown>;
+const fr = yaml.load(frYml) as Record<string, unknown>;
+const de = yaml.load(deYml) as Record<string, unknown>;
 
 export const resources = {
   en: { translation: en },

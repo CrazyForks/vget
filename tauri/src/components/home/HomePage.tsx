@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Download, Folder, Link, Loader2, Upload, FileText } from "lucide-react";
@@ -14,6 +14,12 @@ import { MediaInfo, Config } from "./types";
 import { DownloadItem } from "./DownloadItem";
 import { cn } from "@/lib/utils";
 import { useDropZone } from "@/hooks/useDropZone";
+import {
+  isYouTubeUrl,
+  startDockerDownload,
+  getDockerJobStatus,
+  getDockerServerUrl,
+} from "@/services/dockerApi";
 
 export function HomePage() {
   const [url, setUrl] = useState("");
@@ -22,7 +28,10 @@ export function HomePage() {
   const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
   const downloads = useDownloadsStore((state) => state.downloads);
   const clearCompleted = useDownloadsStore((state) => state.clearCompleted);
+  const addDownload = useDownloadsStore((state) => state.addDownload);
+  const updateDownload = useDownloadsStore((state) => state.updateDownload);
   const { t } = useTranslation();
+  const dockerPollingRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   // Handle bulk file import
   const handleFileImport = async (filePath: string) => {
@@ -74,6 +83,12 @@ export function HomePage() {
     invoke<Config>("get_config")
       .then(setConfig)
       .catch(console.error);
+
+    // Cleanup polling intervals on unmount
+    return () => {
+      dockerPollingRef.current.forEach((interval) => clearInterval(interval));
+      dockerPollingRef.current.clear();
+    };
   }, []);
 
   const handleSelectFile = async () => {
@@ -86,8 +101,122 @@ export function HomePage() {
     }
   };
 
+  // Handle YouTube download via Docker server
+  const handleYouTubeDownload = async (inputUrl: string): Promise<boolean> => {
+    try {
+      // Try to start download on Docker server directly
+      const response = await startDockerDownload(inputUrl);
+      const jobId = response.data.id;
+
+      // Add to local downloads list with docker prefix to distinguish
+      const localId = `docker-${jobId}`;
+      addDownload({
+        id: localId,
+        url: inputUrl,
+        title: `YouTube: ${inputUrl}`,
+        outputPath: "Docker Server",
+        status: "pending",
+        progress: null,
+        error: null,
+      });
+
+      // Poll for status updates
+      const pollInterval = setInterval(async () => {
+        try {
+          const status = await getDockerJobStatus(jobId);
+          const job = status.data;
+
+          if (job.status === "downloading") {
+            updateDownload(localId, {
+              status: "downloading",
+              title: job.filename || `YouTube: ${inputUrl}`,
+              progress: {
+                job_id: localId,
+                downloaded: job.downloaded || 0,
+                total: job.total || null,
+                speed: 0,
+                percent: job.progress || 0,
+              },
+            });
+          } else if (job.status === "completed") {
+            updateDownload(localId, {
+              status: "completed",
+              title: job.filename || `YouTube: ${inputUrl}`,
+              outputPath: job.filename || "Docker Server",
+              progress: null,
+            });
+            clearInterval(pollInterval);
+            dockerPollingRef.current.delete(localId);
+            toast.success(t("home.downloadComplete") || "Download complete!");
+          } else if (job.status === "failed") {
+            updateDownload(localId, {
+              status: "failed",
+              error: job.error || "Download failed",
+              progress: null,
+            });
+            clearInterval(pollInterval);
+            dockerPollingRef.current.delete(localId);
+          } else if (job.status === "cancelled") {
+            updateDownload(localId, {
+              status: "cancelled",
+              progress: null,
+            });
+            clearInterval(pollInterval);
+            dockerPollingRef.current.delete(localId);
+          }
+        } catch (pollError) {
+          console.error("Polling error:", pollError);
+          // Don't stop polling on transient errors
+        }
+      }, 1000);
+
+      dockerPollingRef.current.set(localId, pollInterval);
+
+      toast.success(
+        t("home.youtubeDownloadStarted") ||
+          "YouTube download started via Docker server"
+      );
+      return true;
+    } catch (err) {
+      console.error("Docker download error:", err);
+
+      const errorMessage = err instanceof Error ? err.message : String(err);
+
+      // Check if it's an authentication error
+      if (errorMessage.includes("Authentication required") || errorMessage.includes("401")) {
+        toast.error(
+          t("home.dockerAuthRequired") ||
+            "Docker server requires authentication. Go to Settings → Sites → Docker Server to add your JWT token.",
+          { duration: 8000 }
+        );
+        return false;
+      }
+
+      // Check if server is not reachable (network error)
+      if (errorMessage.includes("Failed to fetch") || errorMessage.includes("NetworkError") || errorMessage.includes("fetch")) {
+        const serverUrl = getDockerServerUrl();
+        toast.error(
+          t("home.dockerNotRunning") ||
+            `YouTube downloads require vget-server. Please run Docker container or start the server at ${serverUrl}`,
+          { duration: 8000 }
+        );
+        return false;
+      }
+
+      // Other errors
+      toast.error(errorMessage);
+      return false;
+    }
+  };
+
   const processUrl = async (inputUrl: string) => {
     if (!inputUrl.trim() || !config) return;
+
+    // Check if it's a YouTube URL
+    if (isYouTubeUrl(inputUrl)) {
+      await handleYouTubeDownload(inputUrl);
+      return;
+    }
 
     try {
       const mediaInfo = await invoke<MediaInfo>("extract_media", { url: inputUrl });
@@ -122,6 +251,15 @@ export function HomePage() {
 
     setIsExtracting(true);
     try {
+      // Check if it's a YouTube URL - handle via Docker
+      if (isYouTubeUrl(url)) {
+        const success = await handleYouTubeDownload(url);
+        if (success) {
+          setUrl("");
+        }
+        return;
+      }
+
       const mediaInfo = await invoke<MediaInfo>("extract_media", { url });
 
       if (mediaInfo.formats.length === 0) {
