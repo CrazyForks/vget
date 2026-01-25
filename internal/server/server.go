@@ -1455,11 +1455,11 @@ func (s *Server) downloadVideoWithAudio(ctx context.Context, format *extractor.V
 		audioExt = "opus"
 	}
 
-	// Build filenames
+	// Build temp filenames for video and audio
 	ext := filepath.Ext(outputPath)
 	baseName := strings.TrimSuffix(outputPath, ext)
-	videoFile := outputPath
-	audioFile := baseName + "." + audioExt
+	videoFile := baseName + "_video" + ext
+	audioFile := baseName + "_audio." + audioExt
 
 	// Track progress from both downloads
 	var videoDownloaded, videoTotal int64
@@ -1520,10 +1520,10 @@ func (s *Server) downloadVideoWithAudio(ctx context.Context, format *extractor.V
 
 	// Try to merge with ffmpeg if available
 	if downloader.FFmpegAvailable() {
-		_, err := downloader.MergeVideoAudioKeepOriginals(videoFile, audioFile)
+		// Merge to final output path and delete temp files on success
+		err := downloader.MergeVideoAudio(videoFile, audioFile, outputPath, true)
 		if err != nil {
-			// Merge failed but downloads succeeded - log warning but don't fail
-			log.Printf("Warning: ffmpeg merge failed: %v (files kept: %s, %s)", err, videoFile, audioFile)
+			log.Printf("Warning: ffmpeg merge failed: %v (temp files kept: %s, %s)", err, videoFile, audioFile)
 		}
 	} else {
 		// ffmpeg not available - just leave the separate files

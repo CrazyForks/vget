@@ -464,11 +464,11 @@ func downloadVideoAndAudio(format *extractor.VideoFormat, outputFile, videoID st
 		audioExt = "opus"
 	}
 
-	// Build filenames
+	// Build temp filenames for video and audio
 	ext := filepath.Ext(outputFile)
 	baseName := strings.TrimSuffix(outputFile, ext)
-	videoFile := outputFile // keep original name for video
-	audioFile := baseName + "." + audioExt
+	videoFile := baseName + "_video" + ext
+	audioFile := baseName + "_audio." + audioExt
 
 	// Download video with headers if provided
 	fmt.Println("  Downloading video stream...")
@@ -496,20 +496,17 @@ func downloadVideoAndAudio(format *extractor.VideoFormat, outputFile, videoID st
 	// Try to merge with ffmpeg if available
 	if downloader.FFmpegAvailable() {
 		fmt.Println("  Merging video and audio...")
-		mergedPath, err := downloader.MergeVideoAudioKeepOriginals(videoFile, audioFile)
+		// Merge to final output path and delete temp files on success
+		err := downloader.MergeVideoAudio(videoFile, audioFile, outputFile, true)
 		if err != nil {
-			// Merge failed, show manual command
 			fmt.Printf("\n  Warning: ffmpeg merge failed: %v\n", err)
 			fmt.Printf("\n  Downloaded separately:\n")
 			fmt.Printf("    Video: %s\n", videoFile)
 			fmt.Printf("    Audio: %s\n", audioFile)
 			fmt.Printf("\n  To merge manually:\n")
-			fmt.Printf("    ffmpeg -i \"%s\" -i \"%s\" -c copy \"%s\"\n", videoFile, audioFile, baseName+"_merged.mp4")
+			fmt.Printf("    ffmpeg -i \"%s\" -i \"%s\" -c copy \"%s\"\n", videoFile, audioFile, outputFile)
 		} else {
-			fmt.Printf("\n  Downloaded:\n")
-			fmt.Printf("    Video: %s\n", videoFile)
-			fmt.Printf("    Audio: %s\n", audioFile)
-			fmt.Printf("    Merged: %s\n", mergedPath)
+			fmt.Printf("\n  Downloaded: %s\n", outputFile)
 		}
 	} else {
 		// No ffmpeg, show manual command
@@ -517,7 +514,7 @@ func downloadVideoAndAudio(format *extractor.VideoFormat, outputFile, videoID st
 		fmt.Printf("    Video: %s\n", videoFile)
 		fmt.Printf("    Audio: %s\n", audioFile)
 		fmt.Printf("\n  To merge with ffmpeg:\n")
-		fmt.Printf("    ffmpeg -i \"%s\" -i \"%s\" -c copy \"%s\"\n", videoFile, audioFile, baseName+"_merged.mp4")
+		fmt.Printf("    ffmpeg -i \"%s\" -i \"%s\" -c copy \"%s\"\n", videoFile, audioFile, outputFile)
 	}
 
 	return nil

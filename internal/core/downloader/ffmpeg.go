@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 )
 
@@ -104,23 +103,3 @@ func MergeVideoAudio(videoPath, audioPath, outputPath string, deleteOriginals bo
 	return nil
 }
 
-// MergeVideoAudioKeepOriginals merges video and audio into a new file with "(merged)" prefix.
-// Original video and audio files are kept.
-// Returns the path to the merged file.
-func MergeVideoAudioKeepOriginals(videoPath, audioPath string) (string, error) {
-	if !FFmpegAvailable() {
-		return "", fmt.Errorf("ffmpeg not found in PATH")
-	}
-
-	// Build merged output path with "(merged)" prefix
-	dir := filepath.Dir(videoPath)
-	filename := filepath.Base(videoPath)
-	mergedPath := filepath.Join(dir, "(merged)"+filename)
-
-	// Merge to new file, keep originals
-	if err := MergeVideoAudio(videoPath, audioPath, mergedPath, false); err != nil {
-		return "", err
-	}
-
-	return mergedPath, nil
-}
