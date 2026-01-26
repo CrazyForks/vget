@@ -441,7 +441,6 @@ fn html_to_pdf(html: &str, output_path: &str, page_size: &str) -> Result<(), Str
 // Light theme CSS - Clean document styling
 const LIGHT_THEME_CSS: &str = r#"
 @page {
-    margin: 0;
     size: auto;
 }
 
@@ -478,7 +477,7 @@ body {
 .markdown-body {
     max-width: 100%;
     margin: 0 auto;
-    padding: 48px 56px;
+    padding: 0;
 }
 
 /* ==================== Typography ==================== */
@@ -756,7 +755,7 @@ kbd {
     }
 
     .markdown-body {
-        padding: 40px 48px;
+        padding: 0;
     }
 
     pre, blockquote, table, img, h1, h2, h3, h4, h5, h6 {
@@ -789,7 +788,6 @@ kbd {
 // Dark theme CSS - Clean document styling
 const DARK_THEME_CSS: &str = r#"
 @page {
-    margin: 0;
     size: auto;
 }
 
@@ -826,7 +824,7 @@ body {
 .markdown-body {
     max-width: 100%;
     margin: 0 auto;
-    padding: 48px 56px;
+    padding: 0;
 }
 
 /* ==================== Typography ==================== */
@@ -1106,7 +1104,7 @@ kbd {
     }
 
     .markdown-body {
-        padding: 40px 48px;
+        padding: 0;
     }
 
     pre, blockquote, table, img, h1, h2, h3, h4, h5, h6 {
