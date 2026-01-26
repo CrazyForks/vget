@@ -250,6 +250,14 @@ ui:
   token_copied: "コピーしました！"
   token_usage: "使用方法"
   token_invalid_json: "無効な JSON"
+  # 履歴
+  history: "履歴"
+  history_title: "ダウンロード履歴"
+  history_empty: "ダウンロード履歴がありません"
+  history_empty_hint: "完了したダウンロードがここに表示されます"
+  history_clear_all: "すべての履歴を削除"
+  history_stats: "統計"
+  history_total_downloaded: "合計ダウンロード数"
 
 # サーバーメッセージ
 server:

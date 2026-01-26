@@ -69,8 +69,9 @@ interface AppContextType {
   // Actions
   refresh: () => Promise<void>;
   submitDownload: (url: string) => Promise<boolean>;
-  cancelJob: (id: string) => Promise<void>;
-  clearAllHistory: () => Promise<void>;
+  cancelDownload: (id: string) => Promise<void>;
+  removeJob: (id: string) => Promise<void>;
+  removeAllJobs: () => Promise<void>;
   updateOutputDir: (dir: string) => Promise<boolean>;
   saveConfig: (values: ConfigValues) => Promise<void>;
   addWebDAV: (
@@ -190,7 +191,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [refresh]
   );
 
-  const cancelJob = useCallback(
+  // Cancel an active (queued/downloading) download
+  const cancelDownload = useCallback(
     async (id: string) => {
       await deleteJob(id);
       refresh();
@@ -198,7 +200,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [refresh]
   );
 
-  const clearAllHistory = useCallback(async () => {
+  // Remove a finished (completed/failed/cancelled) job from the queue
+  const removeJob = useCallback(
+    async (id: string) => {
+      await deleteJob(id);
+      refresh();
+    },
+    [refresh]
+  );
+
+  // Remove all finished jobs from the queue
+  const removeAllJobs = useCallback(async () => {
     await clearHistory();
     refresh();
   }, [refresh]);
@@ -286,8 +298,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setDarkMode,
         refresh,
         submitDownload,
-        cancelJob,
-        clearAllHistory,
+        cancelDownload,
+        removeJob,
+        removeAllJobs,
         updateOutputDir,
         saveConfig,
         addWebDAV,

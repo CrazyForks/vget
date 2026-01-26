@@ -158,6 +158,14 @@ export interface UITranslations {
   token_copied: string;
   token_usage: string;
   token_invalid_json: string;
+  // History
+  history: string;
+  history_title: string;
+  history_empty: string;
+  history_empty_hint: string;
+  history_clear_all: string;
+  history_stats: string;
+  history_total_downloaded: string;
 }
 
 export interface ServerTranslations {
@@ -325,6 +333,14 @@ export const defaultTranslations: UITranslations = {
   token_copied: "Copied!",
   token_usage: "Usage",
   token_invalid_json: "Invalid JSON",
+  // History
+  history: "History",
+  history_title: "Download History",
+  history_empty: "No download history",
+  history_empty_hint: "Completed downloads will appear here",
+  history_clear_all: "Clear All History",
+  history_stats: "Statistics",
+  history_total_downloaded: "Total Downloaded",
 };
 
 export const defaultServerTranslations: ServerTranslations = {

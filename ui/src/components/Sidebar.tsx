@@ -14,6 +14,7 @@ import {
   FaMicrophone,
   FaKey,
   FaXmark,
+  FaClockRotateLeft,
 } from "react-icons/fa6";
 import { useApp } from "../context/AppContext";
 
@@ -45,6 +46,12 @@ export function Sidebar({ lang, onClose }: SidebarProps) {
       to: "/bulk",
       icon: <FaLayerGroup />,
       label: t.bulk_download,
+      show: true,
+    },
+    {
+      to: "/history",
+      icon: <FaClockRotateLeft />,
+      label: t.history,
       show: true,
     },
     {

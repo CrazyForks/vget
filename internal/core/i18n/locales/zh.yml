@@ -262,6 +262,14 @@ ui:
   token_copied: "已复制！"
   token_usage: "使用方法"
   token_invalid_json: "无效的 JSON"
+  # 历史记录
+  history: "历史记录"
+  history_title: "下载历史"
+  history_empty: "暂无下载历史"
+  history_empty_hint: "完成的下载将显示在这里"
+  history_clear_all: "清空所有历史"
+  history_stats: "统计"
+  history_total_downloaded: "总下载量"
 
 # 服务器消息
 server:

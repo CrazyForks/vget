@@ -296,6 +296,14 @@ type UITranslations struct {
 	TokenCopied            string `yaml:"token_copied" json:"token_copied"`
 	TokenUsage             string `yaml:"token_usage" json:"token_usage"`
 	TokenInvalidJSON       string `yaml:"token_invalid_json" json:"token_invalid_json"`
+	// History
+	History              string `yaml:"history" json:"history"`
+	HistoryTitle         string `yaml:"history_title" json:"history_title"`
+	HistoryEmpty         string `yaml:"history_empty" json:"history_empty"`
+	HistoryEmptyHint     string `yaml:"history_empty_hint" json:"history_empty_hint"`
+	HistoryClearAll      string `yaml:"history_clear_all" json:"history_clear_all"`
+	HistoryStats         string `yaml:"history_stats" json:"history_stats"`
+	HistoryTotalDownloaded string `yaml:"history_total_downloaded" json:"history_total_downloaded"`
 }
 
 // ServerTranslations holds translations for server messages

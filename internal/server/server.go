@@ -50,6 +50,7 @@ type Server struct {
 	apiKey     string
 	jobQueue   *JobQueue
 	aiJobQueue *AIJobQueue
+	historyDB  *HistoryDB
 	cfg        *config.Config
 	server     *http.Server
 	engine     *gin.Engine
@@ -68,6 +69,15 @@ func NewServer(port int, outputDir, apiKey string, maxConcurrent int) *Server {
 
 	// Create job queue with download function
 	s.jobQueue = NewJobQueue(maxConcurrent, outputDir, s.downloadWithExtractor)
+
+	// Initialize history database
+	historyDB, err := NewHistoryDB()
+	if err != nil {
+		log.Printf("Warning: failed to initialize history database: %v", err)
+	} else {
+		s.historyDB = historyDB
+		s.jobQueue.SetHistoryDB(historyDB)
+	}
 
 	// Create AI job queue (limit to 2 concurrent to avoid API rate limits)
 	s.aiJobQueue = NewAIJobQueue(2, outputDir, cfg)
@@ -127,6 +137,12 @@ func (s *Server) Start() error {
 	api.GET("/jobs", s.handleGetJobs)
 	api.DELETE("/jobs", s.handleClearJobs)
 	api.DELETE("/jobs/:id", s.handleDeleteJob)
+
+	// History routes
+	api.GET("/history", s.handleGetHistory)
+	api.DELETE("/history", s.handleClearHistory)
+	api.DELETE("/history/:id", s.handleDeleteHistory)
+
 	api.GET("/config", s.handleGetConfig)
 	api.POST("/config", s.handleSetConfig)
 	api.PUT("/config", s.handleUpdateConfig)
@@ -210,6 +226,9 @@ func (s *Server) Start() error {
 func (s *Server) Stop(ctx context.Context) error {
 	s.jobQueue.Stop()
 	s.aiJobQueue.Stop()
+	if s.historyDB != nil {
+		s.historyDB.Close()
+	}
 	return s.server.Shutdown(ctx)
 }
 
@@ -478,6 +497,12 @@ func (s *Server) handleGetJobs(c *gin.Context) {
 
 func (s *Server) handleClearJobs(c *gin.Context) {
 	count := s.jobQueue.ClearHistory()
+
+	// Also clear persistent history
+	if s.historyDB != nil {
+		s.historyDB.ClearHistory()
+	}
+
 	c.JSON(http.StatusOK, Response{
 		Code: 200,
 		Data: gin.H{
@@ -1793,4 +1818,120 @@ func streamFile(w http.ResponseWriter, url, filename string, headers map[string]
 	}
 
 	io.Copy(w, resp.Body)
+}
+
+// History handlers
+
+func (s *Server) handleGetHistory(c *gin.Context) {
+	if s.historyDB == nil {
+		c.JSON(http.StatusServiceUnavailable, Response{
+			Code:    503,
+			Data:    nil,
+			Message: "history database not available",
+		})
+		return
+	}
+
+	// Parse pagination params
+	limit := 50
+	offset := 0
+	if l := c.Query("limit"); l != "" {
+		fmt.Sscanf(l, "%d", &limit)
+		if limit <= 0 || limit > 100 {
+			limit = 50
+		}
+	}
+	if o := c.Query("offset"); o != "" {
+		fmt.Sscanf(o, "%d", &offset)
+		if offset < 0 {
+			offset = 0
+		}
+	}
+
+	records, total, err := s.historyDB.GetHistory(limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, Response{
+			Code:    500,
+			Data:    nil,
+			Message: fmt.Sprintf("failed to get history: %v", err),
+		})
+		return
+	}
+
+	// Get stats
+	completed, failed, totalBytes, _ := s.historyDB.GetStats()
+
+	c.JSON(http.StatusOK, Response{
+		Code: 200,
+		Data: gin.H{
+			"records": records,
+			"total":   total,
+			"limit":   limit,
+			"offset":  offset,
+			"stats": gin.H{
+				"completed":   completed,
+				"failed":      failed,
+				"total_bytes": totalBytes,
+			},
+		},
+		Message: fmt.Sprintf("%d records found", len(records)),
+	})
+}
+
+func (s *Server) handleClearHistory(c *gin.Context) {
+	if s.historyDB == nil {
+		c.JSON(http.StatusServiceUnavailable, Response{
+			Code:    503,
+			Data:    nil,
+			Message: "history database not available",
+		})
+		return
+	}
+
+	count, err := s.historyDB.ClearHistory()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, Response{
+			Code:    500,
+			Data:    nil,
+			Message: fmt.Sprintf("failed to clear history: %v", err),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Code: 200,
+		Data: gin.H{
+			"cleared": count,
+		},
+		Message: fmt.Sprintf("%d records cleared", count),
+	})
+}
+
+func (s *Server) handleDeleteHistory(c *gin.Context) {
+	if s.historyDB == nil {
+		c.JSON(http.StatusServiceUnavailable, Response{
+			Code:    503,
+			Data:    nil,
+			Message: "history database not available",
+		})
+		return
+	}
+
+	id := c.Param("id")
+
+	err := s.historyDB.DeleteRecord(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, Response{
+			Code:    404,
+			Data:    nil,
+			Message: "record not found",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Code:    200,
+		Data:    gin.H{"id": id},
+		Message: "record deleted",
+	})
 }

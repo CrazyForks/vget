@@ -14,6 +14,7 @@ import { Route as TorrentRouteImport } from './routes/torrent'
 import { Route as TokenRouteImport } from './routes/token'
 import { Route as PodcastRouteImport } from './routes/podcast'
 import { Route as Kuaidi100RouteImport } from './routes/kuaidi100'
+import { Route as HistoryRouteImport } from './routes/history'
 import { Route as ConfigRouteImport } from './routes/config'
 import { Route as BulkRouteImport } from './routes/bulk'
 import { Route as BilibiliRouteImport } from './routes/bilibili'
@@ -44,6 +45,11 @@ const PodcastRoute = PodcastRouteImport.update({
 const Kuaidi100Route = Kuaidi100RouteImport.update({
   id: '/kuaidi100',
   path: '/kuaidi100',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HistoryRoute = HistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConfigRoute = ConfigRouteImport.update({
@@ -82,6 +88,7 @@ export interface FileRoutesByFullPath {
   '/bilibili': typeof BilibiliRoute
   '/bulk': typeof BulkRoute
   '/config': typeof ConfigRoute
+  '/history': typeof HistoryRoute
   '/kuaidi100': typeof Kuaidi100Route
   '/podcast': typeof PodcastRoute
   '/token': typeof TokenRoute
@@ -95,6 +102,7 @@ export interface FileRoutesByTo {
   '/bilibili': typeof BilibiliRoute
   '/bulk': typeof BulkRoute
   '/config': typeof ConfigRoute
+  '/history': typeof HistoryRoute
   '/kuaidi100': typeof Kuaidi100Route
   '/podcast': typeof PodcastRoute
   '/token': typeof TokenRoute
@@ -109,6 +117,7 @@ export interface FileRoutesById {
   '/bilibili': typeof BilibiliRoute
   '/bulk': typeof BulkRoute
   '/config': typeof ConfigRoute
+  '/history': typeof HistoryRoute
   '/kuaidi100': typeof Kuaidi100Route
   '/podcast': typeof PodcastRoute
   '/token': typeof TokenRoute
@@ -124,6 +133,7 @@ export interface FileRouteTypes {
     | '/bilibili'
     | '/bulk'
     | '/config'
+    | '/history'
     | '/kuaidi100'
     | '/podcast'
     | '/token'
@@ -137,6 +147,7 @@ export interface FileRouteTypes {
     | '/bilibili'
     | '/bulk'
     | '/config'
+    | '/history'
     | '/kuaidi100'
     | '/podcast'
     | '/token'
@@ -150,6 +161,7 @@ export interface FileRouteTypes {
     | '/bilibili'
     | '/bulk'
     | '/config'
+    | '/history'
     | '/kuaidi100'
     | '/podcast'
     | '/token'
@@ -164,6 +176,7 @@ export interface RootRouteChildren {
   BilibiliRoute: typeof BilibiliRoute
   BulkRoute: typeof BulkRoute
   ConfigRoute: typeof ConfigRoute
+  HistoryRoute: typeof HistoryRoute
   Kuaidi100Route: typeof Kuaidi100Route
   PodcastRoute: typeof PodcastRoute
   TokenRoute: typeof TokenRoute
@@ -208,6 +221,13 @@ declare module '@tanstack/react-router' {
       path: '/kuaidi100'
       fullPath: '/kuaidi100'
       preLoaderRoute: typeof Kuaidi100RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/history': {
+      id: '/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof HistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/config': {
@@ -260,6 +280,7 @@ const rootRouteChildren: RootRouteChildren = {
   BilibiliRoute: BilibiliRoute,
   BulkRoute: BulkRoute,
   ConfigRoute: ConfigRoute,
+  HistoryRoute: HistoryRoute,
   Kuaidi100Route: Kuaidi100Route,
   PodcastRoute: PodcastRoute,
   TokenRoute: TokenRoute,

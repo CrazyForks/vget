@@ -250,6 +250,14 @@ ui:
   token_copied: "복사됨!"
   token_usage: "사용법"
   token_invalid_json: "잘못된 JSON"
+  # 기록
+  history: "기록"
+  history_title: "다운로드 기록"
+  history_empty: "다운로드 기록이 없습니다"
+  history_empty_hint: "완료된 다운로드가 여기에 표시됩니다"
+  history_clear_all: "모든 기록 삭제"
+  history_stats: "통계"
+  history_total_downloaded: "총 다운로드"
 
 # 서버 메시지
 server:

@@ -250,6 +250,14 @@ ui:
   token_copied: "¡Copiado!"
   token_usage: "Uso"
   token_invalid_json: "JSON inválido"
+  # Historial
+  history: "Historial"
+  history_title: "Historial de Descargas"
+  history_empty: "Sin historial de descargas"
+  history_empty_hint: "Las descargas completadas aparecerán aquí"
+  history_clear_all: "Borrar Todo el Historial"
+  history_stats: "Estadísticas"
+  history_total_downloaded: "Total Descargado"
 
 # Mensajes del servidor
 server:

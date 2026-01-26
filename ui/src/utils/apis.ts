@@ -717,3 +717,57 @@ export async function requestModelDownload(
   });
   return res.json();
 }
+
+// History APIs
+
+export interface HistoryRecord {
+  id: string;
+  url: string;
+  filename: string;
+  status: "completed" | "failed";
+  size_bytes: number;
+  started_at: number;   // Unix timestamp
+  completed_at: number; // Unix timestamp
+  duration_seconds: number;
+  error?: string;
+}
+
+export interface HistoryStats {
+  completed: number;
+  failed: number;
+  total_bytes: number;
+}
+
+export interface HistoryData {
+  records: HistoryRecord[];
+  total: number;
+  limit: number;
+  offset: number;
+  stats: HistoryStats;
+}
+
+export async function fetchHistory(
+  limit = 50,
+  offset = 0
+): Promise<ApiResponse<HistoryData>> {
+  const params = new URLSearchParams({
+    limit: limit.toString(),
+    offset: offset.toString(),
+  });
+  const res = await fetch(`/api/history?${params}`);
+  return res.json();
+}
+
+export async function deleteHistoryRecord(
+  id: string
+): Promise<ApiResponse<{ id: string }>> {
+  const res = await fetch(`/api/history/${id}`, { method: "DELETE" });
+  return res.json();
+}
+
+export async function clearAllHistory(): Promise<
+  ApiResponse<{ cleared: number }>
+> {
+  const res = await fetch("/api/history", { method: "DELETE" });
+  return res.json();
+}

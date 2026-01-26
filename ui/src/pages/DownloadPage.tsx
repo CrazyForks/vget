@@ -11,8 +11,9 @@ export function DownloadPage() {
     outputDir,
     t,
     submitDownload,
-    cancelJob,
-    clearAllHistory,
+    cancelDownload,
+    removeJob,
+    removeAllJobs,
     updateOutputDir,
   } = useApp();
 
@@ -139,7 +140,7 @@ export function DownloadPage() {
           <div className="flex gap-2 ml-auto">
             <button
               className="px-2 py-1 border border-zinc-300 dark:border-zinc-700 rounded bg-transparent text-zinc-500 text-[0.7rem] cursor-pointer transition-colors hover:border-red-500 hover:text-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={clearAllHistory}
+              onClick={removeAllJobs}
               disabled={
                 !isConnected ||
                 !jobs.some(
@@ -171,8 +172,8 @@ export function DownloadPage() {
               <DownloadJobCard
                 key={job.id}
                 job={job}
-                onCancel={() => cancelJob(job.id)}
-                onClear={() => cancelJob(job.id)}
+                onCancel={() => cancelDownload(job.id)}
+                onClear={() => removeJob(job.id)}
                 t={t}
               />
             ))}

@@ -262,6 +262,14 @@ ui:
   token_copied: "Copied!"
   token_usage: "Usage"
   token_invalid_json: "Invalid JSON"
+  # History
+  history: "History"
+  history_title: "Download History"
+  history_empty: "No download history"
+  history_empty_hint: "Completed downloads will appear here"
+  history_clear_all: "Clear All History"
+  history_stats: "Statistics"
+  history_total_downloaded: "Total Downloaded"
 
 # Server messages
 server:

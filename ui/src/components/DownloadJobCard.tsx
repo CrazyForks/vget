@@ -1,5 +1,6 @@
 import clsx from "clsx";
 import { useRef, useEffect, useState } from "react";
+import prettyBytes from "pretty-bytes";
 import type { Job, JobStatus } from "../utils/apis";
 import type { UITranslations } from "../utils/translations";
 
@@ -8,24 +9,6 @@ interface DownloadJobCardProps {
   onCancel: () => void;
   onClear: () => void;
   t: UITranslations;
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
-}
-
-function formatSpeed(bytesPerSecond: number): string {
-  if (bytesPerSecond <= 0) return "0 B/s";
-  const k = 1024;
-  const sizes = ["B/s", "KB/s", "MB/s", "GB/s"];
-  const i = Math.floor(Math.log(bytesPerSecond) / Math.log(k));
-  return (
-    parseFloat((bytesPerSecond / Math.pow(k, i)).toFixed(1)) + " " + sizes[i]
-  );
 }
 
 export function DownloadJobCard({
@@ -153,10 +136,10 @@ export function DownloadJobCard({
             <span className="text-xs text-zinc-400 dark:text-zinc-600 sm:min-w-18 text-left sm:text-right">
               {job.total > 0
                 ? `${job.progress.toFixed(1)}%`
-                : formatBytes(job.downloaded)}
+                : prettyBytes(job.downloaded)}
             </span>
             <span className="text-xs text-zinc-500 dark:text-zinc-500 sm:min-w-20 text-right">
-              {formatSpeed(speed)}
+              {prettyBytes(speed, { bits: false }) + "/s"}
             </span>
           </div>
         </div>

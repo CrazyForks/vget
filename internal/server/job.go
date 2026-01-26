@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -51,6 +52,7 @@ type JobQueue struct {
 	wg            sync.WaitGroup
 	cleanupTicker *time.Ticker
 	stopCleanup   chan struct{}
+	historyDB     *HistoryDB // Optional: for persisting download history
 }
 
 // DownloadFunc is the function signature for downloading a URL
@@ -70,9 +72,15 @@ func NewJobQueue(maxConcurrent int, outputDir string, downloadFn DownloadFunc) *
 		outputDir:     outputDir,
 		downloadFn:    downloadFn,
 		stopCleanup:   make(chan struct{}),
+		historyDB:     nil,
 	}
 
 	return jq
+}
+
+// SetHistoryDB sets the history database for persisting completed downloads
+func (jq *JobQueue) SetHistoryDB(db *HistoryDB) {
+	jq.historyDB = db
 }
 
 // Start begins the worker pool and cleanup routine
@@ -123,10 +131,37 @@ func (jq *JobQueue) processJob(job *Job) {
 		} else {
 			jq.updateJobStatus(job.ID, JobStatusFailed, 0, err.Error())
 		}
+		jq.recordJobToHistory(job.ID)
 		return
 	}
 
 	jq.updateJobStatus(job.ID, JobStatusCompleted, 100, "")
+	jq.recordJobToHistory(job.ID)
+}
+
+// recordJobToHistory saves a completed/failed job to the history database
+func (jq *JobQueue) recordJobToHistory(id string) {
+	if jq.historyDB == nil {
+		return
+	}
+
+	jq.mu.RLock()
+	job, ok := jq.jobs[id]
+	if !ok {
+		jq.mu.RUnlock()
+		return
+	}
+	// Make a copy to avoid holding the lock during DB write
+	jobCopy := *job
+	jq.mu.RUnlock()
+
+	// Only record completed or failed jobs
+	if jobCopy.Status == JobStatusCompleted || jobCopy.Status == JobStatusFailed {
+		if err := jq.historyDB.RecordJob(&jobCopy); err != nil {
+			// Log error but don't fail the job
+			log.Printf("Warning: failed to record job to history: %v", err)
+		}
+	}
 }
 
 func (jq *JobQueue) cleanupLoop() {

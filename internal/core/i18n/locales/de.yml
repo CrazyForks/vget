@@ -250,6 +250,14 @@ ui:
   token_copied: "Kopiert!"
   token_usage: "Verwendung"
   token_invalid_json: "Ungültiges JSON"
+  # Verlauf
+  history: "Verlauf"
+  history_title: "Download-Verlauf"
+  history_empty: "Kein Download-Verlauf"
+  history_empty_hint: "Abgeschlossene Downloads werden hier angezeigt"
+  history_clear_all: "Gesamten Verlauf löschen"
+  history_stats: "Statistiken"
+  history_total_downloaded: "Gesamt heruntergeladen"
 
 # Server-Nachrichten
 server:
