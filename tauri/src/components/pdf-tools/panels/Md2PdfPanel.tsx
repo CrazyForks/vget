@@ -22,6 +22,7 @@ export function Md2PdfPanel({ outputDir, loading, setLoading }: PdfPanelProps) {
   const { t } = useTranslation();
   const [inputFile, setInputFile] = useState("");
   const [pageSize, setPageSize] = useState("A4");
+  const [theme, setTheme] = useState("light");
   const [generatedPdf, setGeneratedPdf] = useState("");
 
   const outputPath = inputFile
@@ -57,7 +58,7 @@ export function Md2PdfPanel({ outputDir, loading, setLoading }: PdfPanelProps) {
       await invoke("md_to_pdf", {
         inputPath: inputFile,
         outputPath,
-        theme: "light",
+        theme,
         pageSize,
       });
       toast.success(t("pdfTools.tools.md2pdf.success"));
@@ -166,6 +167,23 @@ export function Md2PdfPanel({ outputDir, loading, setLoading }: PdfPanelProps) {
           <SelectContent>
             <SelectItem value="A4">A4</SelectItem>
             <SelectItem value="Letter">Letter</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>{t("pdfTools.tools.md2pdf.theme")}</Label>
+        <Select value={theme} onValueChange={setTheme}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="light">
+              {t("pdfTools.tools.md2pdf.themeLight") || "Light (GitHub Style)"}
+            </SelectItem>
+            <SelectItem value="dark">
+              {t("pdfTools.tools.md2pdf.themeDark") || "Dark"}
+            </SelectItem>
           </SelectContent>
         </Select>
       </div>
